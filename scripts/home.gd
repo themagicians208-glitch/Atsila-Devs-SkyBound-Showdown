@@ -167,7 +167,7 @@ func _build_home() -> void:
 	var content := VBoxContainer.new()
 	content.custom_minimum_size = Vector2(520, 0)
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", 18)
 	scroll.add_child(content)

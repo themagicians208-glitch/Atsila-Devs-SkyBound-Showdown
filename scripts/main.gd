@@ -949,6 +949,15 @@ func _process(delta: float) -> void:
 			shift_active = false
 			if is_instance_valid(hud) and is_instance_valid(hud.shift_timer_label):
 				hud.shift_timer_label.visible = false
+	if online:
+		for id in remote_players.keys():
+			var proxy: Node3D = remote_players[id]
+			if not is_instance_valid(proxy):
+				continue
+			var target: Vector3 = proxy.get_meta("net_target", proxy.position)
+			proxy.position = proxy.position.lerp(target, delta * 12.0)
+			var target_rot: float = proxy.get_meta("net_rot", proxy.rotation.y)
+			proxy.rotation.y = lerp_angle(proxy.rotation.y, target_rot, delta * 12.0)
 
 func _shift_dimension() -> void:
 	if not shift_active and dimension_shifts_left > 0:
@@ -1530,19 +1539,6 @@ func _physics_process(_delta: float) -> void:
 		rpc("_recv_transform", id, pos, rot)
 	else:
 		rpc_id(1, "_recv_transform", id, pos, rot)
-
-
-func _process(delta: float) -> void:
-	if not online:
-		return
-	for id in remote_players.keys():
-		var proxy: Node3D = remote_players[id]
-		if not is_instance_valid(proxy):
-			continue
-		var target: Vector3 = proxy.get_meta("net_target", proxy.position)
-		proxy.position = proxy.position.lerp(target, delta * 12.0)
-		var target_rot: float = proxy.get_meta("net_rot", proxy.rotation.y)
-		proxy.rotation.y = lerp_angle(proxy.rotation.y, target_rot, delta * 12.0)
 
 
 @rpc("any_peer", "call_remote", "unreliable")
