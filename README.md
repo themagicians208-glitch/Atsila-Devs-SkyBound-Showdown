@@ -1,7 +1,7 @@
-# ☁️ Skybound Showdown
+# ☁️ SkyBound Showdown
 
 <p align="center">
-  <img src="branding/skybound-banner.svg" alt="Skybound Showdown — six sky-island obstacle courses" width="100%">
+  <img src="branding/skybound-banner.svg" alt="SkyBound Showdown — six sky-island obstacle courses" width="100%">
 </p>
 
 <p align="center">
@@ -94,7 +94,7 @@ Want to share your game outside the editor?
 
 ## 🙌 Credits and licenses
 
-Skybound Showdown builds on **Kenney's Starter Kit 3D Platformer**. See [LICENSE.md](LICENSE.md) for the starter project's MIT license. Included models, sprites, and sound effects retain their original asset credits and licenses; the Lilita font license is in [fonts/license.txt](fonts/license.txt).
+SkyBound Showdown is rebuilt and owned by **Atsila Devs**. It builds on **Kenney's Starter Kit 3D Platformer**. See [LICENSE.md](LICENSE.md) for the project's license. Included models, sprites, and sound effects retain their original asset credits and licenses; the Lilita font license is in [fonts/license.txt](fonts/license.txt).
 
 ---
 
