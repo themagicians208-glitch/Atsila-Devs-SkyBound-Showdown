@@ -15,10 +15,10 @@ var controls_hint: Label
 var objective_hint: Label
 var controls_tween: Tween
 var shift_timer_label: Label
-var controls_tween_shift: Tween
 signal continue_pressed
 signal retry_pressed
 signal menu_pressed
+signal save_pressed
 var death_overlay: ColorRect
 var death_heading: Label
 var death_subtitle: Label
@@ -31,6 +31,7 @@ var pause_retry_button: Button
 var pause_menu_button: Button
 var pause_resume_button: Button
 var pause_save_button: Button
+var pause_status: Label
 
 func _ready() -> void:
 	_build_game_hud()
@@ -57,7 +58,7 @@ func show_finish_message(message: String) -> void:
 	timer.timeout.connect(func(): finish_message.visible = false)
 
 func show_victory(level_number: int, total_levels: int) -> void:
-	victory_heading.text = "ALL 5 LEVELS COMPLETE!" if level_number == total_levels else "LEVEL %d COMPLETE!" % level_number
+	victory_heading.text = ("ALL %d LEVELS COMPLETE!" % total_levels) if level_number == total_levels else "LEVEL %d COMPLETE!" % level_number
 	victory_subtitle.text = "You conquered %s!" % level_heading.text.get_slice("•", 1).strip_edges().capitalize()
 	replay_button.text = "PLAY AGAIN" if level_number == total_levels else "NEXT LEVEL"
 
@@ -113,7 +114,16 @@ func toggle_pause() -> void:
 	get_tree().paused = is_paused
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if is_paused else Input.MOUSE_MODE_CAPTURED
 	if is_paused:
+		if is_instance_valid(pause_status):
+			pause_status.text = ""
 		pause_resume_button.grab_focus()
+
+
+func show_pause_status(text: String) -> void:
+	## Feedback shown inside the pause menu. The normal finish message sits behind
+	## the pause overlay, so save feedback needs its own label.
+	if is_instance_valid(pause_status):
+		pause_status.text = text
 
 func _build_game_hud() -> void:
 	objective_hint = Label.new()
@@ -158,7 +168,7 @@ func _build_game_hud() -> void:
 	add_child(level_heading)
 
 	controls_hint = Label.new()
-	controls_hint.text = "WASD / STICK MOVE   MOUSE / RIGHT STICK LOOK   CLICK / SPACE / A JUMP\nRIGHT CLICK / Q / LB SHIFT   F / Y FREEZE   E / X INTERACT   ESC / B MENU\nF1: SHOW HELP"
+	controls_hint.text = "WASD / STICK MOVE   MOUSE / RIGHT STICK LOOK   CLICK / SPACE / %s JUMP\nRIGHT CLICK / Q / %s SHIFT   F / %s FREEZE   E / %s INTERACT   ESC / %s MENU\nF1: SHOW HELP" % [InputPrompts.glyph("jump"), InputPrompts.glyph("shift_dimension"), InputPrompts.glyph("time_freeze"), InputPrompts.glyph("interact"), InputPrompts.glyph("back")]
 	controls_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	controls_hint.offset_left = -540
@@ -334,8 +344,16 @@ func _build_pause_menu() -> void:
 	layout.add_child(pause_resume_button)
 
 	pause_save_button = _hud_button("SAVE PROGRESS", Color("#2e7d32"), Color.WHITE)
-	pause_save_button.pressed.connect(func(): show_finish_message("Game Saved!"))
+	pause_save_button.pressed.connect(func(): save_pressed.emit())
 	layout.add_child(pause_save_button)
+
+	pause_status = Label.new()
+	pause_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_status.add_theme_font_override("font", UI_FONT)
+	pause_status.add_theme_font_size_override("font_size", 16)
+	pause_status.add_theme_color_override("font_color", Color("#9be86a"))
+	pause_status.text = ""
+	layout.add_child(pause_status)
 
 	pause_retry_button = _hud_button("RESTART", Color("#4a6a8a"), Color.WHITE)
 	pause_retry_button.pressed.connect(func(): retry_pressed.emit())

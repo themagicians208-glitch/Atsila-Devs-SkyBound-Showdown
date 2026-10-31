@@ -20,7 +20,7 @@ func explode():
 		
 	exploded = true
 	
-	Audio.play("res://sounds/break.ogg") # Play sound
+	get_node("/root/Audio").play("res://sounds/break.ogg") # Play sound
 	
 	particles.restart()
 	

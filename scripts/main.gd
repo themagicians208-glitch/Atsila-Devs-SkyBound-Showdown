@@ -54,7 +54,7 @@ var shift_active := false
 func _ready() -> void:
 	Engine.time_scale = 1.0
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	Audio.play_music("res://sounds/itty_bitty.mp3")
+	get_node("/root/Audio").play_music("res://sounds/itty_bitty.mp3")
 	$Sun.light_color = Color("#fff2d6")
 	_ensure_key_action("interact", KEY_E, JOY_BUTTON_X)
 	_ensure_key_action("time_freeze", KEY_F, JOY_BUTTON_Y)
@@ -64,16 +64,33 @@ func _ready() -> void:
 	get_tree().set_meta("level_number", current_level)
 	local_coop = bool(get_tree().get_meta("local_coop", false))
 	online = bool(get_tree().get_meta("online", false))
+	var resuming := bool(get_tree().get_meta("resume_save", false))
+
 	_build_level(current_level)
+
+	# CONTINUE PROGRESS restores the exact spot that was saved on this level.
+	var settings = get_node_or_null("/root/Settings")
+	if resuming and settings and int(settings.get_saved_level()) == current_level:
+		var saved_position: Vector3 = settings.get_saved_position()
+		if saved_position != Vector3.ZERO:
+			player.global_position = saved_position
+			player.rotation.y = settings.get_saved_rotation_y()
+			player.velocity = Vector3.ZERO
+			checkpoint_position = saved_position
+
+	# Remember where this level was entered from. The pause menu can update it.
+	if settings:
+		settings.save_progress(current_level, player.global_position, player.rotation.y)
 	coin_goal = get_tree().get_nodes_in_group("collectible_coins").size()
 	hud.set_coin_goal(coin_goal)
 	hud.set_level_info(current_level, LEVEL_NAMES[current_level - 1])
-	hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
+	hud.show_finish_message("RIGHT CLICK / Q / %s: SHIFT DIMENSION" % InputPrompts.glyph("shift_dimension"))
 	hud.continue_pressed.connect(_on_continue_pressed)
 	player.coin_collected.connect(_on_coin_collected)
 	player.died.connect(_on_player_died.bind(player))
 	hud.retry_pressed.connect(_on_retry_pressed)
 	hud.menu_pressed.connect(_go_to_menu)
+	hud.save_pressed.connect(_on_save_pressed)
 	finish.body_entered.connect(_on_finish_body_entered)
 	_apply_dimension_visibility()
 	hud.show_controls_hint()
@@ -287,11 +304,6 @@ func _wall_count(level_number: int) -> int:
 
 func _sweeper_count(level_number: int) -> int:
 	return [2, 3, 4, 5, 6, 3][level_number - 1]
-
-
-func _switch_count(_level_number: int) -> int:
-	# Every course uses the twin-button puzzle: press both far-apart buttons.
-	return 2
 
 
 func _theme_tint(level_number: int) -> Color:
@@ -863,7 +875,6 @@ func respawn_player(who: CharacterBody3D = null) -> void:
 	target.is_dead = false
 	target.slippery = false
 	target.sticky = false
-	target.external_velocity = Vector3.ZERO
 	target.wind_lift = 0.0
 	target.global_position = checkpoint_position
 	target.velocity = Vector3.ZERO
@@ -1090,25 +1101,6 @@ func _add_map_ring(point: Vector3, radius: float, tint: Color) -> void:
 	world.add_child(ring)
 
 
-func _add_map_column(point: Vector3, height: float, radius: float, tint: Color) -> void:
-	var column := MeshInstance3D.new()
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = radius * 0.74
-	cylinder.bottom_radius = radius
-	cylinder.height = height
-	column.mesh = cylinder
-	column.position = point + Vector3(0, 0.5 + height * 0.5, 0)
-	column.material_override = _map_material(tint)
-	world.add_child(column)
-
-
-func _add_ruin_arch(point: Vector3, width: float, height: float, tint: Color) -> void:
-	var pillar_width := 0.22
-	_add_map_box(point + Vector3(-width * 0.5, height * 0.5, 0), Vector3(pillar_width, height, pillar_width), tint)
-	_add_map_box(point + Vector3(width * 0.5, height * 0.5, 0), Vector3(pillar_width, height, pillar_width), tint)
-	_add_map_box(point + Vector3(0, height, 0), Vector3(width + pillar_width, pillar_width, pillar_width), tint)
-
-
 func _add_crown_spires(point: Vector3) -> void:
 	var gold := _map_material(Color("#ffd667"), true)
 	for offset in [Vector3(-1.45, 0, -0.9), Vector3(-0.5, 0, -1.55), Vector3(0.5, 0, -1.55), Vector3(1.45, 0, -0.9)]:
@@ -1121,16 +1113,6 @@ func _add_crown_spires(point: Vector3) -> void:
 		spire.position = point + offset + Vector3(0, 0.425, 0)
 		spire.material_override = gold
 		world.add_child(spire)
-
-
-func _add_map_box(point: Vector3, size: Vector3, tint: Color) -> void:
-	var visual := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	visual.mesh = box
-	visual.position = point
-	visual.material_override = _map_material(tint)
-	world.add_child(visual)
 
 
 func _map_material(tint: Color, emissive: bool = false) -> StandardMaterial3D:
@@ -1231,11 +1213,24 @@ func _on_finish_body_entered(body: Node3D) -> void:
 		return
 	# Reaching the flag shows the level complete screen.
 	Engine.time_scale = 1.0
+
+	# Record this level as the continue point (restarts at its beginning).
+	get_node("/root/Settings").save_progress(current_level, Vector3.ZERO, player.rotation.y)
+
 	hud.show_victory(current_level, LEVEL_NAMES.size())
 
 
 func _on_continue_pressed() -> void:
 	_go_to_next_level()
+
+
+func _on_save_pressed() -> void:
+	var settings = get_node_or_null("/root/Settings")
+	if settings == null:
+		hud.show_pause_status("Could not save progress.")
+		return
+	settings.save_progress(current_level, player.global_position, player.rotation.y)
+	hud.show_pause_status("Progress saved at Level %d" % current_level)
 
 
 func _go_to_next_level() -> void:

@@ -29,7 +29,9 @@ var brand: Label
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	Audio.play_music("res://sounds/pixelland.mp3")
+	var audio = get_node_or_null("/root/Audio")
+	if audio:
+		audio.play_music("res://sounds/pixelland.mp3")
 	_build_home()
 	_build_popup()
 	_run_entrance_sequence()
@@ -92,6 +94,28 @@ func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
 
 func _on_network_failed() -> void:
 	_online_message("CONNECTION FAILED", "Could not connect.\nCheck the address and that the host is ready.")
+
+func _continue_button_text() -> String:
+	var settings = get_node_or_null("/root/Settings")
+	if settings == null:
+		return "CONTINUE PROGRESS"
+	var saved_level := int(settings.get_saved_level())
+	if saved_level > 1:
+		return "CONTINUE PROGRESS   •   LEVEL %d" % saved_level
+	return "CONTINUE PROGRESS"
+
+
+func _on_continue_pressed() -> void:
+	var settings = get_node_or_null("/root/Settings")
+	if settings == null:
+		_online_message("ERROR", "Settings system not found.")
+		return
+
+	var saved_level := int(settings.get_saved_level())
+	if saved_level > 0:
+		_start_level(clampi(saved_level, 1, LEVEL_NAMES.size()), true)
+	else:
+		_online_message("NO SAVE FOUND", "No progress has been saved yet.\nStart from the beginning!")
 
 func _build_home() -> void:
 	background = TextureRect.new()
@@ -193,6 +217,10 @@ func _build_home() -> void:
 	default_button = play
 	play.pressed.connect(func(): _start_level(1))
 	content.add_child(play)
+
+	var continue_btn := _button(_continue_button_text(), Color("#51c46f"), Color("#1a4d2a"))
+	continue_btn.pressed.connect(_on_continue_pressed)
+	content.add_child(continue_btn)
 
 	var levels := _button("EXPLORE LEVELS", Color("#315784"), Color.WHITE)
 	levels.pressed.connect(_show_level_select)
@@ -304,7 +332,7 @@ func _show_controls() -> void:
 	_back_handler = Callable()
 	popup_title.text = "HOW TO PLAY"
 	_clear_popup_body()
-	for line in ["WASD / LEFT STICK   Move", "MOUSE / RIGHT STICK   Look around", "LEFT CLICK / SPACE / A   Jump", "RIGHT CLICK / Q / LEFT BUMPER   Shift dimensions", "F / Y   Slow time", "E / X   Activate the nearby switch", "MOUSE WHEEL / TRIGGERS   Zoom", "CLICK / A   Select     ESC / B   Back"]:
+	for line in ["WASD / LEFT STICK   Move", "MOUSE / RIGHT STICK   Look around", "LEFT CLICK / SPACE / %s   Jump" % InputPrompts.glyph("jump"), "RIGHT CLICK / Q / %s   Shift dimensions" % InputPrompts.glyph("shift_dimension"), "F / %s   Slow time" % InputPrompts.glyph("time_freeze"), "E / %s   Activate the nearby switch" % InputPrompts.glyph("interact"), "MOUSE WHEEL / TRIGGERS   Zoom", "CLICK / %s   Select     ESC / %s   Back" % [InputPrompts.glyph("jump"), InputPrompts.glyph("back")]]:
 		var row := _label(line, 19, Color.WHITE)
 		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		popup_body.add_child(row)
@@ -329,6 +357,7 @@ func _show_settings() -> void:
 		func(value: float) -> String: return "%d%%" % roundi(value * 100.0),
 		func(value: float) -> void: settings.set_master_volume(value)))
 	popup_body.add_child(_graphics_row(settings))
+	popup_body.add_child(_touch_row(settings))
 	popup.visible = true
 	popup.modulate.a = 0.0
 	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
@@ -369,6 +398,30 @@ func _graphics_row(settings: Node) -> VBoxContainer:
 	options.add_item("HIGH", 2)
 	options.select(int(settings.graphics_quality))
 	options.item_selected.connect(func(index: int) -> void: settings.set_graphics_quality(index))
+	row.add_child(options)
+	return row
+
+
+func _touch_row(settings: Node) -> VBoxContainer:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var label := _label("TOUCH CONTROLS", 18, Color.WHITE)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(label)
+	var options := OptionButton.new()
+	options.custom_minimum_size = Vector2(440, 38)
+	options.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	options.add_theme_font_override("font", UI_FONT)
+	options.add_theme_font_size_override("font_size", 18)
+	options.add_item("AUTO", 0)
+	options.add_item("ON", 1)
+	options.add_item("OFF", 2)
+	match str(settings.touch_controls_mode):
+		"on": options.select(1)
+		"off": options.select(2)
+		_: options.select(0)
+	options.item_selected.connect(func(index: int) -> void:
+		settings.set_touch_controls_mode(["auto", "on", "off"][index]))
 	row.add_child(options)
 	return row
 
@@ -643,6 +696,7 @@ func _online_start_host() -> void:
 		network.start_game(1)
 	get_tree().set_meta("online", true)
 	get_tree().set_meta("local_coop", false)
+	get_tree().set_meta("resume_save", false)
 	get_tree().set_meta("level_number", 1)
 	get_tree().paused = false
 	Engine.time_scale = 1.0
@@ -667,6 +721,7 @@ func _online_join(code: String) -> void:
 
 func _start_local(level_number: int) -> void:
 	get_tree().set_meta("local_coop", true)
+	get_tree().set_meta("resume_save", false)
 	get_tree().set_meta("local_p1_device", p1_device)
 	get_tree().set_meta("local_p2_device", p2_device)
 	get_tree().set_meta("local_p1_name", _clean_name(p1_name, "Player 1"))
@@ -674,8 +729,9 @@ func _start_local(level_number: int) -> void:
 	_begin_level(level_number)
 
 
-func _start_level(level_number: int) -> void:
+func _start_level(level_number: int, resume: bool = false) -> void:
 	get_tree().set_meta("local_coop", false)
+	get_tree().set_meta("resume_save", resume)
 	_begin_level(level_number)
 
 
@@ -751,21 +807,6 @@ func _multiplayer_button() -> Button:
 	button.add_theme_constant_override("h_separation", 12)
 	button.pressed.connect(_show_multiplayer)
 	return button
-
-
-func _glow_style(color: Color, border: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = border
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(16)
-	style.shadow_color = Color(border.r, border.g, border.b, 0.5)
-	style.shadow_size = 8
-	style.content_margin_left = 22
-	style.content_margin_right = 22
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	return style
 
 
 func _panel_style(color: Color, border: Color) -> StyleBoxFlat:

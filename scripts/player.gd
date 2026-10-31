@@ -55,7 +55,6 @@ var model_rest_position := Vector3.ZERO
 # Surface / gimmick state (set by zones in level 6)
 var slippery := false                  # ice / oil slick: little traction
 var sticky := false                    # velcro: kills horizontal momentum
-var external_velocity := Vector3.ZERO  # conveyor push (log rollers, slides)
 var wind_lift := 0.0                   # fan tunnel updraft
 
 @onready var particles_trail = $ParticlesTrail
@@ -157,8 +156,6 @@ func _physics_process(delta):
 	var control := 3.0 if slippery else 10.0
 	applied_velocity = velocity.lerp(movement_velocity, delta * control)
 	applied_velocity.y = -gravity
-	applied_velocity.x += external_velocity.x
-	applied_velocity.z += external_velocity.z
 	if sticky:
 		applied_velocity.x = 0.0
 		applied_velocity.z = 0.0
@@ -188,7 +185,7 @@ func _physics_process(delta):
 
 	if is_on_floor() and gravity > 2 and !previously_floored:
 		model.scale = Vector3(1.25, 0.75, 1.25)
-		Audio.play("res://sounds/land.ogg")
+		get_node("/root/Audio").play("res://sounds/land.ogg")
 
 	previously_floored = is_on_floor()
 
@@ -275,7 +272,7 @@ func handle_gravity(delta):
 
 func jump():
 
-	Audio.play("res://sounds/jump.ogg")
+	get_node("/root/Audio").play("res://sounds/jump.ogg")
 
 	gravity = -jump_strength
 
@@ -288,7 +285,7 @@ func cloud_bounce() -> void:
 	gravity = -9.5
 	jumps_remaining = 2
 	model.scale = Vector3(0.75, 1.3, 0.75)
-	Audio.play("res://sounds/jump.ogg")
+	get_node("/root/Audio").play("res://sounds/jump.ogg")
 
 
 # Gimmick surfaces (level 6)
@@ -297,7 +294,7 @@ func bounce(strength: float) -> void:
 	gravity = -strength
 	jumps_remaining = 2
 	model.scale = Vector3(0.7, 1.4, 0.7)
-	Audio.play("res://sounds/jump.ogg")
+	get_node("/root/Audio").play("res://sounds/jump.ogg")
 
 
 func set_slippery(enabled: bool) -> void:
@@ -313,10 +310,6 @@ func set_sticky(enabled: bool) -> void:
 		movement_velocity.z = 0.0
 
 
-func set_conveyor(push: Vector3) -> void:
-	external_velocity = push
-
-
 func set_wind(lift: float) -> void:
 	wind_lift = lift
 
@@ -326,7 +319,7 @@ func _start_dash() -> void:
 	is_dashing = true
 	dash_time_left = dash_duration
 	dash_bob = 0.0
-	Audio.play("res://sounds/jump.ogg")
+	get_node("/root/Audio").play("res://sounds/jump.ogg")
 
 
 func _end_dash() -> void:

@@ -34,7 +34,13 @@ func play(sound_path): queue.append(sound_path)
 func play_music(sound_path: String) -> void:
 	if music_player.playing and music_player.stream and music_player.stream.resource_path == sound_path:
 		return
-	music_player.stream = load(sound_path)
+
+	var stream = load(sound_path)
+	if stream == null:
+		print("Audio Error: Could not load music file at %s" % sound_path)
+		return
+
+	music_player.stream = stream
 	if music_player.stream is AudioStreamMP3 or music_player.stream is AudioStreamOggVorbis:
 		music_player.stream.loop = true
 	music_player.play()

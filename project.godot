@@ -26,9 +26,10 @@ config/icon="res://branding/skybound-icon.svg"
 
 [autoload]
 
-Audio="*res://scripts/audio.gd"
-Settings="*res://scripts/settings.gd"
-Network="*res://scripts/network.gd"
+Audio="res://scripts/audio.gd"
+Settings="res://scripts/settings.gd"
+Network="res://scripts/network.gd"
+TouchControls="*res://scripts/touch_controls.gd"
 
 [display]
 

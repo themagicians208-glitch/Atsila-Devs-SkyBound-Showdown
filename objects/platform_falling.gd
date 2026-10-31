@@ -17,7 +17,7 @@ func _physics_process(delta):
 
 func _on_body_entered(_body):
 	if !falling:
-		Audio.play("res://sounds/fall.ogg") # Play sound
+		get_node("/root/Audio").play("res://sounds/fall.ogg") # Play sound
 		scale = Vector3(1.25, 1, 1.25) # Animate scale
 		
 	falling = true

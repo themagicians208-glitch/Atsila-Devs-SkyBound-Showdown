@@ -84,3 +84,12 @@ func _input(event: InputEvent) -> void:
 			zoom = clampf(zoom + 1.0, zoom_maximum, zoom_minimum)
 		elif event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func add_look(delta: Vector2) -> void:
+	## Called by the on-screen touch controls to turn the camera.
+	var sensitivity: float = mouse_sensitivity
+	if settings:
+		sensitivity = settings.mouse_sensitivity
+	camera_rotation.y -= delta.x * sensitivity
+	camera_rotation.x = clampf(camera_rotation.x - delta.y * sensitivity, -80.0, -10.0)
