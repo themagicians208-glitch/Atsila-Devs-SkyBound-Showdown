@@ -10,9 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="#-the-adventure">The Adventure</a> ·
-  <a href="#️-choose-your-course">Six Courses</a> ·
-  <a href="#-controls">Controls</a> ·
+  <a href="#-the-adventure">The Adventure</a> · 
+  <a href="#️-multiplayer">Multiplayer</a> · 
+  <a href="#️-choose-your-course">Six Courses</a> · 
+  <a href="#-controls">Controls</a> · 
   <a href="#-run-the-game">Get Started</a>
 </p>
 
@@ -44,6 +45,16 @@ Leap across floating islands, hunt down every coin, activate switches, and race 
   <img src="screenshots/screenshot1.jpg" width="45%" />
   <img src="screenshots/screenshot2.jpg" width="45%" />
 </p>
+
+## 👥 Multiplayer
+
+Race against your friends or tackle the courses together.
+
+- 📺 **Local Co-op** — split-screen action for two players on one machine. Full support for dual controllers or shared keyboard.
+- 🌐 **Online Co-op** — join a room via IP address and hop through dimensions with friends over the network.
+- 🛡️ **Secure Networking** — hardened RPC system to prevent spoofing and ensure a fair race.
+
+---
 
 ## 🏝️ Choose your course
 
