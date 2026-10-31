@@ -36,6 +36,7 @@ Leap across floating islands, hunt down every coin, activate switches, and race 
 - 🎢 **Take on the Gauntlet** — balance on see-saws, cross rotating logs, handle slippery and sticky zones, ride bounce pads and fan tunnels, slide down ramps, and avoid rolling barrels.
 - 💛 **Use checkpoints** — reach checkpoint beacons to save your respawn point.
 - 🚩 **Solve and finish** — activate the switches, open the gates, and reach the flag.
+- 💾 **Continue your journey** — resume exactly where you left off with the new progress system.
 
 ## 📸 Gallery
 
