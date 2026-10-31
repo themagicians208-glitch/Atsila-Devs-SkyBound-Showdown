@@ -1543,6 +1543,17 @@ func _physics_process(_delta: float) -> void:
 
 @rpc("any_peer", "call_remote", "unreliable")
 func _recv_transform(id: int, net_position: Vector3, net_rotation_y: float) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+
+	# Server: only accept if the supplied ID matches the actual sender.
+	# Clients: only accept if the message comes from the server (peer 1).
+	if multiplayer.is_server():
+		if sender_id != id:
+			return
+	else:
+		if sender_id != 1:
+			return
+
 	var proxy: Node3D = remote_players.get(id)
 	if proxy != null and is_instance_valid(proxy):
 		proxy.set_meta("net_target", net_position)

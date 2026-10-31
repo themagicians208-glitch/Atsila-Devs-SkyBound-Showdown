@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Six courses. Two dimensions. One sky-high showdown.</strong><br>
-  A single-player 3D platform adventure made with Godot 4.7.
+  A 3D platform adventure with local and online multiplayer, made with Godot 4.7.
 </p>
 
 <p align="center">

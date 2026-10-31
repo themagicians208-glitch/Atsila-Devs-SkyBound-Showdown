@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="SkyBound Showdown"
-config/description="A five-course dimension-shifting platform adventure with keyboard, mouse, and controller support."
+config/description="A six-course dimension-shifting platform adventure with keyboard, mouse, and controller support."
 config/version="1.0.0"
 config/tags=PackedStringArray("platformer", "puzzle", "sky-island", "time-freeze", "anti-gravity")
 run/main_scene="res://scenes/home.tscn"

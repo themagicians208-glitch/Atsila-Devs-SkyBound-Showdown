@@ -110,6 +110,7 @@ func _on_connected_to_server() -> void:
 
 
 func _on_connection_failed() -> void:
+	close()
 	connection_failed.emit()
 
 
@@ -120,6 +121,15 @@ func _on_server_disconnected() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _register_name(id: int, player_name: String) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+
+	if multiplayer.is_server():
+		if sender_id != id:
+			return
+	else:
+		if sender_id != 1:
+			return
+
 	player_names[id] = player_name
 	peer_list_changed.emit()
 	# The host relays names so every client learns every player's name.
