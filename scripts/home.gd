@@ -744,21 +744,11 @@ func _button(text: String, color: Color, text_color: Color) -> Button:
 	return button
 
 func _multiplayer_button() -> Button:
-	var button := Button.new()
-	button.text = "MULTIPLAYER LOBBY"
+	var button := _button("MULTIPLAYER", Color("#315784"), Color.WHITE)
 	button.icon = preload("res://assets/generated/icon_people.png")
 	button.expand_icon = true
-	button.custom_minimum_size = Vector2(390, 48)
-	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 21)
-	button.add_theme_constant_override("icon_max_width", 28)
-	button.add_theme_constant_override("h_separation", 14)
-	button.add_theme_color_override("font_color", Color("#dff3ff"))
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_stylebox_override("normal", _glow_style(Color("#101d38"), Color("#3fb6ff")))
-	button.add_theme_stylebox_override("hover", _glow_style(Color("#182c50"), Color("#8fe0ff")))
-	button.add_theme_stylebox_override("pressed", _glow_style(Color("#0b1428"), Color("#8fe0ff")))
-	button.add_theme_stylebox_override("focus", _glow_style(Color("#101d38"), Color("#c9f0ff")))
+	button.add_theme_constant_override("icon_max_width", 24)
+	button.add_theme_constant_override("h_separation", 12)
 	button.pressed.connect(_show_multiplayer)
 	return button
 
