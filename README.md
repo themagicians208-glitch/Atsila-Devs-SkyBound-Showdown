@@ -94,7 +94,7 @@ Want to share your game outside the editor?
 
 ## 🙌 Credits and licenses
 
-SkyBound Showdown is rebuilt and owned by **Atsila Devs**. It builds on **Kenney's Starter Kit 3D Platformer**. See [LICENSE.md](LICENSE.md) for the project's license. Included models, sprites, and sound effects retain their original asset credits and licenses; the Lilita font license is in [fonts/license.txt](fonts/license.txt).
+SkyBound Showdown is rebuilt and owned by **Atsila Devs**. See [LICENSE.md](LICENSE.md) for the project's license. Included models, sprites, and sound effects retain their original asset credits and licenses; the Lilita font license is in [fonts/license.txt](fonts/license.txt).
 
 ---
 
