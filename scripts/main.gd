@@ -45,6 +45,10 @@ var coins_collected := 0
 # Online co-op (ENet)
 var online := false
 var remote_players: Dictionary = {}
+# Dimension shift constraints
+var dimension_shifts_left := 2
+var shift_timer := 0.0
+var shift_active := false
 
 
 func _ready() -> void:
@@ -926,11 +930,45 @@ func _set_phase_active(root: Node, active: bool) -> void:
 			collision_object.collision_mask = 0
 
 
+func _process(delta: float) -> void:
+	if shift_active:
+		shift_timer -= delta
+		if shift_timer > 0:
+			# Update the HUD timer label
+			if is_instance_valid(hud) and is_instance_valid(hud.shift_timer_label):
+				hud.shift_timer_label.visible = true
+				hud.shift_timer_label.text = "SHIFT ENDS IN: %.1fs" % shift_timer
+		else:
+			# FORCE shift back to material dimension
+			mirror_dimension = false
+			_apply_dimension_visibility()
+			$Sun.light_color = Color("#fff2d6")
+			if is_instance_valid(hud):
+				hud.show_finish_message("MATERIAL DIMENSION")
+
+			shift_active = false
+			if is_instance_valid(hud) and is_instance_valid(hud.shift_timer_label):
+				hud.shift_timer_label.visible = false
+
 func _shift_dimension() -> void:
-	mirror_dimension = not mirror_dimension
-	_apply_dimension_visibility()
-	$Sun.light_color = Color("#a7eaff") if mirror_dimension else Color("#fff2d6")
-	hud.show_finish_message("MIRROR DIMENSION" if mirror_dimension else "MATERIAL DIMENSION")
+	if not shift_active and dimension_shifts_left > 0:
+		mirror_dimension = not mirror_dimension
+		_apply_dimension_visibility()
+		$Sun.light_color = Color("#a7eaff") if mirror_dimension else Color("#fff2d6")
+		hud.show_finish_message("MIRROR DIMENSION" if mirror_dimension else "MATERIAL DIMENSION")
+
+		# Start the timer if we shifted into Mirror
+		if mirror_dimension:
+			shift_active = true
+			shift_timer = 5.0
+			dimension_shifts_left -= 1
+	elif shift_active and not mirror_dimension:
+		# Allow shifting back manually before timer ends
+		mirror_dimension = false
+		_apply_dimension_visibility()
+		$Sun.light_color = Color("#fff2d6")
+		hud.show_finish_message("MATERIAL DIMENSION")
+		shift_active = false
 
 
 func _build_level_identity(level_number: int, route: Array) -> void:
@@ -1117,7 +1155,7 @@ func _get_level_routes() -> Array:
 
 func _serpentine_route(rows: int, columns: int, step: float, rise: float) -> Array:
 	var route: Array = []
-	var row_gap := 2.4
+	var row_gap := 4.0
 	var index := 0
 	for row in range(rows):
 		var z := float(row) * row_gap
@@ -1166,7 +1204,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_shift_dimension()
 			return
 	if event.is_action_pressed("ui_cancel") and not get_tree().paused:
-		_go_to_menu()
+		hud.toggle_pause()
 		return
 	if event.is_action_pressed("interact") and not puzzle_solved:
 		_try_press_switch()

@@ -14,6 +14,8 @@ var replay_button: Button
 var controls_hint: Label
 var objective_hint: Label
 var controls_tween: Tween
+var shift_timer_label: Label
+var controls_tween_shift: Tween
 signal continue_pressed
 signal retry_pressed
 signal menu_pressed
@@ -23,10 +25,18 @@ var death_subtitle: Label
 var retry_button: Button
 var menu_button: Button
 
+var pause_overlay: ColorRect
+var pause_heading: Label
+var pause_retry_button: Button
+var pause_menu_button: Button
+var pause_resume_button: Button
+var pause_save_button: Button
+
 func _ready() -> void:
 	_build_game_hud()
 	_build_victory_overlay()
 	_build_death_overlay()
+	_build_pause_menu()
 	_update_coin_counter(0)
 
 func set_coin_goal(amount: int) -> void:
@@ -39,6 +49,10 @@ func _on_coin_collected(coins):
 func show_finish_message(message: String) -> void:
 	finish_message.text = message
 	finish_message.visible = true
+	finish_message.scale = Vector2(0.5, 0.5)
+	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(finish_message, "scale", Vector2(1.0, 1.0), 0.4)
+
 	var timer := get_tree().create_timer(2.5)
 	timer.timeout.connect(func(): finish_message.visible = false)
 
@@ -46,13 +60,18 @@ func show_victory(level_number: int, total_levels: int) -> void:
 	victory_heading.text = "ALL 5 LEVELS COMPLETE!" if level_number == total_levels else "LEVEL %d COMPLETE!" % level_number
 	victory_subtitle.text = "You conquered %s!" % level_heading.text.get_slice("•", 1).strip_edges().capitalize()
 	replay_button.text = "PLAY AGAIN" if level_number == total_levels else "NEXT LEVEL"
+
 	victory_overlay.visible = true
+	victory_overlay.modulate.a = 1.0
+
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	replay_button.grab_focus()
 	get_tree().paused = true
 
 func show_death() -> void:
 	death_overlay.visible = true
+	death_overlay.modulate.a = 1.0
+
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	retry_button.grab_focus()
 	get_tree().paused = true
@@ -81,9 +100,20 @@ func show_controls_hint() -> void:
 		objective_hint.visible = false
 	)
 
-func _update_coin_counter(coins: int) -> void:	
+func _update_coin_counter(coins: int) -> void:
 	if is_instance_valid(coins_label):
-		coins_label.text = "%d / %02d" % [coins, coin_goal]
+		coins_label.text = "🪙 %d / %02d" % [coins, coin_goal]
+		var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		coins_label.scale = Vector2(1.2, 1.2)
+		tween.tween_property(coins_label, "scale", Vector2(1.0, 1.0), 0.2)
+
+func toggle_pause() -> void:
+	var is_paused = !pause_overlay.visible
+	pause_overlay.visible = is_paused
+	get_tree().paused = is_paused
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if is_paused else Input.MOUSE_MODE_CAPTURED
+	if is_paused:
+		pause_resume_button.grab_focus()
 
 func _build_game_hud() -> void:
 	objective_hint = Label.new()
@@ -101,6 +131,19 @@ func _build_game_hud() -> void:
 	objective_hint.add_theme_constant_override("shadow_offset_x", 2)
 	objective_hint.add_theme_constant_override("shadow_offset_y", 3)
 	add_child(objective_hint)
+
+	shift_timer_label = Label.new()
+	shift_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shift_timer_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	shift_timer_label.offset_left = -200
+	shift_timer_label.offset_top = 66
+	shift_timer_label.offset_right = 200
+	shift_timer_label.offset_bottom = 100
+	shift_timer_label.add_theme_font_override("font", UI_FONT)
+	shift_timer_label.add_theme_font_size_override("font_size", 28)
+	shift_timer_label.add_theme_color_override("font_color", Color("#ff6b8a"))
+	shift_timer_label.visible = false
+	add_child(shift_timer_label)
 
 	level_heading = Label.new()
 	level_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -254,6 +297,53 @@ func _build_death_overlay() -> void:
 	menu_button = _hud_button("MAIN MENU", Color("#315784"), Color.WHITE)
 	menu_button.pressed.connect(func(): menu_pressed.emit())
 	button_row.add_child(menu_button)
+
+func _build_pause_menu() -> void:
+	pause_overlay = ColorRect.new()
+	pause_overlay.color = Color(0, 0, 0, 0.6)
+	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	pause_overlay.visible = false
+	add_child(pause_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(400, 350)
+	panel.add_theme_stylebox_override("panel", _hud_panel_style(Color("#1a2a3a"), Color("#8ce7ff")))
+	center.add_child(panel)
+
+	var layout := VBoxContainer.new()
+	layout.alignment = BoxContainer.ALIGNMENT_CENTER
+	layout.add_theme_constant_override("separation", 12)
+	panel.add_child(layout)
+
+	pause_heading = Label.new()
+	pause_heading.text = "GAME PAUSED"
+	pause_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_heading.add_theme_font_override("font", UI_FONT)
+	pause_heading.add_theme_font_size_override("font_size", 36)
+	pause_heading.add_theme_color_override("font_color", Color("#8ce7ff"))
+	layout.add_child(pause_heading)
+
+	pause_resume_button = _hud_button("RESUME", Color("#315784"), Color.WHITE)
+	pause_resume_button.pressed.connect(func(): toggle_pause())
+	layout.add_child(pause_resume_button)
+
+	pause_save_button = _hud_button("SAVE PROGRESS", Color("#2e7d32"), Color.WHITE)
+	pause_save_button.pressed.connect(func(): show_finish_message("Game Saved!"))
+	layout.add_child(pause_save_button)
+
+	pause_retry_button = _hud_button("RESTART", Color("#4a6a8a"), Color.WHITE)
+	pause_retry_button.pressed.connect(func(): retry_pressed.emit())
+	layout.add_child(pause_retry_button)
+
+	pause_menu_button = _hud_button("MAIN MENU", Color("#263e64"), Color("#d6e6ff") )
+	pause_menu_button.pressed.connect(func(): menu_pressed.emit())
+	layout.add_child(pause_menu_button)
 
 func _hud_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

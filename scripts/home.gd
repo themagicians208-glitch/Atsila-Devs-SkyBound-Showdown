@@ -21,13 +21,18 @@ var _showing_input_setup := false
 # What the popup's single BACK button does on the current screen. When invalid,
 # BACK closes the popup back to the main menu.
 var _back_handler: Callable = Callable()
-
+# Parallax references
+var background: TextureRect
+var shade: ColorRect
+var margin: MarginContainer
+var brand: Label
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Audio.play_music("res://sounds/pixelland.mp3")
 	_build_home()
 	_build_popup()
+	_run_entrance_sequence()
 	# The game can start without window focus when launched from the editor,
 	# and grab_focus() is unreliable inside _ready — so grab the window focus and
 	# set the button focus deferred.
@@ -40,6 +45,35 @@ func _ready() -> void:
 	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
+func _run_entrance_sequence() -> void:
+	background.modulate.a = 0.0
+	shade.modulate.a = 0.0
+	var bg_tween = create_tween().set_parallel(true)
+	bg_tween.tween_property(background, "modulate:a", 1.0, 1.0)
+	bg_tween.tween_property(shade, "modulate:a", 0.38, 1.0)
+	var columns = margin.get_child(0)
+	var content = columns.get_child(0).get_child(0)
+	for child in content.get_children():
+		child.modulate.a = 0.0
+	var seq = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	for i in range(content.get_child_count()):
+		seq.parallel().tween_property(content.get_child(i), "modulate:a", 1.0, 0.5).set_delay(0.3 + (i * 0.1))
+	brand.modulate.a = 0.0
+	create_tween().tween_property(brand, "modulate:a", 1.0, 0.8).set_delay(0.3)
+	var feature_card = columns.get_child(1)
+	feature_card.modulate.a = 0.0
+	feature_card.scale = Vector2(0.9, 0.9)
+	var ftween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	ftween.tween_property(feature_card, "modulate:a", 1.0, 0.8).set_delay(1.0)
+	ftween.parallel().tween_property(feature_card, "scale", Vector2(1.0, 1.0), 0.8).set_delay(1.0)
+
+func _process(_delta: float) -> void:
+	var mouse_pos = get_viewport().get_mouse_position()
+	var screen_size = get_viewport().get_visible_rect().size
+	var target_offset = (mouse_pos / screen_size - Vector2(0.5, 0.5)) * 20.0
+	background.position = background.position.lerp(-target_offset, 0.1)
+	shade.position = shade.position.lerp(-target_offset * 0.5, 0.1)
+	margin.position = margin.position.lerp(target_offset, 0.1)
 
 func _exit_tree() -> void:
 	var network := get_node_or_null("/root/Network")
@@ -60,20 +94,54 @@ func _on_network_failed() -> void:
 	_online_message("CONNECTION FAILED", "Could not connect.\nCheck the address and that the host is ready.")
 
 func _build_home() -> void:
-	var background := TextureRect.new()
+	background = TextureRect.new()
+	background.name = "Background"
 	background.texture = preload("res://sprites/skybox.png")
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_SCALE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.offset_left = -50
+	background.offset_top = -50
+	background.offset_right = 50
+	background.offset_bottom = 50
 	add_child(background)
 
-	var shade := ColorRect.new()
+	shade = ColorRect.new()
+	shade.name = "Shade"
 	shade.color = Color(0.035, 0.075, 0.17, 0.38)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 
-	var margin := MarginContainer.new()
+	brand = _label("SkyBound\nShowdown", 38, Color("#fff1a3"))
+	brand.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	brand.offset_left = 34
+	brand.offset_top = 24
+	brand.offset_right = 300
+	brand.offset_bottom = 112
+	brand.add_theme_color_override("font_shadow_color", Color(0.05, 0.08, 0.2, 0.9))
+	brand.add_theme_constant_override("shadow_offset_x", 3)
+	brand.add_theme_constant_override("shadow_offset_y", 4)
+	add_child(brand)
+	var brand_line := ColorRect.new()
+	brand_line.color = Color("#6fe7ef")
+	brand_line.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	brand_line.offset_left = 36
+	brand_line.offset_top = 112
+	brand_line.offset_right = 190
+	brand_line.offset_bottom = 115
+	brand_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(brand_line)
+	var brand_kicker := _label("DIMENSION HOPPER", 12, Color("#a6f4ff"))
+	brand_kicker.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	brand_kicker.offset_left = 36
+	brand_kicker.offset_top = 120
+	brand_kicker.offset_right = 220
+	brand_kicker.offset_bottom = 142
+	add_child(brand_kicker)
+
+	margin = MarginContainer.new()
+	margin.name = "MainMargin"
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 86)
 	margin.add_theme_constant_override("margin_right", 86)
@@ -84,6 +152,9 @@ func _build_home() -> void:
 	var columns := HBoxContainer.new()
 	columns.alignment = BoxContainer.ALIGNMENT_CENTER
 	columns.add_theme_constant_override("separation", 68)
+	# Ensure columns doesn't squash children
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(columns)
 
 	var scroll := ScrollContainer.new()
@@ -94,35 +165,36 @@ func _build_home() -> void:
 	columns.add_child(scroll)
 
 	var content := VBoxContainer.new()
-	content.custom_minimum_size.x = 520
+	content.custom_minimum_size = Vector2(520, 0)
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 14)
+	content.add_theme_constant_override("separation", 18)
 	scroll.add_child(content)
 
-	var tag := _label("A SIX-LEVEL DIMENSION-HOPPING ADVENTURE", 18, Color("#a6f4ff"))
+	var tag := _label("A SKY-HOPPING ADVENTURE ACROSS SIX WILDS", 18, Color("#a6f4ff"))
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(tag)
 
-	var title := _label("SKYBOUND\nSHOWDOWN", 68, Color("#fff1a3"))
-	title.add_theme_color_override("font_shadow_color", Color(0.05, 0.08, 0.2, 0.8))
-	title.add_theme_constant_override("shadow_offset_x", 3)
-	title.add_theme_constant_override("shadow_offset_y", 5)
-	content.add_child(title)
-
-	var subtitle := _label("Shift dimensions. Reveal the route.\nCan you reach the crown?", 23, Color.WHITE)
+	var subtitle := _label("Bend gravity. Outsmart the impossible.\nThe sky is waiting.", 23, Color.WHITE)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.45))
 	content.add_child(subtitle)
 
+	var menu_hint := _label("READY TO MAKE YOUR MOVE?", 14, Color("#c7f0b9"))
+	menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(menu_hint)
+
 	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 8
+	spacer.custom_minimum_size.y = 2
 	content.add_child(spacer)
 
-	var play := _button("START ADVENTURE", Color("#ffd451"), Color("#493600"))
+	var play := _button("PLAY NOW", Color("#ffd451"), Color("#493600"))
 	default_button = play
 	play.pressed.connect(func(): _start_level(1))
 	content.add_child(play)
 
-	var levels := _button("CHOOSE A LEVEL", Color("#315784"), Color.WHITE)
+	var levels := _button("EXPLORE LEVELS", Color("#315784"), Color.WHITE)
 	levels.pressed.connect(_show_level_select)
 	content.add_child(levels)
 
@@ -133,36 +205,43 @@ func _build_home() -> void:
 	controls.pressed.connect(_show_controls)
 	content.add_child(controls)
 
-	var settings := _button("SETTINGS", Color("#315784"), Color.WHITE)
+	var settings := _button("OPTIONS", Color("#315784"), Color.WHITE)
 	settings.pressed.connect(_show_settings)
 	content.add_child(settings)
 
-	var quit := _button("QUIT GAME", Color("#263e64"), Color("#d6e6ff"))
+	var quit := _button("EXIT TO DESKTOP", Color("#263e64"), Color("#d6e6ff"))
 	quit.pressed.connect(func(): get_tree().quit())
 	content.add_child(quit)
 
 	var feature_card := PanelContainer.new()
-	feature_card.custom_minimum_size = Vector2(350, 340)
+	feature_card.custom_minimum_size = Vector2(350, 320)
 	feature_card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	feature_card.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.11, 0.24, 0.82), Color("#6fe7ef")))
+	feature_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var feature_style := _panel_style(Color(0.04, 0.11, 0.24, 0.72), Color("#6fe7ef"))
+	feature_style.shadow_color = Color(0.02, 0.05, 0.12, 0.45)
+	feature_style.shadow_size = 18
+	feature_style.shadow_offset = Vector2(0, 8)
+	feature_card.add_theme_stylebox_override("panel", feature_style)
 	columns.add_child(feature_card)
 	var feature_list := VBoxContainer.new()
 	feature_list.alignment = BoxContainer.ALIGNMENT_CENTER
 	feature_list.add_theme_constant_override("separation", 17)
 	feature_card.add_child(feature_list)
-	feature_list.add_child(_label("THE SKY IS YOURS", 28, Color("#ffe078")))
-	feature_list.add_child(_label("6 unique obstacle courses", 20, Color.WHITE))
-	feature_list.add_child(_label("Shift between two dimensions", 20, Color.WHITE))
-	feature_list.add_child(_label("Freeze time to beat hazards", 20, Color.WHITE))
-	feature_list.add_child(_label("Float through anti-gravity", 20, Color.WHITE))
-	feature_list.add_child(_label("Find switches to open the way", 20, Color.WHITE))
-	feature_list.add_child(_label("Ice, see-saws, barrels, fans & more", 17, Color("#c7f0b9")))
+	feature_list.add_child(_label("WHY YOU'LL LOVE THE SKY", 28, Color("#ffe078")))
+	feature_list.add_child(_label("6 wild courses to master", 20, Color.WHITE))
+	feature_list.add_child(_label("Flip between dimensions", 20, Color.WHITE))
+	feature_list.add_child(_label("Freeze time. Change everything.", 20, Color.WHITE))
+	feature_list.add_child(_label("Ride the anti-gravity current", 20, Color.WHITE))
+	feature_list.add_child(_label("Crack switches. Open new paths", 20, Color.WHITE))
+	feature_list.add_child(_label("Ice, fans, barrels & surprises", 17, Color("#c7f0b9")))
+	for child in feature_list.get_children():
+		child.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	var footer := _label("WASD / LEFT STICK MOVE     MOUSE / RIGHT STICK LOOK     CLICK / SPACE / A JUMP", 15, Color("#eff8ff"))
+	var footer := _label("v1.0  •  Atsila Devs", 14, Color("#eff8ff"))
 	footer.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	footer.offset_left = -500
-	footer.offset_top = -34
-	footer.offset_right = 500
+	footer.offset_left = -100
+	footer.offset_top = -24
+	footer.offset_right = 100
 	footer.offset_bottom = -8
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(footer)
@@ -207,14 +286,17 @@ func _on_back_pressed() -> void:
 
 func _show_level_select() -> void:
 	_back_handler = Callable()
-	popup_title.text = "CHOOSE YOUR COURSE"
+	popup_title.text = "PICK YOUR COURSE"
 	_clear_popup_body()
 	for i in range(LEVEL_NAMES.size()):
 		var level_number := i + 1
 		var level_button := _button("LEVEL %d   •   %s" % [level_number, LEVEL_NAMES[i].to_upper()], Color("#27496f"), Color.WHITE)
 		level_button.pressed.connect(_start_level.bind(level_number))
 		popup_body.add_child(level_button)
+
 	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
 	if popup_body.get_child_count() > 0:
 		(popup_body.get_child(0) as Control).grab_focus()
 
@@ -227,8 +309,9 @@ func _show_controls() -> void:
 		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		popup_body.add_child(row)
 	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
 	back_button.grab_focus()
-
 
 func _show_settings() -> void:
 	var settings := get_node_or_null("/root/Settings")
@@ -247,8 +330,9 @@ func _show_settings() -> void:
 		func(value: float) -> void: settings.set_master_volume(value)))
 	popup_body.add_child(_graphics_row(settings))
 	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
 	back_button.grab_focus()
-
 
 func _slider_row(caption: String, min_value: float, max_value: float, step: float, value: float, formatter: Callable, on_change: Callable) -> VBoxContainer:
 	var row := VBoxContainer.new()
@@ -269,7 +353,6 @@ func _slider_row(caption: String, min_value: float, max_value: float, step: floa
 	row.add_child(slider)
 	return row
 
-
 func _graphics_row(settings: Node) -> VBoxContainer:
 	var row := VBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -289,11 +372,9 @@ func _graphics_row(settings: Node) -> VBoxContainer:
 	row.add_child(options)
 	return row
 
-
 func _unhandled_input(event: InputEvent) -> void:
 	if popup.visible and event.is_action_pressed("ui_cancel"):
 		_close_popup()
-
 
 # --- Multiplayer lobby -------------------------------------------------------
 
@@ -607,7 +688,9 @@ func _begin_level(level_number: int) -> void:
 
 func _close_popup() -> void:
 	_back_handler = Callable()
-	popup.visible = false
+	var tween = create_tween()
+	tween.tween_property(popup, "modulate:a", 0.0, 0.2)
+	tween.tween_callback(func(): popup.visible = false)
 	default_button.grab_focus()
 
 func _clear_popup_body() -> void:
@@ -626,15 +709,38 @@ func _label(text: String, font_size: int, color: Color) -> Label:
 func _button(text: String, color: Color, text_color: Color) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(390, 48)
+	button.custom_minimum_size = Vector2(390, 44)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	button.add_theme_font_override("font", UI_FONT)
 	button.add_theme_font_size_override("font_size", 21)
 	button.add_theme_color_override("font_color", text_color)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_stylebox_override("normal", _panel_style(color, color.lightened(0.14)))
-	button.add_theme_stylebox_override("hover", _panel_style(color.lightened(0.13), Color("#ffe078")))
-	button.add_theme_stylebox_override("pressed", _panel_style(color.darkened(0.15), Color("#ffe078")))
-	button.add_theme_stylebox_override("focus", _panel_style(color, Color("#a6f4ff")))
+
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = color
+	normal.border_color = color.lightened(0.14)
+	normal.set_border_width_all(2)
+	normal.set_corner_radius_all(16)
+	normal.content_margin_left = 22
+	normal.content_margin_right = 22
+	normal.content_margin_top = 10
+	normal.content_margin_bottom = 10
+
+	var hover = normal.duplicate()
+	hover.bg_color = color.lightened(0.13)
+	hover.border_color = Color("#ffe078")
+
+	var pressed = normal.duplicate()
+	pressed.bg_color = color.darkened(0.15)
+	pressed.border_color = Color("#ffe078")
+
+	var focus = normal.duplicate()
+	focus.border_color = Color("#a6f4ff")
+
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", focus)
 	return button
 
 func _multiplayer_button() -> Button:
