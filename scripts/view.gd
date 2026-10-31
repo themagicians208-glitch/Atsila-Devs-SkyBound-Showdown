@@ -2,6 +2,16 @@ extends Node3D
 
 @export_group("Properties")
 @export var target: Node
+@export var input_enabled := true
+@export var mouse_look := true
+
+@export_group("Input Actions")
+@export var action_cam_left := "camera_left"
+@export var action_cam_right := "camera_right"
+@export var action_cam_up := "camera_up"
+@export var action_cam_down := "camera_down"
+@export var action_zoom_in := "zoom_in"
+@export var action_zoom_out := "zoom_out"
 
 @export_group("Zoom")
 @export var zoom_minimum = 16
@@ -19,7 +29,7 @@ var settings: Node
 @onready var camera = $Camera
 
 func _ready():
-	
+
 	camera_rotation = rotation_degrees # Initial rotation
 	settings = get_node_or_null("/root/Settings")
 	pass
@@ -39,23 +49,27 @@ func _physics_process(delta):
 
 func handle_input(delta):
 	
+	if not input_enabled:
+		return
 	# Rotation
 	
 	var input := Vector3.ZERO
 	
-	input.y = Input.get_axis("camera_left", "camera_right")
-	input.x = Input.get_axis("camera_up", "camera_down")
+	input.y = Input.get_axis(action_cam_left, action_cam_right)
+	input.x = Input.get_axis(action_cam_up, action_cam_down)
 	
 	camera_rotation += input.limit_length(1.0) * rotation_speed * delta
 	camera_rotation.x = clamp(camera_rotation.x, -80, -10)
 	
 	# Zooming
 	
-	zoom += Input.get_axis("zoom_in", "zoom_out") * zoom_speed * delta
+	zoom += Input.get_axis(action_zoom_in, action_zoom_out) * zoom_speed * delta
 	zoom = clamp(zoom, zoom_maximum, zoom_minimum)
 
 
 func _input(event: InputEvent) -> void:
+	if not input_enabled or not mouse_look:
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var sensitivity: float = mouse_sensitivity
 		if settings:

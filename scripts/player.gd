@@ -6,6 +6,15 @@ signal died
 @export_subgroup("Components")
 @export var view: Node3D
 
+@export_subgroup("Input")
+@export var action_left := "move_left"
+@export var action_right := "move_right"
+@export var action_forward := "move_forward"
+@export var action_back := "move_back"
+@export var action_jump := "jump"
+@export var action_dash := "dash"
+@export var action_time_freeze := "time_freeze"
+
 @export_subgroup("Properties")
 @export var movement_speed = 250
 @export var jump_strength = 7
@@ -29,6 +38,10 @@ var jumps_remaining := 2
 var coins = 0
 
 var is_dead := false
+
+# Floating name tag shown above the player (local co-op / online).
+var player_name := ""
+var name_label: Label3D
 
 # Dash skill state
 var is_dashing := false
@@ -94,16 +107,38 @@ func _ensure_dash_action() -> void:
 	button.device = -1
 	InputMap.action_add_event("dash", button)
 
+func set_player_name(new_name: String) -> void:
+	player_name = new_name
+	if new_name.strip_edges().is_empty():
+		if name_label != null:
+			name_label.visible = false
+		return
+	if name_label == null:
+		name_label = Label3D.new()
+		name_label.name = "NameLabel"
+		name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		name_label.no_depth_test = true
+		name_label.font_size = 64
+		name_label.outline_size = 16
+		name_label.modulate = Color.WHITE
+		name_label.outline_modulate = Color(0, 0, 0, 0.85)
+		name_label.pixel_size = 0.006
+		name_label.position = Vector3(0, 1.25, 0)
+		add_child(name_label)
+	name_label.text = new_name
+	name_label.visible = true
+
+
 # Functions
 
 func _physics_process(delta):
 	if is_dead:
 		return
 
-	if Input.is_action_just_pressed("time_freeze") and freeze_cooldown <= 0.0:
+	if Input.is_action_just_pressed(action_time_freeze) and freeze_cooldown <= 0.0:
 		_activate_time_freeze()
 
-	if Input.is_action_just_pressed("dash") and dash_cooldown_left <= 0.0 and not is_dashing:
+	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0 and not is_dashing:
 		_start_dash()
 
 	_update_dash(delta)
@@ -197,8 +232,8 @@ func handle_controls(delta):
 
 	var input := Vector3.ZERO
 
-	input.x = Input.get_axis("move_left", "move_right")
-	input.z = Input.get_axis("move_forward", "move_back")
+	input.x = Input.get_axis(action_left, action_right)
+	input.z = Input.get_axis(action_forward, action_back)
 
 	input = input.rotated(Vector3.UP, view.rotation.y)
 
@@ -214,7 +249,7 @@ func handle_controls(delta):
 
 	# Jumping
 
-	if Input.is_action_just_pressed("jump"):
+	if Input.is_action_just_pressed(action_jump):
 
 		if jumps_remaining > 0:
 			jump()

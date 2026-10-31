@@ -18,6 +18,7 @@ const SLIPPERY_SCRIPT := preload("res://scripts/slippery_zone.gd")
 const STICKY_SCRIPT := preload("res://scripts/sticky_zone.gd")
 const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")
 const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
+const PLAYER_SCENE := preload("res://objects/player.tscn")
 
 const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
@@ -36,6 +37,15 @@ var mirror_dimension := false
 var checkpoint_position := Vector3.ZERO
 var active_checkpoint := 0
 
+# Local split-screen co-op
+var local_coop := false
+var player_two: CharacterBody3D
+var coins_collected := 0
+
+# Online co-op (ENet)
+var online := false
+var remote_players: Dictionary = {}
+
 
 func _ready() -> void:
 	Engine.time_scale = 1.0
@@ -48,6 +58,8 @@ func _ready() -> void:
 	current_level = int(get_tree().get_meta("level_number", 1))
 	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	get_tree().set_meta("level_number", current_level)
+	local_coop = bool(get_tree().get_meta("local_coop", false))
+	online = bool(get_tree().get_meta("online", false))
 	_build_level(current_level)
 	coin_goal = get_tree().get_nodes_in_group("collectible_coins").size()
 	hud.set_coin_goal(coin_goal)
@@ -55,7 +67,7 @@ func _ready() -> void:
 	hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 	hud.continue_pressed.connect(_on_continue_pressed)
 	player.coin_collected.connect(_on_coin_collected)
-	player.died.connect(_on_player_died)
+	player.died.connect(_on_player_died.bind(player))
 	hud.retry_pressed.connect(_on_retry_pressed)
 	hud.menu_pressed.connect(_go_to_menu)
 	finish.body_entered.connect(_on_finish_body_entered)
@@ -66,6 +78,11 @@ func _ready() -> void:
 		$Sun.light_energy = 0.24
 		$Sun.shadow_opacity = 0.85
 		$Environment.environment.background_energy_multiplier = 0.25
+
+	if local_coop:
+		_setup_local_coop()
+	elif online:
+		_setup_online()
 
 
 func _ensure_key_action(action_name: String, key_code: Key, joy_button: JoyButton, mouse_button: MouseButton = MOUSE_BUTTON_NONE) -> void:
@@ -97,6 +114,19 @@ func _ensure_key_action(action_name: String, key_code: Key, joy_button: JoyButto
 		mouse_event.button_index = mouse_button
 		mouse_event.device = -1
 		InputMap.action_add_event(action_name, mouse_event)
+
+
+func _ensure_key_binding(action_name: String, key_code: Key) -> void:
+	if not InputMap.has_action(action_name):
+		InputMap.add_action(action_name)
+		InputMap.action_set_deadzone(action_name, 0.5)
+	for existing_event in InputMap.action_get_events(action_name):
+		if existing_event is InputEventKey and existing_event.physical_keycode == key_code:
+			return
+	var key := InputEventKey.new()
+	key.physical_keycode = key_code
+	key.device = -1
+	InputMap.action_add_event(action_name, key)
 
 
 func _build_level(level_number: int) -> void:
@@ -744,9 +774,12 @@ func _try_press_switch() -> void:
 	for lever in switches:
 		if lever.get_meta("pressed", false):
 			continue
-		if player.global_position.distance_to(lever.global_position) < 2.6:
-			_press_switch(lever)
-			return
+		for who in [player, player_two]:
+			if who == null:
+				continue
+			if who.global_position.distance_to(lever.global_position) < 2.6:
+				_press_switch(lever)
+				return
 
 
 func _press_switch(lever: Node3D) -> void:
@@ -810,7 +843,7 @@ func _add_checkpoint(point: Vector3, checkpoint_index: int) -> void:
 
 
 func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_point: Vector3, flag_material: StandardMaterial3D) -> void:
-	if body != player or checkpoint_index <= active_checkpoint:
+	if (body != player and body != player_two) or checkpoint_index <= active_checkpoint:
 		return
 	active_checkpoint = checkpoint_index
 	checkpoint_position = respawn_point
@@ -819,22 +852,23 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 	hud.show_finish_message("Checkpoint reached! Fall back here if you miss a jump.")
 
 
-func respawn_player() -> void:
+func respawn_player(who: CharacterBody3D = null) -> void:
+	var target := who if who != null else player
 	Engine.time_scale = 1.0
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	player.is_dead = false
-	player.slippery = false
-	player.sticky = false
-	player.external_velocity = Vector3.ZERO
-	player.wind_lift = 0.0
-	player.global_position = checkpoint_position
-	player.velocity = Vector3.ZERO
-	player.movement_velocity = Vector3.ZERO
-	player.gravity = 0.0
-	player.gravity_scale = 1.0
-	player.jumps_remaining = 2
-	player.previously_floored = false
-	player.model.scale = Vector3.ONE
+	target.is_dead = false
+	target.slippery = false
+	target.sticky = false
+	target.external_velocity = Vector3.ZERO
+	target.wind_lift = 0.0
+	target.global_position = checkpoint_position
+	target.velocity = Vector3.ZERO
+	target.movement_velocity = Vector3.ZERO
+	target.gravity = 0.0
+	target.gravity_scale = 1.0
+	target.jumps_remaining = 2
+	target.previously_floored = false
+	target.model.scale = Vector3.ONE
 	hud.show_finish_message("Back at checkpoint %d" % active_checkpoint if active_checkpoint > 0 else "Back at the start")
 
 
@@ -1124,25 +1158,29 @@ func _add_anti_gravity_zone(point: Vector3) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F1:
 		hud.show_controls_hint()
-	if event.is_action_pressed("shift_dimension") and not get_tree().paused:
-		_shift_dimension()
-		return
+	if not get_tree().paused:
+		var shifting := event.is_action_pressed("shift_dimension")
+		if not shifting and InputMap.has_action("shift_dimension_p2"):
+			shifting = event.is_action_pressed("shift_dimension_p2")
+		if shifting:
+			_shift_dimension()
+			return
 	if event.is_action_pressed("ui_cancel") and not get_tree().paused:
-		Engine.time_scale = 1.0
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		get_tree().change_scene_to_file("res://scenes/home.tscn")
+		_go_to_menu()
 		return
 	if event.is_action_pressed("interact") and not puzzle_solved:
 		_try_press_switch()
 
 
-func _on_coin_collected(coins: int) -> void:
-	if coins == coin_goal:
+func _on_coin_collected(_coins: int) -> void:
+	coins_collected += 1
+	hud._on_coin_collected(coins_collected)
+	if coins_collected >= coin_goal:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
-	if body != player:
+	if body != player and body != player_two:
 		return
 	# Reaching the flag shows the level complete screen.
 	Engine.time_scale = 1.0
@@ -1163,9 +1201,13 @@ func _go_to_next_level() -> void:
 	get_tree().reload_current_scene()
 
 
-func _on_player_died() -> void:
-	Engine.time_scale = 1.0
-	hud.show_death()
+func _on_player_died(who: CharacterBody3D) -> void:
+	if local_coop:
+		# In co-op, drop the fallen player back in rather than stopping the game.
+		respawn_player(who)
+	else:
+		Engine.time_scale = 1.0
+		hud.show_death()
 
 
 func _on_retry_pressed() -> void:
@@ -1179,4 +1221,300 @@ func _go_to_menu() -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.close()
+	get_tree().set_meta("online", false)
+	get_tree().set_meta("local_coop", false)
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
+
+
+# --- Local split-screen co-op ------------------------------------------------
+
+# Keyboard bindings per player slot (slot 1 = WASD side, slot 2 = arrow-key side).
+const _SLOT_KEYBOARD := {
+	1: {
+		"left": KEY_A, "right": KEY_D, "forward": KEY_W, "back": KEY_S,
+		"jump": KEY_SPACE, "dash": KEY_SHIFT, "time_freeze": KEY_F,
+	},
+	2: {
+		"left": KEY_LEFT, "right": KEY_RIGHT, "forward": KEY_UP, "back": KEY_DOWN,
+		"jump": KEY_ENTER, "dash": KEY_KP_0, "time_freeze": KEY_KP_2,
+	},
+}
+
+
+func _setup_local_coop() -> void:
+	_ensure_key_binding("shift_dimension_p2", KEY_KP_1)
+	var p1_device := str(get_tree().get_meta("local_p1_device", "keyboard"))
+	var p2_device := str(get_tree().get_meta("local_p2_device", "keyboard"))
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if p1_device.begins_with("pad") else Input.MOUSE_MODE_CAPTURED
+
+	var view_a: Node3D = $View
+	var view_a_rotation := view_a.rotation
+
+	# Two SubViewports side by side. The 3D world stays in the root viewport and
+	# each subviewport renders it through its own camera (own_world_3d = false).
+	var layer := CanvasLayer.new()
+	layer.name = "SplitScreen"
+	layer.layer = -1
+	add_child(layer)
+	var columns := HBoxContainer.new()
+	columns.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	columns.add_theme_constant_override("separation", 3)
+	layer.add_child(columns)
+
+	var container_a := SubViewportContainer.new()
+	container_a.stretch = true
+	container_a.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container_a.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container_a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	columns.add_child(container_a)
+	var viewport_a := SubViewport.new()
+	viewport_a.size = Vector2i(640, 720)
+	viewport_a.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport_a.handle_input_locally = false
+	container_a.add_child(viewport_a)
+
+	var container_b := SubViewportContainer.new()
+	container_b.stretch = true
+	container_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container_b.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	columns.add_child(container_b)
+	var viewport_b := SubViewport.new()
+	viewport_b.size = Vector2i(640, 720)
+	viewport_b.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport_b.handle_input_locally = false
+	container_b.add_child(viewport_b)
+
+	# Player 1's camera goes into the left viewport.
+	remove_child(view_a)
+	viewport_a.add_child(view_a)
+
+	# Player 2 shares the world, with its own camera in the right viewport.
+	player_two = PLAYER_SCENE.instantiate()
+	player_two.position = player.position + Vector3(2.0, 0.0, 0.0)
+	add_child(player_two)
+
+	var view_b := Node3D.new()
+	view_b.name = "View2"
+	view_b.set_script(preload("res://scripts/view.gd"))
+	view_b.rotation = view_a_rotation
+	view_b.set("input_enabled", false)
+	view_b.set("target", player_two)
+	var camera_b := Camera3D.new()
+	camera_b.name = "Camera"
+	camera_b.position = Vector3(0, 0, 10)
+	camera_b.fov = 42.0
+	camera_b.current = true
+	view_b.add_child(camera_b)
+	viewport_b.add_child(view_b)
+	player_two.set("view", view_b)
+
+	player_two.coin_collected.connect(_on_coin_collected)
+	player_two.died.connect(_on_player_died.bind(player_two))
+	player_two.add_to_group("player")
+
+	# Give each player their own input device (keyboard or a specific controller).
+	_configure_local_player(player, view_a, p1_device, 1)
+	_configure_local_player(player_two, view_b, p2_device, 2)
+
+	# Name tags above each player's head.
+	player.set_player_name(str(get_tree().get_meta("local_p1_name", "Player 1")))
+	player_two.set_player_name(str(get_tree().get_meta("local_p2_name", "Player 2")))
+
+	hud.show_finish_message("LOCAL CO-OP  •  P1: %s    P2: %s" % [_device_label(p1_device, 1), _device_label(p2_device, 2)])
+
+
+func _device_label(device: String, slot: int) -> String:
+	if device.begins_with("pad"):
+		return "controller"
+	if slot == 1:
+		return "WASD + mouse"
+	return "arrows + Enter"
+
+
+# Wire one player slot to the chosen device. Each slot gets its own action set
+# ("p1_"/"p2_") so two players never share the same action, even when both use
+# the keyboard or both use controllers.
+func _configure_local_player(p: CharacterBody3D, v: Node3D, device: String, slot: int) -> void:
+	var prefix := "p%d_" % slot
+	for suffix in ["left", "right", "forward", "back", "jump", "dash", "time_freeze",
+			"cam_left", "cam_right", "cam_up", "cam_down"]:
+		_define_action(prefix + suffix)
+
+	var is_pad := device.begins_with("pad")
+	if is_pad:
+		_bind_pad_actions(prefix, int(device.split(":")[1]))
+	else:
+		_bind_keyboard_actions(prefix, slot)
+
+	p.set("action_left", prefix + "left")
+	p.set("action_right", prefix + "right")
+	p.set("action_forward", prefix + "forward")
+	p.set("action_back", prefix + "back")
+	p.set("action_jump", prefix + "jump")
+	p.set("action_dash", prefix + "dash")
+	p.set("action_time_freeze", prefix + "time_freeze")
+
+	if v != null:
+		v.set("action_cam_left", prefix + "cam_left")
+		v.set("action_cam_right", prefix + "cam_right")
+		v.set("action_cam_up", prefix + "cam_up")
+		v.set("action_cam_down", prefix + "cam_down")
+		v.set("input_enabled", true)
+		# Only player 1 on the keyboard looks with the mouse.
+		v.set("mouse_look", slot == 1 and not is_pad)
+
+
+func _define_action(action_name: String) -> void:
+	if InputMap.has_action(action_name):
+		for existing_event in InputMap.action_get_events(action_name):
+			InputMap.action_erase_event(action_name, existing_event)
+	else:
+		InputMap.add_action(action_name)
+	InputMap.action_set_deadzone(action_name, 0.25)
+
+
+func _bind_keyboard_actions(prefix: String, slot: int) -> void:
+	var keys: Dictionary = _SLOT_KEYBOARD[slot]
+	for action in keys.keys():
+		var key := InputEventKey.new()
+		key.physical_keycode = keys[action]
+		key.device = -1
+		InputMap.action_add_event(prefix + str(action), key)
+	if slot == 1:
+		# Player 1 can also jump with the left mouse button.
+		var mouse_jump := InputEventMouseButton.new()
+		mouse_jump.button_index = MOUSE_BUTTON_LEFT
+		mouse_jump.device = -1
+		InputMap.action_add_event(prefix + "jump", mouse_jump)
+
+
+func _bind_pad_actions(prefix: String, pad_id: int) -> void:
+	_add_motion(prefix + "left", JOY_AXIS_LEFT_X, -1.0, pad_id)
+	_add_motion(prefix + "right", JOY_AXIS_LEFT_X, 1.0, pad_id)
+	_add_motion(prefix + "forward", JOY_AXIS_LEFT_Y, -1.0, pad_id)
+	_add_motion(prefix + "back", JOY_AXIS_LEFT_Y, 1.0, pad_id)
+	_add_motion(prefix + "cam_left", JOY_AXIS_RIGHT_X, -1.0, pad_id)
+	_add_motion(prefix + "cam_right", JOY_AXIS_RIGHT_X, 1.0, pad_id)
+	_add_motion(prefix + "cam_up", JOY_AXIS_RIGHT_Y, -1.0, pad_id)
+	_add_motion(prefix + "cam_down", JOY_AXIS_RIGHT_Y, 1.0, pad_id)
+	_add_button(prefix + "left", JOY_BUTTON_DPAD_LEFT, pad_id)
+	_add_button(prefix + "right", JOY_BUTTON_DPAD_RIGHT, pad_id)
+	_add_button(prefix + "forward", JOY_BUTTON_DPAD_UP, pad_id)
+	_add_button(prefix + "back", JOY_BUTTON_DPAD_DOWN, pad_id)
+	_add_button(prefix + "jump", JOY_BUTTON_A, pad_id)
+	_add_button(prefix + "dash", JOY_BUTTON_X, pad_id)
+	_add_button(prefix + "dash", JOY_BUTTON_RIGHT_SHOULDER, pad_id)
+	_add_button(prefix + "time_freeze", JOY_BUTTON_Y, pad_id)
+
+
+func _add_motion(action_name: String, axis: JoyAxis, value: float, device: int) -> void:
+	var motion := InputEventJoypadMotion.new()
+	motion.axis = axis
+	motion.axis_value = value
+	motion.device = device
+	InputMap.action_add_event(action_name, motion)
+
+
+func _add_button(action_name: String, button: JoyButton, device: int) -> void:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button
+	event.device = device
+	InputMap.action_add_event(action_name, event)
+
+
+# --- Online co-op (ENet) -----------------------------------------------------
+
+func _setup_online() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		return
+	network.peer_list_changed.connect(_refresh_remote_players)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	player.set_player_name(network.local_name)
+	_refresh_remote_players()
+	var role := "HOST" if multiplayer.is_server() else "CLIENT"
+	hud.show_finish_message("ONLINE %s  •  players: %d" % [role, network.player_ids().size()])
+
+
+func _refresh_remote_players() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		return
+	var local_id := multiplayer.get_unique_id()
+	# Spawn a proxy for every other peer.
+	for id in network.players.keys():
+		if id == local_id or remote_players.has(id):
+			continue
+		_spawn_remote_player(id)
+	# Drop proxies whose peer left.
+	for id in remote_players.keys():
+		if not network.players.has(id):
+			_remove_remote_player(id)
+	# Keep every remote player's name tag current.
+	for id in remote_players.keys():
+		var proxy: Node = remote_players[id]
+		if is_instance_valid(proxy):
+			proxy.set_player_name(network.get_player_name(id))
+	hud.show_finish_message("ONLINE  •  players connected: %d" % network.player_ids().size())
+
+
+func _spawn_remote_player(id: int) -> void:
+	var proxy: CharacterBody3D = PLAYER_SCENE.instantiate()
+	proxy.name = "Remote_%d" % id
+	proxy.set_physics_process(false)
+	proxy.set("view", null)
+	proxy.position = player.position + Vector3(1.6, 0.0, 0.0)
+	add_child(proxy)
+	proxy.set_meta("net_target", proxy.position)
+	proxy.set_meta("net_rot", 0.0)
+	remote_players[id] = proxy
+
+
+func _remove_remote_player(id: int) -> void:
+	if remote_players.has(id):
+		var proxy: Node = remote_players[id]
+		remote_players.erase(id)
+		if is_instance_valid(proxy):
+			proxy.queue_free()
+
+
+func _physics_process(_delta: float) -> void:
+	if not online or multiplayer.multiplayer_peer == null:
+		return
+	var id := multiplayer.get_unique_id()
+	var pos := player.position
+	var rot := player.rotation.y
+	if multiplayer.is_server():
+		rpc("_recv_transform", id, pos, rot)
+	else:
+		rpc_id(1, "_recv_transform", id, pos, rot)
+
+
+func _process(delta: float) -> void:
+	if not online:
+		return
+	for id in remote_players.keys():
+		var proxy: Node3D = remote_players[id]
+		if not is_instance_valid(proxy):
+			continue
+		var target: Vector3 = proxy.get_meta("net_target", proxy.position)
+		proxy.position = proxy.position.lerp(target, delta * 12.0)
+		var target_rot: float = proxy.get_meta("net_rot", proxy.rotation.y)
+		proxy.rotation.y = lerp_angle(proxy.rotation.y, target_rot, delta * 12.0)
+
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _recv_transform(id: int, net_position: Vector3, net_rotation_y: float) -> void:
+	var proxy: Node3D = remote_players.get(id)
+	if proxy != null and is_instance_valid(proxy):
+		proxy.set_meta("net_target", net_position)
+		proxy.set_meta("net_rot", net_rotation_y)
+	# The host relays other clients' transforms so everyone sees everyone.
+	if multiplayer.is_server():
+		for peer_id in multiplayer.get_peers():
+			if peer_id != id:
+				rpc_id(peer_id, "_recv_transform", id, net_position, net_rotation_y)
