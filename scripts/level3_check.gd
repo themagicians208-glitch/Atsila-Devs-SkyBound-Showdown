@@ -37,6 +37,10 @@ func _run() -> void:
 	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
 	assert(is_equal_approx(wolf._movement_speed(player), float(player.movement_speed) * 1.10), "Frost Wolf must be 110% of player speed")
+	var shadow_slime_script: GDScript = load("res://objects/shadow_slime.gd")
+	var original_slime: Node = shadow_slime_script.new()
+	assert(wolf.attack_damage < original_slime.contact_damage, "Frost Wolf attack must be lower than the original Shadow Slime")
+	original_slime.free()
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]
 	assert(is_equal_approx(slime._movement_speed(player), float(player.movement_speed) * 0.50), "Frost Slime must be 50% of player speed")
 	var titan: Node = world.get_node("FrostTitan")

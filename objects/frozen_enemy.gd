@@ -8,6 +8,7 @@ signal defeated
 @export_enum("Frost Slime", "Frost Wolf", "Crystal Phantom") var variant := "Frost Slime"
 @export var max_health := 2
 @export var contact_damage := 1.0
+@export var attack_damage := 1.0
 @export var detect_range := 10.0
 @export var speed_ratio := 0.5
 
@@ -22,6 +23,16 @@ var _projectile_cooldown := 1.8
 
 func _ready() -> void:
 	add_to_group("enemies")
+	if variant == "Frost Wolf":
+		speed_ratio = 1.10
+		attack_damage = 1.0
+	elif variant == "Crystal Phantom":
+		speed_ratio = 0.72
+		attack_damage = 5.0
+	else:
+		speed_ratio = 0.50
+		attack_damage = 4.0
+	contact_damage = attack_damage
 	health = max_health
 	_home = global_position
 	_build()
@@ -97,7 +108,7 @@ func _physics_process(delta: float) -> void:
 			global_position += flat.normalized() * speed * delta
 		rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), delta * 5.0)
 	if distance < 1.0 and _touch_cooldown <= 0.0 and target.has_method("take_damage"):
-		target.call("take_damage", contact_damage, global_position, "frozen_enemy")
+		target.call("take_damage", attack_damage, global_position, "frozen_enemy")
 		_touch_cooldown = 1.0
 
 func _launch_projectile(target: Node3D) -> void:
@@ -109,11 +120,7 @@ func _launch_projectile(target: Node3D) -> void:
 
 func _movement_speed(target: Node3D) -> float:
 	var player_speed := float(target.get("movement_speed")) if target.get("movement_speed") != null else 8.4
-	if variant == "Frost Wolf":
-		return player_speed * 1.10
-	if variant == "Crystal Phantom":
-		return player_speed * 0.72
-	return player_speed * 0.50
+	return player_speed * speed_ratio
 
 func _nearest_player() -> Node3D:
 	var nearest: Node3D
