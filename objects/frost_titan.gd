@@ -134,8 +134,34 @@ func take_hit(amount: int, from: Vector3) -> bool:
 	if health <= 0:
 		_dead = true
 		defeated.emit()
-		queue_free()
+		Audio.play("res://sounds/break.ogg")
+		_burst_crystals()
+		var tween := create_tween()
+		tween.tween_property(_visual, "scale", Vector3.ZERO, 0.65)
+		tween.tween_callback(queue_free)
 	return true
+
+func _burst_crystals() -> void:
+	var particles := GPUParticles3D.new()
+	particles.amount = 28
+	particles.lifetime = 0.9
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	var shard := QuadMesh.new()
+	shard.size = Vector2(0.18, 0.18)
+	var material := _crystal_material()
+	shard.material = material
+	particles.draw_pass_1 = shard
+	var process := ParticleProcessMaterial.new()
+	process.direction = Vector3(0.0, 1.0, 0.0)
+	process.spread = 180.0
+	process.initial_velocity_min = 1.5
+	process.initial_velocity_max = 4.0
+	process.gravity = Vector3(0.0, -2.0, 0.0)
+	particles.process_material = process
+	particles.position = global_position + Vector3(0.0, 1.0, 0.0)
+	get_parent().add_child(particles)
+	particles.emitting = true
 
 func unlock() -> void:
 	locked = false
