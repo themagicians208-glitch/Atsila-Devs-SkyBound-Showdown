@@ -32,6 +32,8 @@ Leap across floating islands, hunt down every coin, activate switches, and race 
 - 🌀 **Shift dimensions** — press **Q** to switch between Material and Mirror routes.
 - 🪙 **Collect every coin** — explore the course and aim for a perfect run.
 - 🏃 **Move with precision** — run, jump, and double-jump across the islands.
+- ⚔️ **Master the Combat** — unlock attack moves to clear your path.
+- 🎭 **Choose your Hero** — play as Nattie, Isabelle, or the Raccoon, each with unique styles.
 - ⏱️ **Freeze time** — use a brief time-freeze to help plan tricky moves.
 - ⚠️ **Read the hazards** — dodge spinning sweepers, falling platforms, hurdles, and maze walls.
 - 🎢 **Take on the Gauntlet** — balance on see-saws, cross rotating logs, handle slippery and sticky zones, ride bounce pads and fan tunnels, slide down ramps, and avoid rolling barrels.
