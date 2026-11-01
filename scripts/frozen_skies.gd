@@ -114,15 +114,17 @@ func _build_islands() -> void:
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):
-		var coin: Area3D = COIN.instantiate()
-		coin.position = route[index] + Vector3(0.0, 1.05 + float(index % 3) * 0.25, 0.0)
-		_world.add_child(coin)
+		_add_coin(route[index] + Vector3(0.0, 1.05 + float(index % 3) * 0.25, 0.0), "frozen_%02d" % index)
 		coins_placed += 1
-	for index in [3, 5, 8, 12, 14, 19, 21, 27, 28, 34, 35, 39]:
-		var hidden: Area3D = COIN.instantiate()
-		hidden.position = route[index] + Vector3(2.3, 1.6, 0.8)
-		_world.add_child(hidden)
+	for hidden_index in [3, 5, 8, 12, 14, 19, 21, 27, 28, 34, 35, 39]:
+		_add_coin(route[hidden_index] + Vector3(2.3, 1.6, 0.8), "frozen_hidden_%02d" % hidden_index)
 		coins_placed += 1
+
+func _add_coin(where: Vector3, persistent_id: String) -> void:
+	var coin: Area3D = COIN.instantiate()
+	coin.position = where
+	coin.set_meta("persistent_coin_id", persistent_id)
+	_world.add_child(coin)
 
 func _place_enemies() -> void:
 	for index in [6, 15, 24, 31]:
@@ -140,8 +142,14 @@ func _place_enemies() -> void:
 	_chest.position = route[route.size() - 3] + Vector3(2.5, 0.0, 2.5)
 	_world.add_child(_chest)
 	_titan.defeated.connect(_on_boss_defeated)
-	if frozen_seals_complete:
+	if Progress.frost_titan_defeated:
+		boss_defeated = true
+	if frozen_seals_complete or boss_defeated:
 		_titan.unlock()
+	if boss_defeated:
+		_titan.set_process(false)
+		_titan.set_physics_process(false)
+		_chest.unlock()
 	_chest.fragment_recovered.connect(func():
 		if _main.has_method("_on_frozen_fragment_recovered"):
 			_main.call("_on_frozen_fragment_recovered")
@@ -289,6 +297,7 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 
 func _on_boss_defeated() -> void:
 	boss_defeated = true
+	Progress.mark_frost_titan_defeated()
 	if _chest != null:
 		_chest.unlock()
 

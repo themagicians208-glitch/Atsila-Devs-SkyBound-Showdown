@@ -93,6 +93,7 @@ func _ready() -> void:
 		hud.set_objective("Explore the Forgotten Island  -  %d more coins wake the portal" % coin_goal)
 	elif frozen_skies != null:
 		coin_goal = frozen_skies.coins_required
+		coins_collected = Progress.frozen_coins_collected()
 		hud.show_finish_message("LEVEL 3 - FROZEN SKIES")
 		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 	else:

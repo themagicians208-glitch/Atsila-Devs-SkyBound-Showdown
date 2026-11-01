@@ -16,6 +16,10 @@ func _ready() -> void:
 	shape.shape = sphere
 	add_child(shape)
 	_build()
+	if Progress.third_fragment_recovered:
+		unlocked = true
+		opened = true
+		_lid.rotation.x = deg_to_rad(-65.0)
 	body_entered.connect(_on_body_entered)
 
 func _build() -> void:
