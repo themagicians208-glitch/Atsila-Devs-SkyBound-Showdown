@@ -1,43 +1,15 @@
-[gd_scene load_steps=5 format=3 uid="uid://c0e27836xgmhi"]
+[gd_scene load_steps=3 format=3 uid="uid://c0e27836xgmhi"]
 
-[ext_resource type="PackedScene" uid="uid://xy8rvnjp22n5" path="res://models/character.glb" id="1_vn7w5"]
-[ext_resource type="Script" path="res://objects/character_eyes.gd" id="2_eyes"]
+[ext_resource type="PackedScene" path="res://models/racoon.glb" id="1_racoon"]
+[ext_resource type="Script" path="res://objects/character_raccoon.gd" id="2_style"]
 
-[sub_resource type="StandardMaterial3D" id="Material_yellow_black_palette"]
-albedo_color = Color(1, 0.82, 0.04, 1)
-roughness = 0.72
+[node name="character" type="Node3D"]
+script = ExtResource("2_style")
 
-[sub_resource type="StandardMaterial3D" id="Material_black_palette"]
-albedo_color = Color(0.035, 0.04, 0.055, 1)
-roughness = 0.78
+[node name="anim" type="Node3D" parent="."]
 
-[node name="character" instance=ExtResource("1_vn7w5")]
-script = ExtResource("2_eyes")
+[node name="pivot" type="Node3D" parent="anim"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 0)
 
-[node name="leg-left" parent="character/root" index="0"]
-transform = Transform3D(0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, 0.125, 0.17625, -0.02375)
-material_override = SubResource("Material_black_palette")
-
-[node name="leg-right" parent="character/root" index="1"]
-transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.125, 0.17625, -0.02375)
-material_override = SubResource("Material_black_palette")
-
-[node name="torso" parent="character/root" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.996194, 0.0871557, 0, -0.0871557, 0.996194, -1.80478e-15, 0.17625, -0.02375)
-material_override = SubResource("Material_yellow_black_palette")
-
-[node name="arm-left" parent="character/root/torso" index="0"]
-transform = Transform3D(0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 0, 0, 1, 0.3, 0.175, 0)
-material_override = SubResource("Material_black_palette")
-
-[node name="arm-right" parent="character/root/torso" index="1"]
-transform = Transform3D(0.707107, -0.707107, 0, 0.707107, 0.707107, 0, 0, 0, 1, -0.3, 0.1195, 0)
-material_override = SubResource("Material_black_palette")
-
-[node name="antenna" parent="character/root/torso" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.999999, 0, 0, 0, 0.999999, 0, 0.6, 0)
-material_override = SubResource("Material_yellow_black_palette")
-
-[node name="AnimationPlayer" parent="." index="1"]
-deterministic = true
-playback_default_blend_time = 0.2
+[node name="model" parent="anim/pivot" instance=ExtResource("1_racoon")]
+transform = Transform3D(0.279483, 0, 0, 0, 0.279483, 0, 0, 0, 0.279483, 0.14011, 0.047, -0.001878)
