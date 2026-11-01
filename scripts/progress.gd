@@ -15,6 +15,9 @@ const CONFIG_PATH := "user://progress.cfg"
 var config_path := CONFIG_PATH
 var fragment_recovered := false
 var third_fragment_recovered := false
+var ice_shield_unlocked := false
+var frost_dash_unlocked := false
+var crystal_activation_unlocked := false
 
 
 func _ready() -> void:
@@ -27,12 +30,18 @@ func load_progress() -> void:
 		return
 	fragment_recovered = bool(config.get_value("island", "fragment_recovered", false))
 	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
+	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
+	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
+	crystal_activation_unlocked = bool(config.get_value("frozen_skies", "crystal_activation_unlocked", false))
 
 
 func save_progress() -> void:
 	var config := ConfigFile.new()
 	config.set_value("island", "fragment_recovered", fragment_recovered)
 	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
+	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
+	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
+	config.set_value("frozen_skies", "crystal_activation_unlocked", crystal_activation_unlocked)
 	config.save(config_path)
 
 
@@ -49,10 +58,25 @@ func recover_third_fragment() -> void:
 	third_fragment_recovered = true
 	save_progress()
 
+func unlock_ice_shield() -> void:
+	ice_shield_unlocked = true
+	save_progress()
+
+func unlock_frost_dash() -> void:
+	frost_dash_unlocked = true
+	save_progress()
+
+func unlock_crystal_activation() -> void:
+	crystal_activation_unlocked = true
+	save_progress()
+
 
 ## Forget everything. Only the dev checks call this.
 func clear() -> void:
 	fragment_recovered = false
 	third_fragment_recovered = false
+	ice_shield_unlocked = false
+	frost_dash_unlocked = false
+	crystal_activation_unlocked = false
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))

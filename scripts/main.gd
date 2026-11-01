@@ -1028,6 +1028,13 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 	checkpoint_position = respawn_point
 	flag_material.albedo_color = Color("#ffe25a")
 	flag_material.emission = Color("#ffc928")
+	if frozen_skies != null:
+		if checkpoint_index >= 9:
+			Progress.unlock_ice_shield()
+		if checkpoint_index >= 18:
+			Progress.unlock_frost_dash()
+		if checkpoint_index >= 29:
+			Progress.unlock_crystal_activation()
 	hud.show_finish_message("Checkpoint reached! Fall back here if you miss a jump.")
 
 

@@ -19,6 +19,8 @@ signal fly_mode_changed(enabled: bool)
 @export var action_fly := "fly"
 @export var action_time_freeze := "time_freeze"
 @export var action_attack := "attack"
+@export var action_ice_shield := "ice_shield"
+@export var action_frost_dash := "frost_dash"
 
 @export_subgroup("Properties")
 @export var movement_speed = 250
@@ -111,6 +113,11 @@ var _slash_material: StandardMaterial3D
 var _slash_life := 0.0
 var _slash_base := Vector3.ONE
 var _swing_amount := 0.0               # 0..1 through an attack, drives the pose
+var ice_shield_active := false
+var ice_shield_cooldown_left := 0.0
+var frost_dash_cooldown_left := 0.0
+var frost_dash_time_left := 0.0
+var _ice_shield_visual: MeshInstance3D
 
 @onready var particles_trail = $ParticlesTrail
 @onready var sound_footsteps = $SoundFootsteps
@@ -137,6 +144,8 @@ func _ready() -> void:
 		mouse_jump.device = -1
 		InputMap.action_add_event("jump", mouse_jump)
 	_ensure_dash_action()
+	_ensure_frozen_actions()
+	_build_ice_shield_visual()
 	model_rest_rotation = model.rotation
 	model_rest_position = model.position
 	if model.has_method("set_player_index"):
@@ -202,6 +211,31 @@ func _ensure_dash_action() -> void:
 	button.device = -1
 	InputMap.action_add_event("dash", button)
 
+func _ensure_frozen_actions() -> void:
+	for action_name in [action_ice_shield, action_frost_dash]:
+		if InputMap.has_action(action_name):
+			continue
+		InputMap.add_action(action_name)
+		var key := InputEventKey.new()
+		key.physical_keycode = KEY_K if action_name == action_ice_shield else KEY_L
+		key.device = -1
+		InputMap.action_add_event(action_name, key)
+
+func _build_ice_shield_visual() -> void:
+	_ice_shield_visual = MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.9
+	mesh.height = 1.8
+	_ice_shield_visual.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.35, 0.9, 1.0, 0.22)
+	material.emission_enabled = true
+	material.emission = Color("#65e6ff")
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ice_shield_visual.material_override = material
+	_ice_shield_visual.visible = false
+	add_child(_ice_shield_visual)
+
 func set_player_name(new_name: String) -> void:
 	player_name = new_name
 	if new_name.strip_edges().is_empty():
@@ -235,8 +269,15 @@ func _physics_process(delta):
 
 	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0 and not is_dashing:
 		_start_dash()
+	if get_tree().get_meta("level_number", 1) == 3:
+		if Input.is_action_just_pressed(action_ice_shield):
+			_activate_ice_shield()
+		if Input.is_action_just_pressed(action_frost_dash) and frost_dash_cooldown_left <= 0.0:
+			_start_frost_dash()
 
 	_update_dash(delta)
+	_update_frost_dash(delta)
+	_update_ice_shield(delta)
 	_update_combat(delta)
 
 	# Handle functions
@@ -508,6 +549,45 @@ func _end_dash() -> void:
 	dash_time_left = 0.0
 	dash_cooldown_left = dash_cooldown
 
+func _start_frost_dash() -> void:
+	if not Progress.frost_dash_unlocked or is_dead:
+		return
+	frost_dash_time_left = 0.3
+	frost_dash_cooldown_left = 3.0
+	is_dashing = true
+	Audio.play("res://sounds/jump.ogg")
+
+func _update_frost_dash(delta: float) -> void:
+	if frost_dash_cooldown_left > 0.0:
+		frost_dash_cooldown_left = maxf(0.0, frost_dash_cooldown_left - delta)
+	if frost_dash_time_left <= 0.0:
+		return
+	frost_dash_time_left -= delta
+	var direction := Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+	velocity.x = direction.x * movement_speed * 3.0
+	velocity.z = direction.z * movement_speed * 3.0
+	if frost_dash_time_left <= 0.0:
+		is_dashing = false
+
+func _activate_ice_shield() -> void:
+	if not Progress.ice_shield_unlocked or ice_shield_cooldown_left > 0.0 or ice_shield_active:
+		return
+	ice_shield_active = true
+	ice_shield_cooldown_left = 8.0
+	if _ice_shield_visual != null:
+		_ice_shield_visual.visible = true
+	get_tree().create_timer(2.0).timeout.connect(func():
+		ice_shield_active = false
+		if _ice_shield_visual != null:
+			_ice_shield_visual.visible = false
+	)
+
+func _update_ice_shield(delta: float) -> void:
+	if ice_shield_cooldown_left > 0.0:
+		ice_shield_cooldown_left = maxf(0.0, ice_shield_cooldown_left - delta)
+	if _ice_shield_visual != null and ice_shield_active:
+		_ice_shield_visual.rotation.y += delta * 1.8
+
 
 func _update_dash(delta: float) -> void:
 	if is_dashing:
@@ -751,6 +831,8 @@ func _ensure_combat_actions() -> void:
 ## (or remain fatal when contact_damage is 1).
 func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: String = "enemy") -> void:
 	if is_dead:
+		return
+	if ice_shield_active:
 		return
 	Audio.play("res://sounds/land.ogg")
 	var away := global_position - from

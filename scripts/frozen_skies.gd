@@ -5,6 +5,7 @@ const PLATFORM := preload("res://objects/platform_medium.tscn")
 const COIN := preload("res://objects/coin.tscn")
 const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
+const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
 var route: Array = []
@@ -19,9 +20,26 @@ func build(main: Node) -> Array:
 	_world = main.get("world")
 	route = _make_route()
 	_build_islands()
+	_build_frozen_mechanics()
 	_place_coins()
 	_place_enemies()
 	return route
+
+func _build_frozen_mechanics() -> void:
+	# Reuse the main level's switch/gate implementation for the first frozen seal.
+	_main.call("_build_puzzle", 3, route)
+	for index in [10, 20, 30]:
+		_main.call("_add_zone", route[index], Vector3(2.5, 1.2, 2.5), SLIPPERY, Color("#8fe7ff"))
+		_add_ice_bridge(route[index])
+
+func _add_ice_bridge(point: Vector3) -> void:
+	var bridge := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(3.4, 0.12, 1.0)
+	bridge.mesh = mesh
+	bridge.position = point + Vector3(0.0, 0.58, 1.8)
+	bridge.material_override = _material(Color("#a8efff"), 0.8)
+	_world.add_child(bridge)
 
 func _make_route() -> Array:
 	var points: Array = []
