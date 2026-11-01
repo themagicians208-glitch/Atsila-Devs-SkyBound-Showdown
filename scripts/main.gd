@@ -350,6 +350,8 @@ func _bind_frozen_boss(boss: Node) -> void:
 
 
 func _on_frozen_fragment_recovered() -> void:
+	if frozen_skies != null:
+		frozen_skies.thaw_environment()
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
 
 

@@ -33,6 +33,9 @@ var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
 var _time := 0.0
 var _crystal_light: Node3D
+var _snowfall: GPUParticles3D
+var _frozen_tree_materials: Array[StandardMaterial3D] = []
+var environment_thawed := false
 
 func build(main: Node) -> Array:
 	_main = main
@@ -47,6 +50,8 @@ func build(main: Node) -> Array:
 	_build_moving_ice_platforms()
 	_build_unstable_ice()
 	_build_crystal_light_puzzle()
+	if Progress.third_fragment_recovered:
+		thaw_environment()
 	return route
 
 func _build_crystal_light_puzzle() -> void:
@@ -282,7 +287,9 @@ func _add_frozen_tree(point: Vector3) -> void:
 		crown_mesh.height = crown_mesh.radius * 1.8
 		crown.mesh = crown_mesh
 		crown.position = point + Vector3(0.0, height, 0.0)
-		crown.material_override = _material(Color("#b9efff"), 0.3)
+		var crown_material := _material(Color("#b9efff"), 0.3)
+		crown.material_override = crown_material
+		_frozen_tree_materials.append(crown_material)
 		_world.add_child(crown)
 
 func _add_mountain(point: Vector3) -> void:
@@ -319,6 +326,7 @@ func _add_portal(point: Vector3, color: Color) -> void:
 
 func _build_snowfall() -> void:
 	var particles := GPUParticles3D.new()
+	_snowfall = particles
 	particles.name = "FrozenSnowfall"
 	particles.amount = 180
 	particles.lifetime = 5.0
@@ -379,6 +387,18 @@ func _on_boss_defeated() -> void:
 	Progress.mark_frost_titan_defeated()
 	if _chest != null:
 		_chest.unlock()
+
+func thaw_environment() -> void:
+	if environment_thawed:
+		return
+	environment_thawed = true
+	for material in _frozen_tree_materials:
+		material.albedo_color = Color("#8de6b0")
+		material.emission = Color("#5de69a")
+		material.emission_energy_multiplier = 0.8
+	if _snowfall != null:
+		_snowfall.amount = 45
+	Audio.play("res://sounds/coin.ogg")
 
 func is_portal_ready(coins: int) -> bool:
 	return boss_defeated and Progress.third_fragment_recovered and coins >= coins_required

@@ -57,6 +57,8 @@ func _run() -> void:
 	assert(titan.phase == 3, "Frost Titan must enter phase 3")
 	titan.take_hit(8, player.global_position)
 	assert(titan.phase == 4, "Frost Titan must enter the final phase")
+	instance.get("frozen_skies").thaw_environment()
+	assert(instance.get("frozen_skies").environment_thawed, "fragment recovery must thaw Frozen Skies")
 	print("LEVEL3 Frozen Skies smoke passed: coins=", get_nodes_in_group("collectible_coins").size())
 	quit()
 
