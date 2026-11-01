@@ -45,6 +45,12 @@ func play_music(sound_path: String) -> void:
 		music_player.stream.loop = true
 	music_player.play()
 
+func stop_all() -> void:
+	queue.clear()
+	for child in get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+
 func _process(_delta):
 
 	if not queue.is_empty() and not available.is_empty():
