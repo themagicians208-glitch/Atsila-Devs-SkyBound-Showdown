@@ -40,6 +40,7 @@ func _run() -> void:
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
+	assert(not instance.get("frozen_skies").arrival_cinematic_complete, "arrival portal must begin opening")
 	assert(instance.get("frozen_skies").waterfall_count == 6, "Frozen Skies needs frozen waterfalls")
 	assert(instance.get("frozen_skies").cave_cluster_count == 4, "Frozen Crystal Caves need crystal clusters")
 	var player: Node = instance.get_node("Player")

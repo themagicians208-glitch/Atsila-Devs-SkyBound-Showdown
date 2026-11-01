@@ -45,6 +45,10 @@ var _exit_portal_ring: MeshInstance3D
 var _exit_portal_material: StandardMaterial3D
 var _portal_energy := 0.0
 var portal_count := 0
+var _arrival_portal_ring: MeshInstance3D
+var _arrival_portal_material: StandardMaterial3D
+var arrival_cinematic_complete := false
+var _arrival_time := 0.0
 var waterfall_count := 0
 var cave_cluster_count := 0
 
@@ -117,6 +121,13 @@ func region_name_for_checkpoint(checkpoint_index: int) -> String:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if not arrival_cinematic_complete:
+		_arrival_time += delta
+		if _arrival_portal_ring != null:
+			_arrival_portal_ring.scale = Vector3.ONE * (0.35 + clampf(_arrival_time / 1.4, 0.0, 1.0))
+			_arrival_portal_material.emission_energy_multiplier = clampf(_arrival_time / 1.4, 0.0, 1.0) * 1.6
+		if _arrival_time >= 1.4:
+			arrival_cinematic_complete = true
 	if _exit_portal_ring != null and _main != null:
 		var current_coins := int(_main.get("coins_collected"))
 		var target_energy := 1.0 if is_portal_ready(current_coins) else 0.0
@@ -432,6 +443,9 @@ func _add_portal(point: Vector3, color: Color, is_exit := false) -> void:
 	if is_exit:
 		_exit_portal_ring = ring
 		_exit_portal_material = ring_material
+	elif _arrival_portal_ring == null:
+		_arrival_portal_ring = ring
+		_arrival_portal_material = ring_material
 	portal.add_child(ring)
 	var surface := MeshInstance3D.new()
 	var surface_mesh := QuadMesh.new()
