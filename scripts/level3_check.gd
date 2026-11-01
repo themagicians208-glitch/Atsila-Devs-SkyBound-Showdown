@@ -114,6 +114,8 @@ func _run() -> void:
 	assert(not frozen.boss_arena_locked, "Frost Titan arena must reopen after victory")
 	assert(not frozen.is_portal_ready(49), "Level 4 portal must require 50 coins")
 	assert(frozen.is_portal_ready(50), "Level 4 portal must open at 50 coins after boss and fragment")
+	assert(frozen.boss_defeated, "Frozen Skies must retain the defeated Titan state")
+	assert(frozen.fragment_recovered, "Frozen Skies must retain the recovered fragment state")
 	get_root().get_node("Progress").clear()
 	print("LEVEL3 Frozen Skies smoke passed: coins=", get_nodes_in_group("collectible_coins").size())
 	quit()

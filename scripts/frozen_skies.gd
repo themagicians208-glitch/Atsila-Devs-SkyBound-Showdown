@@ -106,6 +106,8 @@ func _build_crystal_gate() -> void:
 	visual.material_override = _material(Color("#62e8ff"), 1.4)
 	_crystal_gate.add_child(visual)
 	_world.add_child(_crystal_gate)
+	if Progress.crystal_light_solved:
+		_crystal_gate.open()
 
 func region_name_for_checkpoint(checkpoint_index: int) -> String:
 	var region_index := 0
@@ -363,6 +365,7 @@ func _place_enemies() -> void:
 		if _main.has_method("_on_frozen_fragment_recovered"):
 			_main.call("_on_frozen_fragment_recovered")
 	)
+	fragment_recovered = Progress.third_fragment_recovered
 	if _main.has_method("_bind_frozen_boss"):
 		_main.call("_bind_frozen_boss", _titan)
 
