@@ -35,6 +35,7 @@ const COIN := preload("res://objects/coin.tscn")
 const CLOUD := preload("res://objects/cloud.tscn")
 const GRASS_TUFT := preload("res://models/grass.glb")
 const GRASS_TUFT_SMALL := preload("res://models/grass-small.glb")
+const SLIME := preload("res://objects/shadow_slime.gd")
 
 ## Coins needed to wake the portal. Editable in the Inspector, or in code.
 @export var coins_required := 30
@@ -70,6 +71,7 @@ var waypoints: Array = []
 var checkpoint_points: Array = []
 var coins_placed := 0
 var coins_collected := 0
+var slimes_placed := 0
 
 var _main: Node = null
 var _materials: Dictionary = {}
@@ -100,6 +102,7 @@ func build(main: Node) -> void:
 	_build_arena()
 	_build_portal_terrace()
 	_build_flanks()
+	_spawn_slimes()
 	_build_backdrop()
 	_place_coins()
 	_setup_environment()
@@ -608,6 +611,30 @@ func _scatter_tufts(surface_y: float, x: float, z: float, radius: float, count: 
 		tuft.position = Vector3(x + cos(angle) * spread, surface_y, z + sin(angle) * spread)
 		tuft.rotation.y = angle * 1.7
 		add_child(tuft)
+
+
+## Shadow Slimes, introduced the way the brief asks: one on its own early on, then
+## a pair, then singles guarding the harder ground. They are placed on the route's
+## own surfaces, so each one patrols a ledge the player has to cross.
+## [surface, x, z, health]
+func _spawn_slimes() -> void:
+	var plans: Array = [
+		[2.6, 1.5, 32.8, 2],      # B - the first one alone, on the way down the forest path
+		[2.0, 0.8, 46.0, 2],      # C - the grove, a pair watching the middle
+		[2.5, 2.8, 57.0, 2],
+		[3.5, 2.8, 83.4, 3],      # D - waiting at the far side of the crossing
+		[4.0, -6.2, 92.4, 3],     # E - one guarding each seal terrace
+		[4.2, 7.6, 94.0, 3],
+		[5.6, 0.0, 122.0, 3],     # F - the ruins floor
+		[8.0, 0.0, 156.0, 3],     # G - the arena
+	]
+	for plan in plans:
+		var slime: ShadowSlime = SLIME.new()
+		slime.name = "ShadowSlime_%02d" % slimes_placed
+		slime.position = Vector3(float(plan[1]), float(plan[0]) + 0.05, float(plan[2]))
+		slime.set("max_health", int(plan[3]))
+		add_child(slime)
+		slimes_placed += 1
 
 
 ## Distant islands and clouds, far enough out that the island feels like one peak

@@ -992,6 +992,16 @@ func respawn_player(who: CharacterBody3D = null) -> void:
 	target.previously_floored = false
 	target.model.scale = Vector3.ONE
 	hud.show_finish_message("Back at checkpoint %d" % active_checkpoint if active_checkpoint > 0 else "Back at the start")
+	_reset_enemies()
+
+
+## Send every enemy that has a patrol spot back to it. The island's Shadow Slimes
+## do, so a player who respawns is not dropped straight back into a chase; the sky
+## sentries drift freely and have nothing to reset to.
+func _reset_enemies() -> void:
+	for node in get_tree().get_nodes_in_group("enemies"):
+		if node.has_method("reset_to_home"):
+			node.call("reset_to_home")
 
 
 func _get_mirror_platform_point(route: Array, index: int) -> Vector3:
