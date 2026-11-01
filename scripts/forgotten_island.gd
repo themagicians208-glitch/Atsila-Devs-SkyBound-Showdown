@@ -86,6 +86,7 @@ var _gates: Dictionary = {}
 var _raisers: Dictionary = {}
 var _crystal: IslandCrystal = null
 var _seals: Array[NatureSeal] = []
+var _stations: Array[RuinSymbol] = []
 ## The puzzle name of the switch hidden behind the waterfall.
 const feed_puzzle := "seal_feed"
 var _symbols: Array[Node3D] = []
@@ -644,7 +645,9 @@ func _spawn_slimes() -> void:
 		[3.5, 2.8, 83.4, 3],      # D - waiting at the far side of the crossing
 		[4.0, -5.6, 93.4, 3, 0.9], # E - one warding each seal terrace; they keep to a
 		[4.2, 7.0, 94.8, 3, 0.9],  #     short patrol there so they cannot fall off it
-		[5.6, 0.0, 122.0, 3],     # F - the ruins floor
+		[5.6, 0.0, 122.0, 3],     # F - the ruins floor, and a pair on it: the ruin
+		[5.6, -3.4, 124.0, 3],    #     asks for company while the symbols are turned
+		[5.6, 3.4, 124.8, 3],
 		[8.0, 0.0, 156.0, 3],     # G - the arena
 	]
 	for plan in plans:
@@ -711,6 +714,120 @@ func _build_puzzles() -> void:
 		_build_gated_bridge("hidden_crystal", float(plank[0]), float(plank[1]), float(plank[2]), 0.9)
 
 	_build_nature_seals()
+	_build_ruins_sequence()
+
+
+## Puzzle 5 - the ancient ruins. Three symbol pillars stand on the ruin floor,
+## each with a pressure plate in front of it. A pillar can be turned by
+## interacting, and a plate only holds a charge when its pillar matches the symbol
+## carved on the broken pillars outside - which is the clue the player must read.
+## Three charged stations flood the floor with energy and open the way up to the
+## guardian's chamber.
+##
+##   station 1 wants a circle, station 2 a triangle, station 3 a square, and the
+##   three clue markers stand in that order: near-left, near-right, far-left.
+func _build_ruins_sequence() -> void:
+	var stations: Array = [
+		[Vector3(-3.6, 5.6, 126.4), 1],
+		[Vector3(0.0, 5.6, 128.2), 2],
+		[Vector3(3.6, 5.6, 126.4), 0],
+	]
+	for entry in stations:
+		var station := RuinSymbol.new()
+		station.name = "RuinStation_%d" % _stations.size()
+		station.island = self
+		station.position = entry[0]
+		station.required = int(entry[1])
+		add_child(station)
+		_stations.append(station)
+		_record_surface(entry[0], 0.9)
+
+	# The clue, carved and lit on the broken pillars the player walks past. Each
+	# marker carries pips above it - one, two, three - saying which station it
+	# names, so the answer is readable rather than guessable. Order: left to right.
+	var clue: Array = [
+		[Vector3(-4.6, 8.3, 119.5), 1, 0],
+		[Vector3(4.6, 8.3, 119.5), 2, 1],
+		[Vector3(-5.4, 8.3, 125.0), 0, 2],
+	]
+	for entry in clue:
+		_clue_marker(entry[0], int(entry[1]), int(entry[2]))
+
+	# The gate to the chamber: across the ruin floor, so the climb up to the
+	# guardian's arena cannot be reached until the symbols are aligned. The floor
+	# is 8.7 across where the wall stands, so 10.0 seals it with room to spare.
+	var gate := IslandGate.new()
+	gate.name = "ChamberGate"
+	gate.solved_name = "ruins_sequence"
+	gate.width = 10.0
+	gate.position = Vector3(0.0, 5.6, 127.5)
+	add_child(gate)
+	_register_gate("ruins_sequence", gate)
+	_gate_off("ruins_sequence", 127.5)
+
+
+## A glowing shape on a ruin pillar: the clue for one station, with pips above it
+## counting which of the three stations it names.
+func _clue_marker(spot: Vector3, shape: int, index: int) -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#d8c6ff")
+	material.emission_enabled = true
+	material.emission = Color("#b06bff")
+	material.emission_energy_multiplier = 1.2
+	var marker := Node3D.new()
+	marker.name = "ClueMarker_%d" % (index + 1)
+	marker.position = spot
+	marker.set_meta("station", index)
+	marker.set_meta("shape", shape)
+	add_child(marker)
+	match shape:
+		0:
+			_box(marker, Vector3(0.5, 0.5, 0.12), material, Vector3.ZERO)
+		1:
+			_torus(marker, 0.16, 0.28, material, Vector3.ZERO, Vector3(90.0, 0.0, 0.0))
+		_:
+			var pyramid := MeshInstance3D.new()
+			var pyramid_mesh := CylinderMesh.new()
+			pyramid_mesh.top_radius = 0.0
+			pyramid_mesh.bottom_radius = 0.34
+			pyramid_mesh.height = 0.54
+			pyramid_mesh.radial_segments = 3
+			pyramid.mesh = pyramid_mesh
+			pyramid.material_override = material
+			pyramid.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+			marker.add_child(pyramid)
+	# The pips: index + 1 small beads in a row under the shape.
+	var pip_material := StandardMaterial3D.new()
+	pip_material.albedo_color = Color("#f0e4ff")
+	pip_material.emission_enabled = true
+	pip_material.emission = Color("#cfa8ff")
+	pip_material.emission_energy_multiplier = 1.6
+	for i in index + 1:
+		var pip := MeshInstance3D.new()
+		var pip_mesh := SphereMesh.new()
+		pip_mesh.radius = 0.075
+		pip_mesh.height = 0.15
+		pip.mesh = pip_mesh
+		pip.material_override = pip_material
+		pip.position = Vector3((float(i) - float(index) * 0.5) * 0.22, -0.5, 0.0)
+		marker.add_child(pip)
+
+
+func ruin_station_charged(who: RuinSymbol) -> void:
+	var done := ruin_stations_charged()
+	if done >= _stations.size():
+		solve_puzzle("ruins_sequence",
+			"The three symbols align - energy floods the floor and the way to the chamber opens!")
+	else:
+		message.emit("%s locks in.  %d of %d stations charged." % [who.shape_name(), done, _stations.size()])
+
+
+func ruin_stations_charged() -> int:
+	var done := 0
+	for station in _stations:
+		if is_instance_valid(station) and station.is_charged:
+			done += 1
+	return done
 
 
 ## Puzzle 4 - the three nature seals, one at each terrace of the seal terraces.
@@ -802,14 +919,27 @@ func seals_awakened() -> int:
 
 ## Mark every ledge north of a wall as lying behind that puzzle. The wall is the
 ## only way past, so nothing beyond it can be reached until its gate opens - and
-## the checks in tools/ rely on this being true.
+## the checks in tools/ rely on this being true. Several puzzles can stand between
+## the player and one ledge; the names are kept as a "|"-joined list.
 func _gate_off(puzzle: String, beyond_z: float) -> void:
 	for entry in _surfaces:
-		if not str(entry.get("gate", "")).is_empty():
-			continue
 		var point: Vector3 = entry["point"]
-		if point.z > beyond_z:
-			entry["gate"] = puzzle
+		if point.z <= beyond_z:
+			continue
+		var existing := str(entry.get("gate", ""))
+		if existing.split("|").has(puzzle):
+			continue
+		entry["gate"] = puzzle if existing.is_empty() else "%s|%s" % [existing, puzzle]
+
+
+## Whether a recorded ledge exists yet, given which puzzles have been solved.
+func surface_open(entry: Dictionary) -> bool:
+	for name in str(entry.get("gate", "")).split("|"):
+		if name.is_empty():
+			continue
+		if not is_puzzle_solved(name):
+			return false
+	return true
 
 
 ## A plank bridge that does not exist until its puzzle is solved. It is recorded
@@ -891,6 +1021,14 @@ func solve_all_puzzles() -> void:
 		pedestal.call("fill")
 	else:
 		solve_puzzle("hidden_crystal")
+	for seal in _seals:
+		if is_instance_valid(seal):
+			seal.awaken()
+	for station in _stations:
+		if is_instance_valid(station):
+			station.force_charge()
+	solve_puzzle("nature_seals")
+	solve_puzzle("ruins_sequence")
 
 
 func find_crystal() -> IslandCrystal:

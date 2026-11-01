@@ -53,7 +53,7 @@ func _ready() -> void:
 		# be out of reach, or solving that puzzle would not open anything.
 		if island.is_puzzle_solved("ancient_switch") or island.is_puzzle_solved("hidden_crystal"):
 			problems.append("a puzzle is already marked solved before anyone played")
-		var closed := _indices(surfaces, false)
+		var closed := _indices(surfaces, false, island)
 		var reached_closed := _reachable(surfaces, start, closed)
 		for i in surfaces.size():
 			var gate := str(surfaces[i].get("gate", ""))
@@ -87,7 +87,7 @@ func _ready() -> void:
 		island.solve_all_puzzles()
 		await get_tree().process_frame
 		await get_tree().process_frame
-		var all_open := _indices(surfaces, true)
+		var all_open := _indices(surfaces, true, island)
 		var reached := _reachable(surfaces, start, all_open)
 		var unreachable := 0
 		for i in all_open:
@@ -215,10 +215,10 @@ func _nearest_surface(surfaces: Array, spot: Vector3) -> int:
 
 
 ## Every ledge index, optionally including the ones a puzzle has to be solved for.
-func _indices(surfaces: Array, include_gated: bool) -> Array[int]:
+func _indices(surfaces: Array, include_gated: bool, island: ForgottenIsland) -> Array[int]:
 	var list: Array[int] = []
 	for i in surfaces.size():
-		if include_gated or str(surfaces[i].get("gate", "")).is_empty():
+		if include_gated or island.surface_open(surfaces[i]):
 			list.append(i)
 	return list
 
@@ -228,7 +228,9 @@ func _indices(surfaces: Array, include_gated: bool) -> Array[int]:
 func _reachable(surfaces: Array, start: int, allowed: Array[int] = []) -> Dictionary:
 	var usable := allowed
 	if usable.is_empty():
-		usable = _indices(surfaces, true)
+		# No filter given: every ledge counts.
+		for i in surfaces.size():
+			usable.append(i)
 	var seen := {}
 	if start in usable:
 		seen[start] = true

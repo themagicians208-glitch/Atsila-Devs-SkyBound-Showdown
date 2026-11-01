@@ -97,6 +97,12 @@ func _ready() -> void:
 	# 26 units away, on a real platform of the forest path rather than in mid-air.
 	player.global_position = Vector3(1.5, 3.2, 32.8)
 	player.velocity = Vector3.ZERO
+	# And put the slime a solid 6 units out from its patrol spot, on the same
+	# ground, so "goes home" is a journey rather than a wobble inside the radius
+	# its patrol wanders over anyway. Its home stays where it is: place_at()
+	# re-homes a slime by design, so this moves it without moving the goalpost.
+	subject.global_position = patrol_spot + Vector3(0.0, 0.35, -6.0)
+	subject.velocity = Vector3(0.0, -1.0, 0.0)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	print("player %.1f units away: state %s, paused %s" % [
@@ -110,12 +116,10 @@ func _ready() -> void:
 		await get_tree().create_timer(0.1).timeout
 	var after := subject.global_position.distance_to(patrol_spot)
 	print("walking home: %.2f -> %.2f units from its patrol spot" % [before, after])
-	if after > before + 0.2:
-		_problems.append("it drifted away from home instead of returning (%.2f -> %.2f)" % [before, after])
-	if before > 4.0 and after >= before:
-		# Only meaningful when it was genuinely away: inside its patrol radius it
-		# wanders around home by design, so the distance can wobble either way.
-		_problems.append("it made no progress back to its patrol spot (%.2f -> %.2f)" % [before, after])
+	if before < 4.0:
+		_problems.append("the slime was only %.2f from home, too close to judge the return" % before)
+	elif after > before - 0.5:
+		_problems.append("it made no real progress home (%.2f -> %.2f)" % [before, after])
 
 	# --- 4. They stay on their ledges ---------------------------------------
 	# Six seconds of patrolling with the player far away: every slime should still
