@@ -1336,6 +1336,9 @@ func _setup_local_coop() -> void:
 
 	# Player 2 shares the world, with its own camera in the right viewport.
 	player_two = PLAYER_SCENE.instantiate()
+	# Second player uses the second colour and their own character pick.
+	player_two.set("player_index", 1)
+	player_two.set("character_id", str(get_tree().get_meta("p2_character", "")))
 	player_two.position = player.position + Vector3(2.0, 0.0, 0.0)
 	add_child(player_two)
 
@@ -1477,9 +1480,21 @@ func _setup_online() -> void:
 	network.peer_list_changed.connect(_refresh_remote_players)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	player.set_player_name(network.local_name)
+	player.call("set_player_index", _player_index_for(multiplayer.get_unique_id()))
 	_refresh_remote_players()
 	var role := "HOST" if multiplayer.is_server() else "CLIENT"
 	hud.show_finish_message("ONLINE %s  •  players: %d" % [role, network.player_ids().size()])
+
+
+func _player_index_for(id: int) -> int:
+	# A stable 0-based slot for a peer, used to pick a distinct character colour.
+	var ids: Array = []
+	for peer in multiplayer.get_peers():
+		ids.append(int(peer))
+	ids.append(multiplayer.get_unique_id())
+	ids.sort()
+	var index: int = ids.find(id)
+	return maxi(0, index)
 
 
 func _refresh_remote_players() -> void:
@@ -1496,19 +1511,29 @@ func _refresh_remote_players() -> void:
 	for id in remote_players.keys():
 		if not network.players.has(id):
 			_remove_remote_player(id)
-	# Keep every remote player's name tag current.
+	# Keep every remote player's name tag and character current.
 	for id in remote_players.keys():
 		var proxy: Node = remote_players[id]
-		if is_instance_valid(proxy):
-			proxy.set_player_name(network.get_player_name(id))
+		if not is_instance_valid(proxy):
+			continue
+		if str(proxy.get("character_id")) != network.get_player_character(id):
+			# They changed character: rebuild the proxy with the new model.
+			_remove_remote_player(id)
+			_spawn_remote_player(id)
+			continue
+		proxy.set_player_name(network.get_player_name(id))
 	hud.show_finish_message("ONLINE  •  players connected: %d" % network.player_ids().size())
 
 
 func _spawn_remote_player(id: int) -> void:
+	var network := get_node_or_null("/root/Network")
 	var proxy: CharacterBody3D = PLAYER_SCENE.instantiate()
 	proxy.name = "Remote_%d" % id
 	proxy.set_physics_process(false)
 	proxy.set("view", null)
+	# Each peer gets a distinct colour and their own character.
+	proxy.set("player_index", _player_index_for(id))
+	proxy.set("character_id", "" if network == null else network.get_player_character(id))
 	proxy.position = player.position + Vector3(1.6, 0.0, 0.0)
 	add_child(proxy)
 	proxy.set_meta("net_target", proxy.position)

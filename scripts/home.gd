@@ -1,6 +1,7 @@
 extends Control
 
 const UI_FONT = preload("res://fonts/lilita_one_regular.ttf")
+const ROSTER := preload("res://scripts/roster.gd")
 const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
 var popup: ColorRect
@@ -15,6 +16,9 @@ var p2_device := "keyboard"
 var p1_name := "Player 1"
 var p2_name := "Player 2"
 var online_name := "Player"
+# Chosen characters (ids from the roster). The display name is the model file name.
+var p1_character := ""
+var p2_character := ""
 var _p2_auto_assigned := false
 var _showing_input_setup := false
 
@@ -215,7 +219,7 @@ func _build_home() -> void:
 
 	var play := _button("PLAY NOW", Color("#ffd451"), Color("#493600"))
 	default_button = play
-	play.pressed.connect(func(): _start_level(1))
+	play.pressed.connect(func(): _show_character_select(1, func(): _start_level(1)))
 	content.add_child(play)
 
 	var continue_btn := _button(_continue_button_text(), Color("#51c46f"), Color("#1a4d2a"))
@@ -223,7 +227,7 @@ func _build_home() -> void:
 	content.add_child(continue_btn)
 
 	var levels := _button("EXPLORE LEVELS", Color("#315784"), Color.WHITE)
-	levels.pressed.connect(_show_level_select)
+	levels.pressed.connect(func(): _show_character_select(1, _show_level_select))
 	content.add_child(levels)
 
 	var multiplayer_button := _multiplayer_button()
@@ -327,6 +331,129 @@ func _show_level_select() -> void:
 	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
 	if popup_body.get_child_count() > 0:
 		(popup_body.get_child(0) as Control).grab_focus()
+
+
+## Ask which character to play as, before the level is picked. `slots` is 1 for
+## single player and online, 2 for local split screen.
+func _show_character_select(slots: int, on_done: Callable, back: Callable = Callable()) -> void:
+	_showing_input_setup = false
+	if p1_character.is_empty() or not ROSTER.has(p1_character):
+		p1_character = ROSTER.default_id()
+	if p2_character.is_empty() or not ROSTER.has(p2_character):
+		p2_character = ROSTER.default_id()
+	get_tree().set_meta("p1_character", p1_character)
+	get_tree().set_meta("p2_character", p2_character)
+
+	_back_handler = back
+	popup_title.text = "PICK A CHARACTER" if slots < 2 else "PICK YOUR CHARACTERS"
+	_clear_popup_body()
+
+	var note := _label("Who do you want to play as?" if slots < 2 else "Choose one for each player.",
+		16, Color("#cfe9ff"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(note)
+
+	var preview_size := Vector2(190, 215) if slots < 2 else Vector2(132, 152)
+	for slot in slots:
+		if slots > 1:
+			var who := _label("PLAYER %d" % (slot + 1), 17, Color("#ffd451"))
+			who.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			popup_body.add_child(who)
+		var current := p1_character if slot == 0 else p2_character
+
+		# The picked character stands next to its buttons, so the choice can be
+		# seen rather than only read.
+		var line := HBoxContainer.new()
+		line.alignment = BoxContainer.ALIGNMENT_CENTER
+		line.add_theme_constant_override("separation", 14)
+		popup_body.add_child(line)
+		line.add_child(_character_preview(current, slot, preview_size))
+
+		var choices := GridContainer.new()
+		choices.columns = 1 if slots < 2 else 2
+		choices.add_theme_constant_override("h_separation", 8)
+		choices.add_theme_constant_override("v_separation", 8)
+		line.add_child(choices)
+		for i in ROSTER.count():
+			var character_id := ROSTER.id_at(i)
+			var picked := character_id == current
+			var choice := _button(character_id,
+				Color("#ffd451") if picked else Color("#315784"),
+				Color("#493600") if picked else Color.WHITE)
+			choice.custom_minimum_size = Vector2(148, 42) if slots < 2 else Vector2(126, 40)
+			choice.add_theme_font_size_override("font_size", 18)
+			choice.pressed.connect(_pick_character.bind(slot, character_id, slots, on_done, back))
+			choices.add_child(choice)
+
+	var confirm := _button("CONTINUE", Color("#8fe0ff"), Color("#062a3d"))
+	confirm.pressed.connect(on_done)
+	popup_body.add_child(confirm)
+
+	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
+	confirm.grab_focus()
+
+
+## A small 3D stage showing one character, tinted in its player's colour, to sit
+## in the character select.
+func _character_preview(character_id: String, player_index: int, preview_size: Vector2) -> Control:
+	var container := SubViewportContainer.new()
+	container.custom_minimum_size = preview_size
+	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(preview_size)
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport.msaa_3d = Viewport.MSAA_4X
+	# Its own world, so the menu scene's lights and geometry stay out of the shot.
+	viewport.own_world_3d = true
+	container.add_child(viewport)
+
+	var stage := Node3D.new()
+	viewport.add_child(stage)
+	var character: Node3D = load(ROSTER.scene_for(character_id)).instantiate()
+	character.set("player_index", player_index)
+	character.set("animate_motion", false)
+	stage.add_child(character)
+	if character.has_method("set_pose"):
+		# Neutral stance: the rig's resting pose has the arms where they belong.
+		character.call("set_pose", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+	var cam := Camera3D.new()
+	cam.fov = 30.0
+	# Far enough back that the tallest character (about one unit) fits whole.
+	cam.look_at_from_position(Vector3(0.78, 0.98, 2.05), Vector3(0.0, 0.52, 0.0), Vector3.UP)
+	cam.current = true
+	stage.add_child(cam)
+
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-40, -30, 0)
+	light.light_energy = 1.15
+	stage.add_child(light)
+
+	var env := WorldEnvironment.new()
+	var world_env := Environment.new()
+	world_env.background_mode = Environment.BG_COLOR
+	world_env.background_color = Color("#17324f")
+	world_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	world_env.ambient_light_color = Color.WHITE
+	world_env.ambient_light_energy = 0.85
+	env.environment = world_env
+	stage.add_child(env)
+	return container
+
+
+func _pick_character(slot: int, character_id: String, slots: int, on_done: Callable, back: Callable) -> void:
+	if slot == 0:
+		p1_character = character_id
+	else:
+		p2_character = character_id
+	get_tree().set_meta("p1_character", p1_character)
+	get_tree().set_meta("p2_character", p2_character)
+	# Rebuild so the pick is highlighted.
+	_show_character_select(slots, on_done, back)
 
 func _show_controls() -> void:
 	_back_handler = Callable()
@@ -545,7 +672,7 @@ func _local_start_pressed() -> void:
 		else:
 			_ask_keyboard_share()
 		return
-	_show_local_levels()
+	_show_character_select(2, _show_local_levels, _show_local_options)
 
 
 func _ask_keyboard_share() -> void:
@@ -558,7 +685,7 @@ func _ask_keyboard_share() -> void:
 	info.custom_minimum_size.x = 460
 	popup_body.add_child(info)
 	var yes := _button("YES, PLAY ON ONE KEYBOARD", Color("#ffd451"), Color("#493600"))
-	yes.pressed.connect(_show_local_levels)
+	yes.pressed.connect(func(): _show_character_select(2, _show_local_levels, _show_local_options))
 	popup_body.add_child(yes)
 	_back_handler = _show_local_options
 	popup.visible = true
@@ -675,7 +802,7 @@ func _online_create() -> void:
 	popup_body.add_child(address)
 	popup_body.add_child(_label("They pick JOIN ROOM and type it in.\n(Same Wi-Fi / LAN works best.)", 15, Color("#9fc4e8")))
 	var start := _button("START GAME", Color("#ffd451"), Color("#493600"))
-	start.pressed.connect(_online_start_host)
+	start.pressed.connect(func(): _show_character_select(1, _online_character_confirmed, _online_leave_room))
 	popup_body.add_child(start)
 	var cancel := _button("CLOSE ROOM", Color("#315784"), Color.WHITE)
 	cancel.pressed.connect(func() -> void:
@@ -689,9 +816,32 @@ func _online_create() -> void:
 	start.grab_focus()
 
 
+## The player has confirmed their online character: publish it, then either start
+## the level (host) or wait for the host to start it (client).
+func _online_character_confirmed() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.local_character = p1_character
+		network.announce_profile()
+	if network != null and network.is_host:
+		_online_start_host()
+	else:
+		_online_message("WAITING FOR THE HOST",
+			"You picked %s.\nThe host will start the level." % p1_character)
+
+
+func _online_leave_room() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.close()
+	_show_online()
+
+
 func _online_start_host() -> void:
 	var network := get_node_or_null("/root/Network")
 	if network:
+		network.local_character = p1_character
+		network.announce_profile()
 		# Tell the host's own client list (and any later joiner) to load level 1.
 		network.start_game(1)
 	get_tree().set_meta("online", true)
@@ -716,7 +866,8 @@ func _online_join(code: String) -> void:
 	if not network.join(address):
 		_online_message("JOIN ROOM", "Could not start the connection to \"%s\"." % address)
 		return
-	_online_message("JOINING ROOM", "Connecting to %s ...\nThe host will start the level." % address)
+	# Pick a character while the connection is being made.
+	_show_character_select(1, _online_character_confirmed, _online_leave_room)
 
 
 func _start_local(level_number: int) -> void:
