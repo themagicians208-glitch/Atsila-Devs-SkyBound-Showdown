@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#-the-adventure">The Adventure</a> · 
+  <a href="#-the-adventure">The adventure</a> · 
   <a href="#️-multiplayer">Multiplayer</a> · 
   <a href="#️-choose-your-course">Six Courses</a> · 
   <a href="#-controls">Controls</a> · 
@@ -75,17 +75,30 @@ For more detail on route sizes and mechanics, see **[COURSES.md](COURSES.md)**.
 
 ## 🎮 Controls
 
-| Action | Keyboard / mouse | Controller |
-|---|---|---|
-| Move | W, A, S, D | Left stick |
-| Look around | Mouse movement | Right stick |
-| Jump / double jump | Space / left click | A |
-| Shift dimension | Q / right click | Left bumper (LB) |
-| Freeze time briefly | F | Y |
-| Activate a nearby switch | E | X |
-| Zoom camera | Mouse wheel | Triggers |
-| Navigate menus / select | Mouse click | D-pad or left stick / A |
-| Return / back | Esc | B |
+### ⌨️ Standard Controls
+| Action | Keyboard / mouse | Xbox / PC Controller | PS5 / PS4 Controller | Handheld (Switch/SteamDeck) |
+|---|---|---|---|---|
+| Move | W, A, S, D | Left stick | Left stick | Left stick |
+| Look around | Mouse movement | Right stick | Right stick | Right stick |
+| Jump / double jump | Space / left click | A | Cross ($\times$) | A / South |
+| Shift dimension | Q / right click | Left bumper (LB) | L1 | L |
+| Freeze time briefly | F | Y | Triangle ($\triangle$) | B / East |
+| Activate a nearby switch | E | X | Square ($\square$) | X / West |
+| Zoom camera | Mouse wheel | Triggers | Triggers | Triggers |
+| Navigate menus / select | Mouse click | D-pad or left stick / A | D-pad / Cross ($\times$) | D-pad / A |
+| Return / back | Esc | B | Circle ($\bigcirc$) | B / East |
+
+### 🥽 VR Controls
+| Action | VR Controller |
+|---|---|
+| Move | Left Thumbstick |
+| Look around | Head Movement (HMD) |
+| Jump / double jump | A / Trigger |
+| Shift dimension | X / B Button |
+| Freeze time briefly | Y Button |
+| Activate a nearby switch | Grip / Trigger |
+| Zoom camera | Right Thumbstick |
+| Menu / Pause | Menu Button |
 
 **First-time tip:** try switching dimensions with **Q** whenever a route seems blocked. Material and Mirror have different platforms and selected hazards, so changing the world can reveal another way forward.
 
