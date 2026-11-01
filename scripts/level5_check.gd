@@ -4,8 +4,8 @@ func _init() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	root.set_meta("level_number", 5)
-	root.set_meta("resume_save", false)
+	set_meta("level_number", 5)
+	set_meta("resume_save", false)
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	var instance: Node = packed.instantiate()
 	root.add_child(instance)

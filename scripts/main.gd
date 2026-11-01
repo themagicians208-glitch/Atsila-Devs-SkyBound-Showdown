@@ -22,6 +22,7 @@ const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")
 const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
+const FROZEN_SKIES_SCRIPT := preload("res://scripts/frozen_skies.gd")
 
 const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
@@ -46,6 +47,7 @@ var player_two: CharacterBody3D
 var coins_collected := 0
 ## Level 1 is the hand-laid Forgotten Island instead of a generated course.
 var island: ForgottenIsland = null
+var frozen_skies: FrozenSkies = null
 ## Stops the dormant portal from spamming its message while the player stands in it.
 var _portal_locked_cooldown := 0.0
 
@@ -89,6 +91,10 @@ func _ready() -> void:
 		island.notify_coins(0)
 		hud.show_finish_message("THE FORGOTTEN ISLAND")
 		hud.set_objective("Explore the Forgotten Island  -  %d more coins wake the portal" % coin_goal)
+	elif frozen_skies != null:
+		coin_goal = frozen_skies.coins_required
+		hud.show_finish_message("LEVEL 3 - FROZEN SKIES")
+		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
@@ -216,11 +222,15 @@ func _build_level(level_number: int) -> void:
 	switches_pressed = 0
 	puzzle_solved = false
 	island = null
+	frozen_skies = null
 	for child in world.get_children():
 		world.remove_child(child)
 		child.free()
 	if level_number == 1:
 		_build_island()
+		return
+	if level_number == 3:
+		_build_frozen_skies()
 		return
 	var routes := _get_level_routes()
 	var route: Array = routes[level_number - 1]
@@ -307,6 +317,34 @@ func _build_island() -> void:
 	finish.position = node.portal_position
 	_apply_dimension_visibility()
 	_bind_island_boss()
+
+
+func _build_frozen_skies() -> void:
+	var node: FrozenSkies = FROZEN_SKIES_SCRIPT.new()
+	node.name = "FrozenSkies"
+	world.add_child(node)
+	frozen_skies = node
+	route_points = node.build(self)
+	player.position = route_points[0] + Vector3(0.0, 0.55, 0.0)
+	player.velocity = Vector3.ZERO
+	checkpoint_position = player.position
+	active_checkpoint = 0
+	for checkpoint_index in [0, 9, 18, 29, 38]:
+		_add_checkpoint(route_points[checkpoint_index], checkpoint_index)
+	finish.position = route_points[route_points.size() - 1] + Vector3(0.0, 1.0, 0.0)
+
+
+func _bind_frozen_boss(boss: Node) -> void:
+	if boss == null or not boss.has_signal("health_changed"):
+		return
+	boss.health_changed.connect(func(health: int, maximum: int, phase: int):
+		hud.show_boss("THE FROST TITAN")
+		hud.update_boss(health, maximum, phase)
+	)
+	boss.defeated.connect(func():
+		hud.hide_boss()
+		hud.show_finish_message("The Third Fragment of the Eternal Tree is yours!")
+	)
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1385,6 +1423,11 @@ func _on_coin_collected(_coins: int) -> void:
 
 func _on_finish_body_entered(body: Node3D) -> void:
 	if body != player and body != player_two:
+		return
+	if frozen_skies != null and not frozen_skies.is_portal_ready(coins_collected):
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message(frozen_skies.portal_blocked_reason(coins_collected))
 		return
 	if island != null and not island.is_portal_ready():
 		# The portal is dormant until the guardian is gone, the Fragment is

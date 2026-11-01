@@ -14,6 +14,7 @@ const CONFIG_PATH := "user://progress.cfg"
 
 var config_path := CONFIG_PATH
 var fragment_recovered := false
+var third_fragment_recovered := false
 
 
 func _ready() -> void:
@@ -25,11 +26,13 @@ func load_progress() -> void:
 	if config.load(config_path) != OK:
 		return
 	fragment_recovered = bool(config.get_value("island", "fragment_recovered", false))
+	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
 
 
 func save_progress() -> void:
 	var config := ConfigFile.new()
 	config.set_value("island", "fragment_recovered", fragment_recovered)
+	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
 	config.save(config_path)
 
 
@@ -40,9 +43,16 @@ func recover_fragment() -> void:
 	fragment_recovered = true
 	save_progress()
 
+func recover_third_fragment() -> void:
+	if third_fragment_recovered:
+		return
+	third_fragment_recovered = true
+	save_progress()
+
 
 ## Forget everything. Only the dev checks call this.
 func clear() -> void:
 	fragment_recovered = false
+	third_fragment_recovered = false
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))
