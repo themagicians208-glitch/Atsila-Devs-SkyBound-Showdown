@@ -347,7 +347,8 @@ func _bind_frozen_boss(boss: Node) -> void:
 	)
 	boss.defeated.connect(func():
 		hud.hide_boss()
-		hud.show_finish_message("The Third Fragment of the Eternal Tree is yours!")
+		hud.show_finish_message("The Frost Titan falls. Open the ancient chest!")
+		hud.set_objective("Open the ancient chest and recover the Third Fragment.")
 	)
 
 
@@ -355,6 +356,7 @@ func _on_frozen_fragment_recovered() -> void:
 	if frozen_skies != null:
 		frozen_skies.thaw_environment()
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
+	hud.set_objective("Find 50 coins to unlock the Level 4 portal.")
 
 
 func _on_frozen_mechanism_progress(current: int, total: int) -> void:
@@ -1469,6 +1471,9 @@ func _on_coin_collected(_coins: int) -> void:
 		return
 	if coins_collected >= coin_goal:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
+	if frozen_skies != null and coins_collected >= coin_goal \
+			and frozen_skies.boss_defeated and Progress.third_fragment_recovered:
+		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
