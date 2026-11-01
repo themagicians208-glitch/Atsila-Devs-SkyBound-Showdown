@@ -14,6 +14,7 @@ const CONFIG_PATH := "user://progress.cfg"
 
 var config_path := CONFIG_PATH
 var fragment_recovered := false
+var second_fragment_recovered := false
 var third_fragment_recovered := false
 var ice_shield_unlocked := false
 var frost_dash_unlocked := false
@@ -33,6 +34,7 @@ func load_progress() -> void:
 	if config.load(config_path) != OK:
 		return
 	fragment_recovered = bool(config.get_value("island", "fragment_recovered", false))
+	second_fragment_recovered = bool(config.get_value("progression", "second_fragment_recovered", false))
 	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
 	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
 	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
@@ -48,6 +50,7 @@ func load_progress() -> void:
 func save_progress() -> void:
 	var config := ConfigFile.new()
 	config.set_value("island", "fragment_recovered", fragment_recovered)
+	config.set_value("progression", "second_fragment_recovered", second_fragment_recovered)
 	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
 	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
 	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
@@ -64,6 +67,12 @@ func recover_fragment() -> void:
 	if fragment_recovered:
 		return
 	fragment_recovered = true
+	save_progress()
+
+func recover_second_fragment() -> void:
+	if second_fragment_recovered:
+		return
+	second_fragment_recovered = true
 	save_progress()
 
 func recover_third_fragment() -> void:
@@ -112,6 +121,7 @@ func mark_crystal_light_solved() -> void:
 ## Forget everything. Only the dev checks call this.
 func clear() -> void:
 	fragment_recovered = false
+	second_fragment_recovered = false
 	third_fragment_recovered = false
 	ice_shield_unlocked = false
 	frost_dash_unlocked = false

@@ -6,6 +6,7 @@ func _init() -> void:
 func _run() -> void:
 	# Smoke tests must start from a known progression state, not a developer save.
 	get_root().get_node("Progress").clear()
+	get_root().get_node("Progress").recover_second_fragment()
 	set_meta("level_number", 3)
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	assert(packed != null, "main scene must load")
@@ -13,6 +14,7 @@ func _run() -> void:
 	root.add_child(instance)
 	await process_frame
 	assert(instance.get("current_level") == 3, "level 3 must be selected")
+	assert(get_root().get_node("Progress").second_fragment_recovered, "Level 3 must preserve the Second Fragment")
 	assert(instance.get("frozen_skies") != null, "Frozen Skies builder must be active")
 	var world: Node = instance.get_node("World")
 	assert(world.get_node_or_null("FrostTitan") != null, "Frost Titan must spawn")
