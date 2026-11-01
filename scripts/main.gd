@@ -99,6 +99,7 @@ func _ready() -> void:
 		hud.show_finish_message("LEVEL 3 – FROZEN SKIES")
 		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 		_update_frozen_ability_hud()
+		_update_frozen_progress_hud()
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
@@ -357,10 +358,12 @@ func _on_frozen_fragment_recovered() -> void:
 		frozen_skies.thaw_environment()
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
 	hud.set_objective("Find 50 coins to unlock the Level 4 portal.")
+	_update_frozen_progress_hud()
 
 
 func _on_frozen_mechanism_progress(current: int, total: int) -> void:
 	_update_frozen_ability_hud()
+	_update_frozen_progress_hud()
 	if current >= total:
 		hud.set_objective("All three frozen seals are active. Defeat the Frost Titan.")
 	else:
@@ -369,6 +372,7 @@ func _on_frozen_mechanism_progress(current: int, total: int) -> void:
 func _on_frozen_crystal_light_solved() -> void:
 	hud.show_finish_message("Crystal light aligned! The frozen gate responds.")
 	hud.set_objective("Crystal light aligned. Continue through Frozen Crystal Caves.")
+	_update_frozen_progress_hud()
 
 func _on_frozen_mechanism_blocked(message: String) -> void:
 	hud.show_finish_message(message)
@@ -384,6 +388,16 @@ func _update_frozen_ability_hud() -> void:
 	if Progress.crystal_activation_unlocked:
 		unlocked.append("E Crystal Activation")
 	hud.set_frozen_abilities(unlocked)
+
+func _update_frozen_progress_hud() -> void:
+	if frozen_skies == null:
+		return
+	hud.set_frozen_progress(
+		Progress.frozen_seals_activated,
+		frozen_skies.mechanisms.size(),
+		Progress.crystal_light_solved,
+		Progress.third_fragment_recovered,
+		active_checkpoint)
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1067,6 +1081,7 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 	checkpoint_position = respawn_point
 	if frozen_skies != null:
 		Progress.set_frozen_checkpoint(checkpoint_index)
+		_update_frozen_progress_hud()
 	flag_material.albedo_color = Color("#ffe25a")
 	flag_material.emission = Color("#ffc928")
 	if frozen_skies != null:

@@ -14,6 +14,7 @@ var replay_button: Button
 var controls_hint: Label
 var objective_hint: Label
 var frozen_ability_hint: Label
+var frozen_progress_hint: Label
 ## When true the objective stays on screen after the controls hint fades.
 var objective_persistent := false
 var controls_tween: Tween
@@ -323,6 +324,14 @@ func set_frozen_abilities(unlocked: Array[String]) -> void:
 		return
 	frozen_ability_hint.text = "ICE ABILITIES  •  " + "  |  ".join(unlocked)
 	frozen_ability_hint.visible = true
+
+func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int) -> void:
+	if not is_instance_valid(frozen_progress_hint):
+		return
+	frozen_progress_hint.text = "SEALS %d/%d  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d" % [
+		seals, total, "ALIGNED" if crystal_solved else "PENDING",
+		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
+	frozen_progress_hint.visible = true
 
 func _on_coin_collected(coins):
 	_update_coin_counter(coins)
@@ -678,6 +687,22 @@ func _build_game_hud() -> void:
 	frozen_ability_hint.add_theme_constant_override("shadow_offset_y", 2)
 	frozen_ability_hint.visible = false
 	add_child(frozen_ability_hint)
+
+	frozen_progress_hint = Label.new()
+	frozen_progress_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frozen_progress_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	frozen_progress_hint.offset_left = -560
+	frozen_progress_hint.offset_top = 96
+	frozen_progress_hint.offset_right = 560
+	frozen_progress_hint.offset_bottom = 122
+	frozen_progress_hint.add_theme_font_override("font", UI_FONT)
+	frozen_progress_hint.add_theme_font_size_override("font_size", 14)
+	frozen_progress_hint.add_theme_color_override("font_color", Color("#d8f8ff"))
+	frozen_progress_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	frozen_progress_hint.add_theme_constant_override("shadow_offset_x", 2)
+	frozen_progress_hint.add_theme_constant_override("shadow_offset_y", 2)
+	frozen_progress_hint.visible = false
+	add_child(frozen_progress_hint)
 
 	shift_timer_label = Label.new()
 	shift_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
