@@ -2,9 +2,18 @@ class_name IslandGate
 extends StaticBody3D
 
 ## An ancient stone gate: a wall of masonry that sinks into the ground when its
-## puzzle is solved, taking its collision with it. Same trick as the levels'
-## PuzzleGate, but it builds its own carved stonework and can be told to wait for
-## a named puzzle rather than a count of levers.
+## puzzle is solved, taking its collision with it.
+##
+## The collision is a DIRECT child of this body, built before it can join the tree.
+## That is not a style choice: with the Jolt backend a CollisionShape3D nested
+## under an intermediate node - this gate used to hang its shape off the sinking
+## Slab - never registers at all, and a shape added to a body already inside the
+## tree does not register either. Either way the wall looks solid and is not, which
+## is how every gate in the Forgotten Island could be walked straight through
+## (tools/check_collision guards it now).
+##
+## The Slab carries only the masonry, and still sinks when the puzzle is solved;
+## the collision is switched off at the same moment, so it does not need to follow.
 
 @export var solved_name := "ancient_switch"
 @export var width := 4.6
@@ -16,10 +25,27 @@ extends StaticBody3D
 var opened := false
 
 var _slab: Node3D
+var _collision: CollisionShape3D
 var _rune: MeshInstance3D
 
 
+func _init() -> void:
+	_collision = CollisionShape3D.new()
+	_collision.name = "WallCollision"
+	var box := BoxShape3D.new()
+	box.size = Vector3(width, height, 0.7)
+	_collision.shape = box
+	_collision.position.y = height * 0.5
+	add_child(_collision)
+
+
 func _ready() -> void:
+	# The exports are only known now, so size the placeholder for real.
+	(_collision.shape as BoxShape3D).size = Vector3(width, height, 0.7)
+	_collision.position.y = height * 0.5
+	_slab = Node3D.new()
+	_slab.name = "Slab"
+	add_child(_slab)
 	_build()
 
 
@@ -30,17 +56,6 @@ func _build() -> void:
 	var stone_dark := StandardMaterial3D.new()
 	stone_dark.albedo_color = Color("#5d5a66")
 	stone_dark.roughness = 0.95
-
-	_slab = Node3D.new()
-	_slab.name = "Slab"
-	add_child(_slab)
-
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(width, height, 0.7)
-	shape.shape = box
-	shape.position.y = height * 0.5
-	_slab.add_child(shape)
 
 	var mesh := MeshInstance3D.new()
 	var box_mesh := BoxMesh.new()
