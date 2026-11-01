@@ -890,7 +890,10 @@ func _begin_level(level_number: int) -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	get_tree().set_meta("level_number", level_number)
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	if level_number == 1 and not bool(get_tree().get_meta("resume_save", false)):
+		get_tree().change_scene_to_file("res://scenes/intro.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 func _close_popup() -> void:
