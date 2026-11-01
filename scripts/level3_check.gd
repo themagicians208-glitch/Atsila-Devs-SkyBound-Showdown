@@ -15,6 +15,7 @@ func _run() -> void:
 	var world: Node = instance.get_node("World")
 	assert(world.get_node_or_null("FrostTitan") != null, "Frost Titan must spawn")
 	assert(world.get_node_or_null("ThirdFragmentChest") != null, "Third Fragment chest must spawn")
+	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
 	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")

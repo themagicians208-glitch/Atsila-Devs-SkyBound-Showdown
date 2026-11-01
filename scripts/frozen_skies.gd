@@ -6,6 +6,7 @@ const COIN := preload("res://objects/coin.tscn")
 const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
 const FRAGMENT_CHEST := preload("res://objects/frozen_fragment_chest.gd")
+const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
@@ -16,6 +17,8 @@ var fragment_recovered := false
 var _world: Node3D
 var _main: Node
 var _chest: FrozenFragmentChest
+var mechanisms: Array[FrozenMechanism] = []
+var frozen_seals_complete := false
 
 func build(main: Node) -> Array:
 	_main = main
@@ -34,6 +37,39 @@ func _build_frozen_mechanics() -> void:
 	for index in [10, 20, 30]:
 		_main.call("_add_zone", route[index], Vector3(2.5, 1.2, 2.5), SLIPPERY, Color("#8fe7ff"))
 		_add_ice_bridge(route[index])
+	for entry in [["Frozen Switch", 5], ["Crystal Generator", 18], ["Frozen Seal", 31]]:
+		var mechanism: FrozenMechanism = FROZEN_MECHANISM.new()
+		mechanism.name = str(entry[0]).replace(" ", "")
+		mechanism.mechanism_name = str(entry[0])
+		mechanism.position = route[int(entry[1])] + Vector3(0.0, 0.55, 1.25)
+		_world.add_child(mechanism)
+		mechanisms.append(mechanism)
+		mechanism.activated.connect(_on_mechanism_activated.bind(mechanism))
+	for index in range(mini(Progress.frozen_seals_activated, mechanisms.size())):
+		mechanisms[index].activate()
+	frozen_seals_complete = Progress.frozen_seals_activated >= mechanisms.size()
+
+func try_activate_nearby(player: Node3D) -> bool:
+	for mechanism in mechanisms:
+		if not mechanism.is_activated and mechanism.global_position.distance_to(player.global_position) <= 2.4:
+			return mechanism.activate()
+	return false
+
+func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
+	var activated_count := 0
+	for mechanism in mechanisms:
+		if mechanism.is_activated:
+			activated_count += 1
+	Progress.set_frozen_seals_activated(activated_count)
+	if activated_count == 1:
+		Progress.unlock_ice_shield()
+	if activated_count == 2:
+		Progress.unlock_frost_dash()
+	if activated_count == 3:
+		Progress.unlock_crystal_activation()
+		frozen_seals_complete = true
+	if _main.has_method("_on_frozen_mechanism_progress"):
+		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
 func _add_ice_bridge(point: Vector3) -> void:
 	var bridge := MeshInstance3D.new()

@@ -351,6 +351,13 @@ func _on_frozen_fragment_recovered() -> void:
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
 
 
+func _on_frozen_mechanism_progress(current: int, total: int) -> void:
+	if current >= total:
+		hud.set_objective("All three frozen seals are active. Defeat the Frost Titan.")
+	else:
+		hud.set_objective("Activate the frozen mechanisms: %d / %d" % [current, total])
+
+
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
 ## every hit, gone when it falls.
 func _bind_island_boss() -> void:
@@ -1417,6 +1424,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		hud.toggle_pause()
 		return
 	if event.is_action_pressed("interact") and not puzzle_solved:
+		if frozen_skies != null and frozen_skies.try_activate_nearby(player):
+			return
 		_try_press_switch()
 
 

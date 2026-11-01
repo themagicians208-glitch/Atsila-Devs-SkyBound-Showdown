@@ -18,6 +18,7 @@ var third_fragment_recovered := false
 var ice_shield_unlocked := false
 var frost_dash_unlocked := false
 var crystal_activation_unlocked := false
+var frozen_seals_activated := 0
 
 
 func _ready() -> void:
@@ -33,6 +34,7 @@ func load_progress() -> void:
 	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
 	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
 	crystal_activation_unlocked = bool(config.get_value("frozen_skies", "crystal_activation_unlocked", false))
+	frozen_seals_activated = int(config.get_value("frozen_skies", "frozen_seals_activated", 0))
 
 
 func save_progress() -> void:
@@ -42,6 +44,7 @@ func save_progress() -> void:
 	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
 	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
 	config.set_value("frozen_skies", "crystal_activation_unlocked", crystal_activation_unlocked)
+	config.set_value("frozen_skies", "frozen_seals_activated", frozen_seals_activated)
 	config.save(config_path)
 
 
@@ -70,6 +73,10 @@ func unlock_crystal_activation() -> void:
 	crystal_activation_unlocked = true
 	save_progress()
 
+func set_frozen_seals_activated(value: int) -> void:
+	frozen_seals_activated = clampi(value, 0, 3)
+	save_progress()
+
 
 ## Forget everything. Only the dev checks call this.
 func clear() -> void:
@@ -78,5 +85,6 @@ func clear() -> void:
 	ice_shield_unlocked = false
 	frost_dash_unlocked = false
 	crystal_activation_unlocked = false
+	frozen_seals_activated = 0
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))
