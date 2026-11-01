@@ -12,6 +12,8 @@ var _time := 0.0
 var _dead := false
 var _visual: Node3D
 var _material: StandardMaterial3D
+var _attack_cooldown := 2.0
+var _attack_flash := 0.0
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -65,11 +67,31 @@ func _physics_process(delta: float) -> void:
 	if _dead:
 		return
 	_time += delta
+	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
+	_attack_flash = maxf(0.0, _attack_flash - delta)
 	_visual.position.y = sin(_time * 1.4) * 0.08
 	_visual.rotation.y += delta * 0.18
 	var target := get_tree().get_first_node_in_group("player") as Node3D
-	if target != null and global_position.distance_to(target.global_position) < 2.4 and target.has_method("take_damage"):
+	if target == null:
+		return
+	if global_position.distance_to(target.global_position) < 2.4 and target.has_method("take_damage"):
 		target.call("take_damage", contact_damage, global_position, "frost_titan")
+	if _attack_cooldown <= 0.0:
+		_perform_phase_attack(target)
+
+func _perform_phase_attack(target: Node3D) -> void:
+	_attack_cooldown = 3.0 if phase == 1 else (2.2 if phase == 2 else 1.6)
+	_attack_flash = 0.3
+	var distance := global_position.distance_to(target.global_position)
+	if phase == 1:
+		if distance < 7.0 and target.has_method("take_damage"):
+			target.call("take_damage", 10.0, global_position, "frost_titan_shockwave")
+	elif phase == 2:
+		if distance < 11.0 and target.has_method("take_damage"):
+			target.call("take_damage", 7.0, global_position, "frost_titan_crystal_storm")
+	else:
+		if distance < 13.0 and target.has_method("take_damage"):
+			target.call("take_damage", 12.0, global_position, "frost_titan_absolute_frost")
 
 func take_hit(amount: int, from: Vector3) -> bool:
 	if _dead:

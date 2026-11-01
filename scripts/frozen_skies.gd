@@ -21,6 +21,7 @@ func build(main: Node) -> Array:
 	route = _make_route()
 	_build_islands()
 	_build_frozen_mechanics()
+	_build_boss_arena()
 	_place_coins()
 	_place_enemies()
 	return route
@@ -153,6 +154,28 @@ func _add_mountain(point: Vector3) -> void:
 	mountain.position = point
 	mountain.material_override = _material(Color("#8bc9ed"), 0.15)
 	_world.add_child(mountain)
+
+func _build_boss_arena() -> void:
+	var centre: Vector3 = route[route.size() - 3] + Vector3(0.0, 0.0, 3.0)
+	for i in 8:
+		var angle := TAU * float(i) / 8.0
+		var pillar := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.25
+		mesh.bottom_radius = 0.55
+		mesh.height = 3.6
+		pillar.mesh = mesh
+		pillar.position = centre + Vector3(cos(angle) * 5.0, 1.8, sin(angle) * 5.0)
+		pillar.material_override = _material(Color("#b8eaff"), 0.55)
+		_world.add_child(pillar)
+	var sigil := MeshInstance3D.new()
+	var sigil_mesh := TorusMesh.new()
+	sigil_mesh.inner_radius = 2.6
+	sigil_mesh.outer_radius = 2.75
+	sigil.mesh = sigil_mesh
+	sigil.position = centre + Vector3(0.0, 0.08, 0.0)
+	sigil.material_override = _material(Color("#8cddff"), 1.0)
+	_world.add_child(sigil)
 
 func _material(color: Color, emission: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
