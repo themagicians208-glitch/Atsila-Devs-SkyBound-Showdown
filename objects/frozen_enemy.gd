@@ -1,6 +1,8 @@
 extends Node3D
 class_name FrozenEnemy
 
+const ICE_PROJECTILE := preload("res://objects/ice_projectile.gd")
+
 signal defeated
 
 @export_enum("Frost Slime", "Frost Wolf", "Crystal Phantom") var variant := "Frost Slime"
@@ -16,6 +18,7 @@ var _body_material: StandardMaterial3D
 var _dead := false
 var _time := 0.0
 var _touch_cooldown := 0.0
+var _projectile_cooldown := 1.8
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -72,6 +75,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	_touch_cooldown = maxf(_touch_cooldown - delta, 0.0)
+	_projectile_cooldown = maxf(_projectile_cooldown - delta, 0.0)
 	_visual.position.y = sin(_time * 3.0) * 0.1
 	_visual.rotation.y += delta * 0.45
 	var target := _nearest_player()
@@ -81,6 +85,8 @@ func _physics_process(delta: float) -> void:
 	var distance := offset.length()
 	if distance > detect_range:
 		return
+	if variant == "Crystal Phantom" and _projectile_cooldown <= 0.0:
+		_launch_projectile(target)
 	var speed := _movement_speed(target)
 	if variant == "Crystal Phantom":
 		global_position += offset.normalized() * speed * delta
@@ -93,6 +99,13 @@ func _physics_process(delta: float) -> void:
 	if distance < 1.0 and _touch_cooldown <= 0.0 and target.has_method("take_damage"):
 		target.call("take_damage", contact_damage, global_position, "frozen_enemy")
 		_touch_cooldown = 1.0
+
+func _launch_projectile(target: Node3D) -> void:
+	_projectile_cooldown = 2.8
+	var projectile: IceProjectile = ICE_PROJECTILE.new()
+	projectile.global_position = global_position + Vector3(0.0, 0.2, 0.0)
+	get_parent().add_child(projectile)
+	projectile.launch(target)
 
 func _movement_speed(target: Node3D) -> float:
 	var player_speed := float(target.get("movement_speed")) if target.get("movement_speed") != null else 8.4
