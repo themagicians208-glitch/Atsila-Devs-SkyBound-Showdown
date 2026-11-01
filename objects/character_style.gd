@@ -322,8 +322,7 @@ func _build_bone_rig() -> void:
 			"lead": -signf(side) if absf(side) > 0.0001 else 1.0,
 		})
 	if not _bone_arms.is_empty():
-		print("%s: driving %d arm bones (%s)" % [
-			name, _bone_arms.size(), ", ".join(rig_bone_arms + rig_bone_hold)])
+		pass
 
 
 func _find_skeleton() -> Skeleton3D:
@@ -352,9 +351,9 @@ func _apply_bone_pose(arm_swing: float, arm_reach: float, arm_flap: float) -> vo
 		var off_swing := float(entry["swing_off"])
 		var off_lift := float(entry["lift_off"]) * lead
 		if bool(entry["driven"]):
-			var swing := (arm_swing * lead - arm_reach) * arm_amp_scale + off_swing
+			var swing_amount := (arm_swing * lead - arm_reach) * arm_amp_scale + off_swing
 			var lift := arm_flap * lead * arm_amp_scale + off_lift
-			desired = Quaternion(axis_side, swing) * Quaternion(axis_front, lift)
+			desired = Quaternion(axis_side, swing_amount) * Quaternion(axis_front, lift)
 		elif not (is_zero_approx(off_swing) and is_zero_approx(off_lift)):
 			# A held bone still holds, but at its corrected rest angle: the arm above
 			# it swings without dragging the geometry skinned to this bone.

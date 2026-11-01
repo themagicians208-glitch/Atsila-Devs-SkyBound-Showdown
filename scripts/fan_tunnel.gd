@@ -12,9 +12,9 @@ func _ready() -> void:
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.has_method("set_wind"):
-		body.set_wind(lift)
+		body.set_wind(lift, self)
 
 
 func _on_body_exited(body: Node3D) -> void:
 	if body.has_method("set_wind"):
-		body.set_wind(0.0)
+		body.set_wind(0.0, self)

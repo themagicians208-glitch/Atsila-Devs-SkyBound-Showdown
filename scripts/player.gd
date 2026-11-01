@@ -16,8 +16,8 @@ signal died
 @export var action_time_freeze := "time_freeze"
 
 @export_subgroup("Properties")
-@export var movement_speed = 250
-@export var jump_strength = 7
+@export var movement_speed: float = 250.0
+@export var jump_strength: float = 7.0
 
 # Which player this is (0-3). Drives the character's colour so co-op players and
 # online peers look different from each other.
@@ -32,18 +32,18 @@ signal died
 @export var dash_duration := 1.0
 @export var dash_cooldown := 10.0
 
-var movement_velocity: Vector3
-var rotation_direction: float
-var gravity = 0
-var gravity_scale := 1.0
+var movement_velocity: Vector3 = Vector3.ZERO
+var rotation_direction: float = 0.0
+var gravity: float = 0.0
+var gravity_scale: float = 1.0
 var time_freeze_active := false
 var freeze_cooldown := 0.0
 
-var previously_floored = false
+var previously_floored := false
 
 var jumps_remaining := 2
 
-var coins = 0
+var coins: int = 0
 
 var is_dead := false
 
@@ -70,6 +70,9 @@ var model_rest_position := Vector3.ZERO
 var slippery := false                  # ice / oil slick: little traction
 var sticky := false                    # velcro: kills horizontal momentum
 var wind_lift := 0.0                   # fan tunnel updraft
+var _slippery_sources: Dictionary = {}
+var _sticky_sources: Dictionary = {}
+var _wind_sources: Dictionary = {}
 
 @onready var particles_trail = $ParticlesTrail
 @onready var sound_footsteps = $SoundFootsteps
@@ -100,7 +103,6 @@ func _ready() -> void:
 	model_rest_position = model.position
 	if model.has_method("set_player_index"):
 		model.set_player_index(player_index)
-
 
 
 func set_player_index(index: int) -> void:
@@ -177,7 +179,7 @@ func set_player_name(new_name: String) -> void:
 
 # Functions
 
-func _physics_process(delta):
+func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
 
@@ -200,7 +202,7 @@ func _physics_process(delta):
 
 	var applied_velocity: Vector3
 
-	var control := 3.0 if slippery else 10.0
+	var control: float = 3.0 if slippery else 10.0
 	applied_velocity = velocity.lerp(movement_velocity, delta * control)
 	applied_velocity.y = -gravity
 	if sticky:
@@ -238,14 +240,16 @@ func _physics_process(delta):
 
 # Handle animation(s)
 
-func handle_effects(delta):
+func handle_effects(delta: float) -> void:
+	if particles_trail == null or sound_footsteps == null:
+		return
 
 	particles_trail.emitting = false
 	sound_footsteps.stream_paused = true
 
 	if is_on_floor():
-		var horizontal_velocity = Vector2(velocity.x, velocity.z)
-		var speed_factor = horizontal_velocity.length() / movement_speed / delta
+		var horizontal_velocity: Vector2 = Vector2(velocity.x, velocity.z)
+		var speed_factor: float = horizontal_velocity.length() / maxf(movement_speed, 0.001) / maxf(delta, 0.001)
 		if speed_factor > 0.05:
 			if _pose_state != "walk":
 				_set_pose_state("walk")
@@ -322,14 +326,15 @@ func _play(logical: String, blend: float = 0.1) -> void:
 			animation.seek(0.0, true)
 			animation.pause()
 
-
 func _set_pose_state(logical: String) -> void:
 	_pose_state = logical
 	_play(logical)
 
 # Handle movement input
 
-func handle_controls(delta):
+func handle_controls(delta: float) -> void:
+	if view == null or is_dead:
+		return
 
 	# Movement
 
@@ -359,11 +364,12 @@ func handle_controls(delta):
 
 # Handle gravity
 
-func handle_gravity(delta):
+func handle_gravity(delta: float) -> void:
 
 	if wind_lift > 0.0:
-		# A fan tunnel overrides gravity and carries the player upward.
-		gravity = -wind_lift
+		# A fan tunnel provides a brief upward boost, then normal gravity pulls the
+		# player back down so the lift cannot carry them indefinitely into the sky.
+		gravity = maxf(gravity - wind_lift * delta, -jump_strength * 0.9)
 		jumps_remaining = 2
 		return
 
@@ -403,21 +409,58 @@ func bounce(strength: float) -> void:
 	get_node("/root/Audio").play("res://sounds/jump.ogg")
 
 
-func set_slippery(enabled: bool) -> void:
-	slippery = enabled
+func set_slippery(enabled: bool, source: Object = null) -> void:
+	_update_effect_sources(_slippery_sources, enabled, source)
+	slippery = not _slippery_sources.is_empty()
 
 
-func set_sticky(enabled: bool) -> void:
-	sticky = enabled
+func set_sticky(enabled: bool, source: Object = null) -> void:
+	_update_effect_sources(_sticky_sources, enabled, source)
+	sticky = not _sticky_sources.is_empty()
 	if enabled:
 		velocity.x = 0.0
 		velocity.z = 0.0
 		movement_velocity.x = 0.0
 		movement_velocity.z = 0.0
 
+func set_wind(lift: float, source: Object = null) -> void:
+	if lift <= 0.0:
+		if source == null:
+			_wind_sources.clear()
+		else:
+			_wind_sources.erase(source.get_instance_id())
+	else:
+		var source_id := source.get_instance_id() if source != null else 0
+		_wind_sources[source_id] = lift
+	_update_wind_strength()
 
-func set_wind(lift: float) -> void:
-	wind_lift = lift
+func _update_wind_strength() -> void:
+	wind_lift = 0.0
+	for source_id in _wind_sources.keys():
+		if not is_instance_id_valid(int(source_id)):
+			_wind_sources.erase(source_id)
+			continue
+		wind_lift = maxf(wind_lift, float(_wind_sources[source_id]))
+
+func clear_surface_effects() -> void:
+	_slippery_sources.clear()
+	_sticky_sources.clear()
+	_wind_sources.clear()
+	slippery = false
+	sticky = false
+	wind_lift = 0.0
+
+func _update_effect_sources(sources: Dictionary, enabled: bool, source: Object) -> void:
+	var source_id := source.get_instance_id() if source != null else 0
+	if enabled:
+		sources[source_id] = true
+	else:
+		sources.erase(source_id)
+	for existing_id in sources.keys():
+		if not is_instance_id_valid(int(existing_id)):
+			sources.erase(existing_id)
+	if sources.has(0) and not enabled:
+		sources.erase(0)
 
 # Dash skill
 
@@ -426,7 +469,6 @@ func _start_dash() -> void:
 	dash_time_left = dash_duration
 	dash_bob = 0.0
 	get_node("/root/Audio").play("res://sounds/jump.ogg")
-
 
 func _end_dash() -> void:
 	is_dashing = false
@@ -441,7 +483,6 @@ func _update_dash(delta: float) -> void:
 			_end_dash()
 	elif dash_cooldown_left > 0.0:
 		dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
-
 
 func handle_dash_animation(delta: float) -> void:
 	# Lean into the dash and bob for a speedy look while moving fast.
@@ -478,21 +519,22 @@ func die() -> void:
 	dash_cooldown_left = 0.0
 	died.emit()
 
-
 func _activate_time_freeze() -> void:
-	if time_freeze_active:
+	if time_freeze_active or freeze_cooldown > 0.0:
 		return
 	time_freeze_active = true
 	freeze_cooldown = 9.0
 	Engine.time_scale = 0.18
 	get_tree().create_timer(1.25, true, false, true).timeout.connect(_end_time_freeze)
-	get_tree().create_timer(9.0, true, false, true).timeout.connect(func(): freeze_cooldown = 0.0)
-
+	get_tree().create_timer(9.0, true, false, true).timeout.connect(_reset_freeze_cooldown)
 
 func _end_time_freeze() -> void:
 	Engine.time_scale = 1.0
 	time_freeze_active = false
 
+
+func _reset_freeze_cooldown() -> void:
+	freeze_cooldown = 0.0
 
 func set_anti_gravity(enabled: bool) -> void:
 	gravity_scale = -0.35 if enabled else 1.0

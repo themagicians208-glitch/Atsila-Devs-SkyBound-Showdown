@@ -196,6 +196,10 @@ var _sustained: Dictionary = {}
 # Inputs auto-held for the duration of an in-flight `until` wait, label -> entry.
 # Always emptied before the act returns; only `sustain` outlives an act.
 var _wait_held: Dictionary = {}
+# Modifier keycodes this session holds down. Only these are stamped on injected
+# events: the host's Input state also carries the real keyboard (and a Super whose
+# key-up the desktop swallowed), which must not reach a seated game.
+var _held_modifiers: Dictionary = {}
 # Signal taps armed by game_watch, "node_path:signal" -> true. Recorders stay
 # connected for the session's life; the session ends with the process.
 var _watches: Dictionary = {}
@@ -355,6 +359,14 @@ func _load_params() -> Dictionary:
 # inside this call for the harness's own events and outside it for everyone
 # else's - which is the whole discrimination the detector rests on.
 func _inject(event: InputEvent) -> void:
+	# A real device stamps held modifiers on every event; without this a game
+	# reading event.shift_pressed sees no Shift the session is holding.
+	if event is InputEventWithModifiers:
+		var with_mods: InputEventWithModifiers = event
+		with_mods.shift_pressed = _held_modifiers.has(KEY_SHIFT)
+		with_mods.ctrl_pressed = _held_modifiers.has(KEY_CTRL)
+		with_mods.alt_pressed = _held_modifiers.has(KEY_ALT)
+		with_mods.meta_pressed = _held_modifiers.has(KEY_META)
 	_injecting += 1
 	if _seat != null:
 		# BOTH paths, deliberately. push_input reaches the game's own nodes and the
@@ -555,10 +567,7 @@ func _dispatch_key(entry: Dictionary, pressed: bool) -> String:
 		ev.keycode = OS.find_keycode_from_string(key_str)
 	# A name Godot does not know resolves to keycode 0, and the multi-character
 	# branch sets no unicode either - so the event reaches the game as nothing at
-	# all while the delivery record still says it landed. A real run spent its
-	# whole first session sending key:"Player" at a name field, read the silence
-	# as the game ignoring valid input, and finally reached for a scene-changing
-	# probe that poisoned the session. Refuse it instead.
+	# all while the delivery record still says it landed. Refuse it instead.
 	if ev.keycode == 0 and ev.unicode == 0:
 		return (
 			"'%s' is not a key: it is neither a single character nor a Godot key name "
@@ -568,6 +577,11 @@ func _dispatch_key(entry: Dictionary, pressed: bool) -> String:
 		)
 	if ev.keycode != 0:
 		ev.physical_keycode = ev.keycode
+	if ev.keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]:
+		if pressed:
+			_held_modifiers[ev.keycode] = true
+		else:
+			_held_modifiers.erase(ev.keycode)
 	_inject(ev)
 	return ""
 
@@ -609,7 +623,7 @@ func _dispatch_edge(entry: Dictionary, pressed: bool) -> String:
 		"key":
 			return _dispatch_key(entry, pressed)
 		"mouse":
-			# Missing coordinates used to default to (0,0) - a click in the screen
+			# Missing coordinates must not default to (0,0) - a click in the screen
 			# corner that reads as the game ignoring valid input.
 			if not entry.has("x") or not entry.has("y"):
 				return (
@@ -631,7 +645,7 @@ func _dispatch_edge(entry: Dictionary, pressed: bool) -> String:
 			# Relative motion is what drives a MOUSE_MODE_CAPTURED first-person
 			# camera; it has no release edge, so only the press edge dispatches.
 			var mv := InputEventMouseMotion.new()
-			mv.relative = _to_window(Vector2(float(entry.get("dx", 0)), float(entry.get("dy", 0))))
+			mv.relative = _to_window_delta(Vector2(float(entry.get("dx", 0)), float(entry.get("dy", 0))))
 			# The event's position is where the pointer actually is (in window
 			# pixels, like every parsed event - see _click_at), not a hardcoded
 			# viewport centre the polled cursor never matched.
@@ -877,6 +891,8 @@ func _run() -> void:
 			img.get_height() * MAX_FRAME_EDGE / longest,
 			Image.INTERPOLATE_LANCZOS
 		)
+	report["screenshot_size"] = [img.get_width(), img.get_height()]
+	report["viewport_size"] = _viewport_size()
 	var results_tmp := String(_params["results_tmp"])
 	var err: int = img.save_png(results_tmp)
 	if err != OK:
@@ -1058,8 +1074,7 @@ func _start_session() -> void:
 
 # A native window becomes a pane of glass when a session owns it: mouse events
 # pass through to whatever is behind it, so it can never be clicked, so it can
-# never take focus, so the host's keystrokes can never reach the game. Six
-# sessions of the Godotcraft run died to exactly that click-then-type path.
+# never take focus, so the host's keystrokes can never reach the game.
 #
 # Measured on X11 with a peer window holding focus: a plain window took 3 keys
 # and 2 clicks from the host; this takes 0 of each. A passthrough REGION was the
@@ -1253,7 +1268,7 @@ func _serve(text: String) -> void:
 # non-JSON Variant becomes its var_to_str form ("Vector2(4, 5)") rather than
 # being silently dropped or mangled by JSON.stringify. Text is capped: a probe
 # that evaluates to the whole world otherwise ships the whole world into model
-# context every time it runs (measured: one value of 248,127 chars).
+# context every time it runs.
 func _jsonable(value: Variant) -> Variant:
 	match typeof(value):
 		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT:
@@ -1273,9 +1288,8 @@ func _jsonable(value: Variant) -> Variant:
 			# Same failure by two more routes: `_block_types` on a voxel world is
 			# hundreds of thousands of entries, and an Array of Nodes -
 			# `tree.get_nodes_in_group(...)` - recurses through each node even
-			# when there are only two of them. Both measured live on Godotcraft.
-			# The caller still receives the real value; only this log line is
-			# summarized.
+			# when there are only two of them. The caller still receives the real
+			# value; only this log line is summarized.
 			var count: int = value.size()
 			if count > CONTAINER_LOG_LIMIT:
 				return (
@@ -1476,8 +1490,7 @@ func _world_diff(before: Dictionary, after: Dictionary) -> Dictionary:
 	# The whole-tree digest is deliberately NOT a fallback signal here. A living
 	# game moves on its own - day/night, animals, particles - so in Godotcraft it
 	# differs on every act, which would make `none` unreachable and strip the one
-	# state that is a real finding of all meaning. Measured: an unbound keypress
-	# reported "changed" purely from ambient motion.
+	# state that is a real finding of all meaning.
 	return {"lines": out, "moved": moved_meaningfully}
 
 
@@ -1686,6 +1699,7 @@ func _op_observe(msg: Dictionary) -> Dictionary:
 			return {"ok": false, "error": String(shot["error"])}
 		reply["screenshot"] = shot["png_base64"]
 		reply["screenshot_size"] = shot["size"]
+		reply["viewport_size"] = _viewport_size()
 	return reply
 
 
@@ -1697,7 +1711,7 @@ func _op_observe(msg: Dictionary) -> Dictionary:
 # counter instead, bounded, so a game that is not being drawn says so in one
 # second rather than hanging the op until the session's 120s deadline.
 func _capture_frame() -> Dictionary:
-	# The overlay is up during pauses now (see _tick_recorder), and this is the
+	# The overlay is up during pauses (see _tick_recorder), and this is the
 	# frame the agent reasons over - so it comes down for exactly this capture
 	# and goes straight back. Hiding it costs one drawn frame, which the wait
 	# below already needs anyway.
@@ -1913,11 +1927,10 @@ func _note_overlay_event(event: InputEvent) -> void:
 		return
 	if label.is_empty():
 		return
-	# A bare modifier is never something this session sends, so one appearing is
-	# the HOST's keyboard reaching the game. Worse, a desktop that grabs the
-	# key-up (KWin swallows Super) never delivers the release, so the chip sticks
-	# for the rest of the run - a real run showed "Meta" pinned over every frame.
-	if label in BARE_MODIFIERS:
+	# A bare modifier this session did not send is the HOST's keyboard reaching
+	# the game. Worse, a desktop that grabs the key-up (KWin swallows Super) never
+	# delivers the release, so the chip sticks for the rest of the run.
+	if label in BARE_MODIFIERS and _injecting == 0:
 		return
 	if pressed:
 		_held[label] = true
@@ -1953,11 +1966,9 @@ func _draw_overlay() -> void:
 
 	# Two lines, sized to their own text and floated over the game rather than a
 	# band laid across it.
-	# Falls back to the SESSION's goal, not to a shrug. The five settle frames
-	# after every game_start are recorded before any act exists, and across a run
-	# with many restarts those frames were most of the footage - all of them
-	# captioned "no stated goal" while the agent knew perfectly well what it was
-	# there for. The brief now rides the whole session.
+	# Falls back to the SESSION's goal: the five settle frames after every
+	# game_start are recorded before any act exists, and across a run with many
+	# restarts those frames can be most of the footage.
 	var goal := _intent
 	if goal.is_empty():
 		goal = ("GOAL: " + _session_goal) if not _session_goal.is_empty() else "no stated goal"
@@ -2016,7 +2027,7 @@ func _draw_overlay() -> void:
 			)
 			cx += w2 + 10.0
 
-	# REC: a dot and a word, no box, bottom-left as the spike had it. Top-left is
+	# REC: a dot and a word, no box, bottom-left. Top-left is
 	# where games put their own debug text - Godotcraft's "Press ` to toggle this
 	# panel" ran straight through the badge - and the corner under the caption is
 	# the one place nothing competes for.
@@ -2109,12 +2120,10 @@ func _input_line(cursor: Vector2) -> String:
 # the machine draws (see MIN_HOLD_FRAMES).
 #
 # `sustain` leaves the input DOWN when the act ends, and `release` lets a later
-# act lift it. Without that, a mechanic needing a hold longer than one act was
-# unreachable: every act released everything at its end, so a game that
+# act lift it. Without that, a mechanic needing a hold longer than one act is
+# unreachable: if every act released everything at its end, a game that
 # accumulates while held and decays while not (mining, a charged attack, a drawn
-# bow, aim-down-sights) reset between acts and could never finish. Measured on
-# Godotcraft: 301 frames of holding got mining to 1.9 of the 4.5 it needed, and
-# the next act started from 0.667 and then 0.
+# bow, aim-down-sights) would reset between acts and never finish.
 #
 # With `wait_active` (the act carries an `until`), a pressable input does not
 # hold-and-release here at all: it stays DOWN for the whole wait and _op_act
@@ -2155,9 +2164,8 @@ func _deliver(entry: Dictionary, wait_active: bool) -> Dictionary:
 	#
 	# It exists because tool affordances shape behaviour. Games commonly poll
 	# `get_viewport().get_mouse_position()` for aiming and treat the drag as their
-	# PRIMARY control, with keys as a coarse fallback - and for twelve runs this
-	# harness offered easy keys and no drag at all, so every run used the fallback
-	# and inherited its granularity.
+	# PRIMARY control, with keys as a coarse fallback; without a drag every run
+	# would use the fallback and inherit its granularity.
 	if kind == "drag":
 		return await _dispatch_drag(entry, label)
 
@@ -2327,10 +2335,9 @@ func _dispatch_servo(entry: Dictionary, label: String) -> Dictionary:
 				"dropped": "a servo needs '%s' (got keys %s)" % [field, str(entry.keys())],
 			}
 	var probe_expr := String(entry["probe"])
-	# Models keep sending the computed target as a quoted number - measured
-	# "-0.507" x5 and "2.077" x75 across two real runs, each a spiral of
-	# identical refusals. A string that IS a number is accepted as the number it
-	# names; only a genuine non-number is refused, by type.
+	# Models keep sending the computed target as a quoted number. A string that
+	# IS a number is accepted as the number it names; only a genuine non-number is
+	# refused, by type.
 	if entry["target"] is String and String(entry["target"]).is_valid_float():
 		entry["target"] = String(entry["target"]).to_float()
 	if not _is_number(entry["target"]):
@@ -2574,27 +2581,25 @@ func _move_mouse(position: Vector2, relative: Vector2) -> void:
 	var motion := InputEventMouseMotion.new()
 	motion.position = _to_window(position)
 	motion.global_position = motion.position
-	motion.relative = _to_window(relative)
+	motion.relative = _to_window_delta(relative)
 	_inject(motion)
 
 
-# Callers speak VIEWPORT pixels - the space `unproject_position`, Control rects
-# and `get_viewport().get_mouse_position()` all use. `warp_mouse` speaks WINDOW
-# pixels, and the two differ whenever the window is not the viewport's size: a
-# 900px-tall window showing a 1080px viewport scales every coordinate by 1.2, so
-# a drag aimed at the ball landed 170px below it and the game never saw the grab.
+# Callers speak VIEWPORT pixels, `warp_mouse` and parsed events WINDOW pixels; the
+# stretch transform carries both the scale and the letterbox offset between them.
 func _to_window(position: Vector2) -> Vector2:
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
-		return position
-	var window: Window = get_window()
-	if window == null:
-		return position
-	var window_size: Vector2 = Vector2(window.size)
-	return Vector2(
-		position.x * window_size.x / viewport_size.x,
-		position.y * window_size.y / viewport_size.y
-	)
+	return get_viewport().get_final_transform() * position
+
+
+func _to_window_delta(relative: Vector2) -> Vector2:
+	return get_viewport().get_final_transform().basis_xform(relative)
+
+
+# Mouse x,y are viewport pixels while a screenshot can be smaller, so replies
+# that carry a frame carry this too for the caller to scale between them.
+func _viewport_size() -> Array:
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	return [int(size.x), int(size.y)]
 
 
 # A game must never be left with a key stuck down: the next session, or the
@@ -2655,9 +2660,7 @@ func _op_act(msg: Dictionary) -> Dictionary:
 	# Sampled at the release edge, because "ended lower than it started" cannot
 	# tell a decaying hold from an input that simply drives the value DOWN - a left
 	# turn lowering a camera angle, a restart zeroing a stroke count. Both read
-	# identically at the act boundary, and calling the second one a decay told one
-	# real run "more acts can never finish this" 23 times while it was aiming
-	# correctly. Only a value that ROSE while held and FELL once let go is the
+	# identically at the act boundary. Only a value that ROSE while held and FELL once let go is the
 	# mechanic this warning is for. For an `until` act the release edge is where
 	# the wait resolves, so the sample happens after the wait below instead.
 	var released_something := false
@@ -2773,8 +2776,7 @@ func _op_act(msg: Dictionary) -> Dictionary:
 	# A value that builds while an input is held and falls once it is let go is the
 	# fingerprint of a hold-driven mechanic - and this act just let go of it. The
 	# world is frozen BETWEEN acts, so the fall happens inside the act, after the
-	# release edge: exactly what Godotcraft's mining did (1.9 -> 0.667 -> 0). The
-	# model cannot infer "splitting this across acts is futile" from a number
+	# release edge. The model cannot infer "splitting this across acts is futile" from a number
 	# going down, so name it.
 	# Only a press-and-release inside THIS act counts. An explicit release:true is
 	# the caller deliberately letting go, and telling them they let go too early
@@ -2990,8 +2992,7 @@ class DriveApi:
 	# A refused coroutine call must still yield one frame before returning:
 	# these are exactly the calls loop-shaped bodies await, and a sync refusal
 	# turns such a loop into a zero-await spin that freezes the game's main
-	# thread - measured live: a faulted 15-shot drive froze the game until the
-	# process was killed. One frame per refused call keeps the tree serving
+	# thread. One frame per refused call keeps the tree serving
 	# while the body runs itself out (or the drive watchdog abandons it).
 	func _refuse_yielding() -> bool:
 		await _h.get_tree().physics_frame
@@ -3185,8 +3186,7 @@ func _run_drive_body(runner: RefCounted, api: DriveApi, done: Dictionary) -> voi
 	# The closing segment check runs HERE, in the same synchronous block as the
 	# body's return. Between this return and the watchdog's next poll the game
 	# runs real frames, and a check delayed until then blames the body for them
-	# - measured: a clean drive tainted on camera variables the game's own
-	# _physics_process had just written. Skipped when a call was abandoned
+	# (the game's own _physics_process writes in between). Skipped when a call was abandoned
 	# without await: the zombie may already have pressed something, which would
 	# read as body mutation here.
 	if api.fault == "" and api.unfinished == 0 and api._enter("end", ""):

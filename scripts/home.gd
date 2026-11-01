@@ -2,7 +2,7 @@ extends Control
 
 const UI_FONT = preload("res://fonts/lilita_one_regular.ttf")
 const ROSTER := preload("res://scripts/roster.gd")
-const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Malakar's Fortress", "Gimmick Gauntlet"]
 
 var popup: ColorRect
 var popup_title: Label
