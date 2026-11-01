@@ -338,6 +338,23 @@ func _build_frozen_skies() -> void:
 		_add_checkpoint(route_points[checkpoint_index], checkpoint_index)
 	finish.position = route_points[route_points.size() - 1] + Vector3(0.0, 1.0, 0.0)
 	_apply_dimension_visibility()
+	call_deferred("_play_frozen_arrival_reveal")
+
+func _play_frozen_arrival_reveal() -> void:
+	if frozen_skies == null or not is_instance_valid($View):
+		return
+	var view: Node3D = $View
+	view.input_enabled = false
+	var start_zoom: float = view.zoom
+	var start_rotation: Vector3 = view.camera_rotation
+	var reveal_rotation := Vector3(-20.0, start_rotation.y + 12.0, 0.0)
+	var tween := create_tween()
+	tween.tween_property(view, "camera_rotation", reveal_rotation, 0.65)
+	tween.parallel().tween_property(view, "zoom", minf(start_zoom + 4.0, view.zoom_minimum), 0.65)
+	tween.tween_interval(0.8)
+	tween.tween_property(view, "camera_rotation", start_rotation, 0.65)
+	tween.parallel().tween_property(view, "zoom", start_zoom, 0.65)
+	tween.tween_callback(func(): view.input_enabled = true)
 
 
 func _bind_frozen_boss(boss: Node) -> void:
