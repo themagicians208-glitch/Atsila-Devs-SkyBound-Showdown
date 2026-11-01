@@ -71,6 +71,17 @@ func _build() -> void:
 	column.position.y = 1.0
 	add_child(column)
 
+	var collider := StaticBody3D.new()
+	collider.name = "SealBody"
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.65
+	cylinder.height = 1.35
+	shape.shape = cylinder
+	shape.position.y = 0.68
+	collider.add_child(shape)
+	add_child(collider)
+
 	_rune_material = StandardMaterial3D.new()
 	_rune_material.albedo_color = IDLE_COLOR
 	_rune_material.emission_enabled = true

@@ -4,6 +4,7 @@ signal coin_collected
 signal died
 signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
+signal fly_mode_changed(enabled: bool)
 
 @export_subgroup("Components")
 @export var view: Node3D
@@ -15,6 +16,7 @@ signal stamina_changed(current: float, maximum: float)
 @export var action_back := "move_back"
 @export var action_jump := "jump"
 @export var action_dash := "dash"
+@export var action_fly := "fly"
 @export var action_time_freeze := "time_freeze"
 @export var action_attack := "attack"
 
@@ -67,6 +69,7 @@ var previously_floored = false
 var jumps_remaining := 2
 
 var coins = 0
+var fly_mode := false
 
 var is_dead := false
 var health: float = 100.0
@@ -403,7 +406,7 @@ func handle_controls(delta):
 
 	if Input.is_action_just_pressed(action_jump):
 
-		if jumps_remaining > 0:
+		if jumps_remaining > 0 or fly_mode:
 			jump()
 
 # Handle gravity
@@ -433,7 +436,22 @@ func jump():
 
 	model.scale = Vector3(0.5, 1.5, 0.5)
 
-	jumps_remaining = maxi(0, jumps_remaining - 1)
+	if fly_mode:
+		jumps_remaining = 2
+	else:
+		jumps_remaining = maxi(0, jumps_remaining - 1)
+
+
+func set_fly_mode(enabled: bool) -> void:
+	fly_mode = enabled
+	if fly_mode:
+		jumps_remaining = 2
+	fly_mode_changed.emit(fly_mode)
+
+
+func toggle_fly_mode() -> bool:
+	set_fly_mode(not fly_mode)
+	return fly_mode
 
 
 func cloud_bounce() -> void:

@@ -68,6 +68,17 @@ func _build() -> void:
 	shaft.position.y = 1.05
 	add_child(shaft)
 
+	var collider := StaticBody3D.new()
+	collider.name = "PillarBody"
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.68
+	cylinder.height = 1.8
+	shape.shape = cylinder
+	shape.position.y = 0.9
+	collider.add_child(shape)
+	add_child(collider)
+
 	# The symbol itself, floating above the pillar on a slowly turning ring.
 	_symbol_mesh = Node3D.new()
 	_symbol_mesh.name = "Symbol"

@@ -36,6 +36,8 @@ var pause_save_button: Button
 
 # Inventory: the button in the corner and the panel it opens.
 var inventory_button: Button
+var fly_button: Button
+var pause_fly_button: Button
 var inventory_overlay: ColorRect
 var inventory_rows: VBoxContainer
 ## The boss bar, shown while the island's Warden is on its feet.
@@ -289,6 +291,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			toggle_inventory()
 			get_viewport().set_input_as_handled()
 			return
+	for action in ["fly", "p1_fly", "p2_fly"]:
+		if InputMap.has_action(action) and event.is_action_pressed(action) \
+				and not event.is_echo():
+			toggle_fly_mode()
+			get_viewport().set_input_as_handled()
+			return
 
 func set_coin_goal(amount: int) -> void:
 	coin_goal = amount
@@ -377,6 +385,16 @@ func bind_players(players: Array) -> void:
 
 
 func _build_inventory_button() -> void:
+	fly_button = _hud_button("FLY: OFF  (9)", Color("#27496f"), Color.WHITE)
+	fly_button.custom_minimum_size = Vector2(160, 42)
+	fly_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	fly_button.offset_left = -376
+	fly_button.offset_top = 24
+	fly_button.offset_right = -216
+	fly_button.offset_bottom = 66
+	fly_button.pressed.connect(toggle_fly_mode)
+	add_child(fly_button)
+
 	inventory_button = _hud_button("INVENTORY  (I)", Color("#27496f"), Color.WHITE)
 	inventory_button.custom_minimum_size = Vector2(180, 42)
 	inventory_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -386,6 +404,35 @@ func _build_inventory_button() -> void:
 	inventory_button.offset_bottom = 66
 	inventory_button.pressed.connect(toggle_inventory)
 	add_child(inventory_button)
+
+
+func toggle_fly_mode() -> void:
+	var enabled := false
+	for who in _players:
+		var p: Node = who as Node
+		if p != null and is_instance_valid(p) and p.has_method("toggle_fly_mode"):
+			enabled = bool(p.call("toggle_fly_mode"))
+	_refresh_fly_buttons(enabled)
+	show_finish_message("FLY MODE: ON  (INFINITE DOUBLE JUMP)" if enabled else "FLY MODE: OFF")
+	if inventory_overlay != null and inventory_overlay.visible:
+		_fill_inventory()
+
+
+func _refresh_fly_buttons(enabled: bool) -> void:
+	var label_text := "FLY: ON  (9)" if enabled else "FLY: OFF  (9)"
+	var bg := Color("#2b7a52") if enabled else Color("#27496f")
+	for btn in [fly_button, pause_fly_button]:
+		if btn == null:
+			continue
+		btn.text = label_text
+		var normal := StyleBoxFlat.new()
+		normal.bg_color = bg
+		normal.set_corner_radius_all(12)
+		normal.content_margin_left = 18
+		normal.content_margin_right = 18
+		normal.content_margin_top = 10
+		normal.content_margin_bottom = 10
+		btn.add_theme_stylebox_override("normal", normal)
 
 
 func _build_inventory() -> void:
@@ -486,6 +533,8 @@ func _fill_inventory() -> void:
 		if player.get("stamina") != null and player.get("max_stamina") != null:
 			var st_pct := roundi((float(player.get("stamina")) / maxf(float(player.get("max_stamina")), 1.0)) * 100.0)
 			inventory_rows.add_child(_inventory_row("Stamina", "%d%%" % st_pct, Color("#6ef2b8")))
+		var is_fly := bool(player.get("fly_mode")) if player.get("fly_mode") != null else false
+		inventory_rows.add_child(_inventory_row("Fly mode (9)", "ON (Infinite Jump)" if is_fly else "OFF", Color("#6ef2b8") if is_fly else Color("#9fc4e8")))
 		inventory_rows.add_child(_inventory_row("Slash", "J / pad B", Color("#fff3d6")))
 		inventory_rows.add_child(_inventory_row("Aim the slash", "hold forward = up, back in mid-air = down", Color("#9fc4e8")))
 
@@ -783,6 +832,10 @@ func _build_pause_menu() -> void:
 	pause_resume_button = _hud_button("RESUME", Color("#315784"), Color.WHITE)
 	pause_resume_button.pressed.connect(func(): toggle_pause())
 	layout.add_child(pause_resume_button)
+
+	pause_fly_button = _hud_button("FLY: OFF  (9)", Color("#27496f"), Color.WHITE)
+	pause_fly_button.pressed.connect(func(): toggle_fly_mode())
+	layout.add_child(pause_fly_button)
 
 	pause_save_button = _hud_button("SAVE PROGRESS", Color("#2e7d32"), Color.WHITE)
 	pause_save_button.pressed.connect(func(): show_finish_message("Game Saved!"))

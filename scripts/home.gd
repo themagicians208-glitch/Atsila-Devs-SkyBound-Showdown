@@ -38,6 +38,7 @@ const BINDABLE := [
 	["time_freeze", "Slow time", KEY_F],
 	["interact", "Interact", KEY_E],
 	["inventory", "Inventory", KEY_I],
+	["fly", "Fly (infinite jump)", KEY_9],
 ]
 
 # Mouse buttons the game binds by itself (main.gd and player.gd), so a rebind onto

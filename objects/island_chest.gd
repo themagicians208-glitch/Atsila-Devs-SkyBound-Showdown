@@ -71,6 +71,16 @@ func _build() -> void:
 	plinth.position.y = 0.09
 	add_child(plinth)
 
+	var collider := StaticBody3D.new()
+	collider.name = "ChestBody"
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.6, 1.0, 1.1)
+	shape.shape = box
+	shape.position.y = 0.5
+	collider.add_child(shape)
+	add_child(collider)
+
 	# The lid rides a pivot along its back edge, so it swings open the way a real
 	# chest does rather than sliding off.
 	_lid_pivot = Node3D.new()

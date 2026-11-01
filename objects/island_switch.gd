@@ -55,6 +55,17 @@ func _build() -> void:
 	column.position.y = 0.85
 	add_child(column)
 
+	var collider := StaticBody3D.new()
+	collider.name = "SwitchBody"
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.62
+	cylinder.height = 1.4
+	shape.shape = cylinder
+	shape.position.y = 0.7
+	collider.add_child(shape)
+	add_child(collider)
+
 	_lamp_material = StandardMaterial3D.new()
 	_lamp_material.albedo_color = Color("#b06bff")
 	_lamp_material.emission_enabled = true

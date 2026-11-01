@@ -233,76 +233,61 @@ func _build_start_glade() -> void:
 	for spot in [Vector3(-6.2, 0.0, 5.0), Vector3(6.4, 0.0, 3.0)]:
 		_mushroom(spot, 1.5, true)
 	_motes(0.9, 0.0, 2.0, 30, MAGIC, 5.0)
-	_rock(-0.5, 7.4, 6.4, 1.3, 0.7, false)
-	_rock(-1.2, -7.6, 6.0, 1.6, 2.1, false)
+	_rock(-0.5, 11.2, 6.4, 1.3, 0.7, false)
+	_rock(-1.2, -11.4, 6.0, 1.6, 2.1, false)
 
 
 # --- B: the forest path -------------------------------------------------------
 
 func _build_forest_path() -> void:
+	# Stepping stones and small islands along the forest path, spaced so no yellow
+	# tile ever sits underneath or inside a rock or grass island.
 	var route := [
 		[0.2, 0.0, 13.0, "medium"],
-		[0.6, 4.0, 17.4, "small"],
-		[0.7, 2.2, 19.6, "medium"],
-		[0.8, 0.2, 21.8, "small"],
-		[1.0, -1.8, 24.0, "small"],
-		[1.1, 0.2, 26.2, "grass"],
-		[1.3, 2.4, 28.4, "small"],
-		[1.4, 4.4, 30.6, "small"],
-		[1.5, 2.6, 32.8, "medium"],
-		[1.6, 0.6, 35.0, "small"],
+		[0.9, 0.4, 19.8, "medium"],
+		[1.2, 0.8, 26.2, "grass"],
+		[1.5, 1.2, 33.8, "medium"],
 	]
 	for point in route:
 		_platform(float(point[0]), float(point[1]), float(point[2]), str(point[3]), float(point[1]) * 0.2)
 
-	# The cave: a rock shell you drop into, with a way back out.
-	_grass_slab(1.2, -3.6, 20.5, 2.6, 2.2)
-	_cave_shell(Vector3(-3.6, 1.2, 20.5), 2.6)
-	_platform(1.7, -1.2, 18.8, "small")
-	_rock(1.6, -3.4, 22.6, 1.4, 0.4, false)
+	# Small rock islands that form the hops between the platforms (with no yellow
+	# tiles underneath them) plus the west grass island.
+	_rock(0.7, 2.4, 16.6, 1.3, 0.5, true)
+	_rock(1.1, -1.8, 22.4, 1.2, 1.2, true)
+	_grass_slab(1.2, -4.6, 19.8, 2.2, 2.0)
+	_rock(1.4, 2.8, 30.2, 1.3, 2.4, true)
 
-	# The waterfall on the east edge. The ledge with the coins is on the far side
-	# of the falling water, so the player has to hop through it to find them.
-	_platform(-1.6, 3.2, 25.2, "small")
-	_platform(-1.4, 5.2, 26.6, "small")
-	_platform(-1.3, 6.0, 28.6, "small")
-	_waterfall(Vector3(6.4, 6.2, 30.0), 3.2, 20.0)
-	_platform(-1.25, 6.4, 30.0, "small")
-	_platform(-1.2, 6.6, 31.4, "small")
-	_cliff(-1.2, 6.6, 34.4, 3.0)
-	_mushroom(Vector3(1.6, 0.2, 26.2), 1.3, true)
+	# The waterfall on the east edge, with non-overlapping stepping stones to the cliff.
+	_platform(0.2, 4.6, 26.8, "small")
+	_platform(-0.4, 6.4, 29.2, "small")
+	_waterfall(Vector3(6.8, 6.2, 30.8), 3.2, 20.0)
+	_cliff(-1.2, 6.8, 33.4, 2.6)
+	_mushroom(Vector3(2.2, 1.2, 26.2), 1.3, true)
 
-	# Optional floating rocks above the path.
-	_rock(1.2, 2.4, 15.6, 1.3, 0.5, true)
-	_rock(2.0, -1.4, 22.0, 1.4, 1.2, true)
-	_rock(2.6, 2.6, 31.5, 1.3, 2.4, true)
 	_tree(0.4, -5.0, 16.4, 3.8, LEAF)
-	_tree(1.1, 5.4, 26.0, 4.6, LEAF_DEEP)
-	_flower(Vector3(2.2, 1.1, 26.2), 1.7, PETAL_BLUE)
+	_tree(1.2, 5.4, 26.0, 4.6, LEAF_DEEP)
+	_flower(Vector3(-0.6, 1.2, 26.2), 1.7, PETAL_BLUE)
 
 
 # --- C: the crystal grove -----------------------------------------------------
 
 func _build_crystal_grove() -> void:
 	var route := [
-		[1.6, 0.6, 37.2, "medium"],
-		[1.7, -1.4, 39.4, "small"],
+		[1.6, 0.2, 37.4, "medium"],
 		[1.8, 0.6, 41.6, "grass"],
-		[1.9, 2.6, 43.8, "small"],
 		[2.0, 0.8, 46.0, "medium"],
-		[2.1, -1.2, 48.2, "small"],
 		[2.2, 0.8, 50.4, "grass"],
-		[2.3, 2.8, 52.6, "small"],
-		[2.4, 4.8, 54.8, "small"],
+		[2.4, 3.2, 54.0, "small"],
 		[2.5, 2.8, 57.0, "medium"],
-		[2.6, 0.8, 59.2, "small"],
-		[2.6, -1.2, 61.4, "medium"],
+		[2.6, 0.6, 59.6, "small"],
+		[2.6, -1.2, 62.0, "medium"],
 	]
 	for point in route:
 		_platform(float(point[0]), float(point[1]), float(point[2]), str(point[3]), float(point[1]) * 0.3)
 
 	# The pedestal that holds the crystal is built with the puzzles; the
-# grove only reserves the clearing for it.
+	# grove only reserves the clearing for it.
 	_tree(1.8, -4.4, 40.0, 4.4, LEAF)
 	_tree(1.8, 4.6, 42.6, 4.0, LEAF_DEEP)
 	_tree(2.2, -4.8, 50.0, 4.8, LEAF)
@@ -313,13 +298,12 @@ func _build_crystal_grove() -> void:
 	_flower(Vector3(1.4, 1.8, 50.4), 1.8, PETAL_PINK)
 	_motes(1.8, 0.0, 46.0, 24, MAGIC, 6.0)
 
-	# The optional upper route: two coins up there for anyone who looks.
-	_platform(2.2, 3.0, 41.0, "small")
-	_platform(3.0, 4.4, 42.6, "small")
-	_platform(3.8, 5.4, 44.4, "small")
-	_rock(1.2, 3.0, 37.4, 1.3, 0.9, true)
-	_rock(3.2, 4.0, 44.5, 1.4, 1.7, true)
-	_rock(2.0, 0.2, 50.9, 1.3, 2.6, true)
+	# Side rock islands and upper coin lookout, all separated cleanly with no
+	# yellow tiles underneath or inside the grass/rock islands.
+	_rock(1.7, 3.8, 37.8, 1.3, 0.9, true)
+	_rock(2.6, 4.6, 43.0, 1.3, 1.7, true)
+	_platform(3.4, 5.4, 46.2, "small")
+	_rock(2.4, -3.4, 51.0, 1.3, 2.6, true)
 
 
 # --- D: the vanishing crossing ------------------------------------------------
@@ -328,7 +312,7 @@ func _build_crossing() -> void:
 	# The two ends of the crossing stand still; the middle five take turns
 	# vanishing (puzzle 3), so the way is a rhythm rather than a staircase.
 	_platform(3.0, -1.2, 70.2, "small", -1.2 * 0.5)
-	_platform(3.5, 2.8, 83.4, "grass", 0.4)
+	_platform(3.5, 2.8, 84.0, "grass", 0.4)
 	# Puzzle 3: the vanishing stones, staggered so neighbours are never gone at
 	# the same moment. Ghost outlines show where each one returns.
 	var vanish_at: Array = [
@@ -353,43 +337,39 @@ func _build_crossing() -> void:
 	# The rope bridge look: two low posts either side of the crossing.
 	_post(3.6, -3.2, 62.6, 1.2)
 	_post(3.7, 1.6, 84.6, 1.2)
-	# A ledge tucked under the far end, and a rock above the middle.
-	_grass_slab(0.6, 2.6, 86.4, 2.4, 2.0)
-	_platform(1.6, 5.4, 85.0, "small")
-	_rock(1.6, 0.5, 71.2, 1.4, 1.1, true)
-	_rock(-0.6, -6.6, 68.0, 1.6, 0.6, false)
-	_flower(Vector3(4.4, 3.3, 83.4), 1.7, PETAL_BLUE)
+	# A side grass island to the east of the far end, and a rock island beside the start.
+	_grass_slab(2.4, 6.6, 85.8, 1.9, 1.8)
+	_rock(2.2, 2.0, 71.2, 1.3, 1.1, true)
+	_rock(-0.6, -7.6, 68.0, 1.6, 0.6, false)
+	_flower(Vector3(4.4, 3.5, 84.0), 1.7, PETAL_BLUE)
 
 
 # --- E: the seal terraces -----------------------------------------------------
 
 func _build_seal_terraces() -> void:
-	_grass_slab(3.6, 0.6, 90.0, 2.6, 3.0)
+	_grass_slab(3.6, 0.6, 90.0, 2.5, 2.8)
 	_post(3.7, 0.6, 86.8, 1.2)
-	# The long path east, wandering a little.
-	for i in 12:
-		var surface := 3.6 + float(i) * 0.14
-		var z := 92.4 + float(i) * 2.2
-		var x := sin(float(i) * 0.7) * 0.6
-		var kind := "small" if i % 3 != 1 else "medium"
-		_platform(surface, x, z, kind, float(i) * 0.4)
+	# The long path north, spaced 2.45 apart so neighbouring platforms never overlap.
+	for i in 9:
+		var surface := 3.7 + float(i) * 0.18
+		var z := 93.8 + float(i) * 2.45
+		var x := sin(float(i) * 0.7) * 0.5
+		_platform(surface, x, z, "small", float(i) * 0.4)
 		waypoints.append(Vector3(x, surface + 0.55, z))
-	# West terrace.
-	_platform(3.6, -2.4, 90.6, "small")
-	_platform(3.8, -4.4, 91.4, "small")
-	_platform(4.0, -6.2, 92.4, "grass", 0.3)
-	# East terrace.
-	_platform(3.7, 3.8, 90.0, "small")
-	_platform(3.9, 5.8, 91.0, "small")
+	# West terrace: a single clean stepping stone between the hub and the grass island.
+	_platform(3.8, -3.2, 91.2, "small")
+	_platform(4.0, -6.8, 92.4, "grass", 0.3)
+	# East terrace: a single clean stepping stone between the hub and the grass island.
+	_platform(3.9, 4.1, 92.0, "small")
 	_platform(4.2, 7.6, 94.0, "grass", 0.2)
 	# The upper terrace. Its seal and the climb up to it are built with the
 	# nature seals, further down.
-	_platform(5.8, 5.6, 102.6, "grass", 0.1)
+	_platform(5.8, 6.8, 104.2, "grass", 0.1)
 	_tree(4.0, -8.4, 94.2, 3.8, LEAF)
 	_tree(4.2, 9.6, 95.6, 3.6, LEAF_DEEP)
-	for spot in [Vector3(-6.0, 4.0, 90.8), Vector3(7.4, 4.2, 91.6), Vector3(5.0, 5.8, 103.8)]:
+	for spot in [Vector3(-6.6, 4.0, 90.8), Vector3(7.4, 4.2, 92.2), Vector3(6.2, 5.8, 105.0)]:
 		_mushroom(spot, 1.4, true)
-	_motes(4.0, -6.2, 92.4, 18, MAGIC, 5.0)
+	_motes(4.0, -6.8, 92.4, 18, MAGIC, 5.0)
 	_motes(4.2, 7.6, 94.0, 18, MAGIC, 5.0)
 
 
@@ -398,12 +378,12 @@ func _build_seal_terraces() -> void:
 func _build_ruins_approach() -> void:
 	_stone_slab(5.6, 0.0, 122.0, 7.0, 2.6)
 	_stone_slab(8.0, 0.0, 147.0, 8.5, 3.0)
-	# A climbing avenue of broken pillars between the two floors.
+	# A climbing avenue between the two stone floors, spaced so no platform sticks
+	# into either stone slab.
 	var climb := [
-		[6.0, -1.6, 132.5],
-		[6.5, 1.2, 134.5],
-		[7.0, -1.2, 136.5],
-		[7.5, 1.6, 138.5],
+		[6.2, -1.6, 131.2],
+		[6.8, 1.4, 133.8],
+		[7.4, -1.4, 136.4],
 	]
 	for point in climb:
 		_platform(float(point[0]), float(point[1]), float(point[2]), "medium", float(point[1]))
@@ -414,7 +394,7 @@ func _build_ruins_approach() -> void:
 	]:
 		_pillar(spot, 3.4, 0.35, true)
 	_arch(8.0, 0.0, 131.0, 6.0, 4.0, 0.0)
-	_rock(6.6, -3.6, 128.5, 1.5, 0.8, true)
+	_rock(6.4, -5.6, 129.4, 1.4, 0.8, true)
 	_mushroom(Vector3(2.4, 5.6, 123.4), 1.5, true)
 	_flower(Vector3(-2.2, 5.6, 123.6), 1.8, PETAL_PINK)
 	_motes(5.6, 0.0, 122.0, 20, MAGIC, 6.0)
@@ -503,8 +483,6 @@ func portal_blocked_reason() -> String:
 
 func _build_portal_terrace() -> void:
 	_stone_slab(8.0, 0.0, 168.0, 6.2, 3.0)
-	# Steps up to the terrace from the arena side.
-	_platform(8.0, 0.0, 164.0, "medium", 0.0)
 	portal_position = Vector3(0.0, 8.55, 168.5)
 	_build_portal(portal_position)
 	_pillar(Vector3(-4.4, 8.0, 166.0), 3.6, 0.2, true)
@@ -589,44 +567,44 @@ func _place_coins() -> void:
 		[0.0, -5.6, 4.6, 1.0],          # behind a mushroom
 		[0.0, 0.0, 4.4, 1.9],           # on the stone arch
 		# B. forest path
-		[0.6, 4.0, 17.4, 0.8],          # on the path
-		[1.1, -0.6, 25.4, 0.8],         # on the path, either side of the crystal
-		[1.1, 2.6, 27.2, 0.8],
-		[1.4, 4.4, 30.6, 0.8],          # on the path
-		[1.2, -3.6, 20.5, 0.8],         # inside the cave
-		[1.2, -4.4, 20.9, 1.1],
-		[1.2, -2.8, 21.4, 1.3],
-		[-1.2, 6.6, 31.4, 0.8],         # behind the waterfall
-		[-1.2, 6.8, 31.2, 1.0],
-		[1.2, 2.4, 15.6, 0.8],          # floating rocks
-		[2.0, -1.4, 22.0, 0.8],
-		[2.6, 2.6, 31.5, 0.8],
+		[0.2, 0.0, 13.0, 0.8],          # on the path
+		[1.2, -0.4, 25.4, 0.8],         # on the grass island, either side of the crystal
+		[1.2, 2.0, 27.0, 0.8],
+		[0.9, 0.4, 19.8, 0.8],          # on the path
+		[1.2, -4.6, 19.8, 0.8],         # on the west grass island
+		[1.2, -5.2, 20.2, 1.0],
+		[1.2, -3.8, 20.4, 1.1],
+		[1.4, 6.8, 33.4, 0.8],          # on the waterfall cliff island
+		[1.4, 7.2, 33.0, 1.0],
+		[0.7, 2.4, 16.6, 0.8],          # small rock islands
+		[1.1, -1.8, 22.4, 0.8],
+		[1.4, 2.8, 30.2, 0.8],
 		# C. crystal grove
-		[1.6, 0.6, 37.2, 0.8],
+		[1.6, 0.2, 37.4, 0.8],
 		[2.2, 0.8, 50.4, 0.8],
 		[1.8, -0.6, 41.6, 0.9],         # by the glowing plants
 		[2.0, 1.4, 46.0, 0.9],
-		[1.2, 3.0, 37.4, 0.8],          # floating rocks
-		[3.2, 4.0, 44.5, 0.8],
-		[2.0, 0.2, 50.9, 0.8],
-		[2.2, 3.0, 41.0, 0.8],          # the upper route
-		[3.8, 5.4, 44.4, 0.8],
+		[1.7, 3.8, 37.8, 0.8],          # side rock islands
+		[2.6, 4.6, 43.0, 0.8],
+		[2.4, -3.4, 51.0, 0.8],
+		[3.4, 5.4, 46.2, 0.8],          # the upper lookout
+		[2.4, 3.2, 54.0, 0.8],
 		# D. vanishing crossing
 		[3.0, -1.2, 70.2, 0.8],
 		[3.3, -1.2, 79.0, 0.8],
-		[1.6, 0.5, 71.2, 0.8],          # rock beside the middle
-		[0.6, 2.6, 86.4, 0.8],          # under the far end
-		[0.6, 3.6, 86.9, 1.0],
+		[2.2, 2.0, 71.2, 0.8],          # rock beside the start
+		[2.4, 6.6, 85.8, 0.8],          # side island at the far end
+		[2.4, 7.2, 86.2, 1.0],
 		# E. seal terraces
-		[4.0, -6.2, 92.4, 0.8],
+		[4.0, -6.8, 92.4, 0.8],
 		[4.2, 7.6, 94.0, 0.8],
-		[5.8, 5.6, 102.6, 0.8],
+		[5.8, 6.8, 104.2, 0.8],
 		[3.6, 0.6, 90.0, 0.8],
-		[4.16, 0.2, 101.2, 0.8],
+		[4.42, sin(2.8) * 0.5, 103.6, 0.8],
 		# F. ruins approach
 		[5.6, -4.6, 124.0, 0.8],        # behind a pillar
-		[6.6, -3.6, 128.5, 0.8],        # on a floating rock
-		[6.0, 0.0, 133.0, 0.8],         # under the arch
+		[6.4, -5.6, 129.4, 0.8],        # on the side rock island
+		[6.2, -1.6, 131.2, 0.8],        # on the first climb stone
 		# G. arena
 		[8.0, 6.0, 158.0, 0.8],
 		# H. portal terrace
@@ -713,16 +691,16 @@ func _scatter_tufts(surface_y: float, x: float, z: float, radius: float, count: 
 ## [surface, x, z, health]
 func _spawn_slimes() -> void:
 	var plans: Array = [
-		[2.6, 1.5, 32.8, 2],      # B - the first one alone, on the way down the forest path
-		[2.0, 0.8, 46.0, 2],      # C - the grove, a pair watching the middle
+		[1.5, 1.2, 33.8, 2],       # B - the first one alone, on the way down the forest path
+		[2.0, 0.8, 46.0, 2],       # C - the grove, a pair watching the middle
 		[2.5, 2.8, 57.0, 2],
-		[3.5, 2.8, 83.4, 3],      # D - waiting at the far side of the crossing
-		[4.0, -5.6, 93.4, 3, 0.9], # E - one warding each seal terrace; they keep to a
+		[3.5, 2.8, 84.0, 3],       # D - waiting at the far side of the crossing
+		[4.0, -6.2, 93.2, 3, 0.9], # E - one warding each seal terrace; they keep to a
 		[4.2, 7.0, 94.8, 3, 0.9],  #     short patrol there so they cannot fall off it
-		[5.6, 0.0, 122.0, 3],     # F - the ruins floor, and a pair on it: the ruin
-		[5.6, -3.4, 124.0, 3],    #     asks for company while the symbols are turned
+		[5.6, 0.0, 122.0, 3],      # F - the ruins floor, and a pair on it: the ruin
+		[5.6, -3.4, 124.0, 3],     #     asks for company while the symbols are turned
 		[5.6, 3.4, 124.8, 3],
-		[8.0, 8.0, 156.0, 3],     # G - the arena, on the arena floor itself
+		[8.0, 8.0, 156.0, 3],      # G - the arena, on the arena floor itself
 	]
 	var slime_death_lines: Array[String] = [
 		"A Shadow Slime dissolves into purple mist!",
@@ -783,7 +761,7 @@ func _build_puzzles() -> void:
 	_crystal = IslandCrystal.new()
 	_crystal.name = "PathCrystal"
 	_crystal.island = self
-	_crystal.position = Vector3(0.2, 1.1, 26.2)
+	_crystal.position = Vector3(0.8, 1.2, 26.2)
 	add_child(_crystal)
 
 	var pedestal := CrystalPedestal.new()
@@ -794,8 +772,8 @@ func _build_puzzles() -> void:
 	_record_surface(Vector3(0.6, 1.8, 41.6), 0.8)
 
 	# The bridge the pedestal raises: it fills the three-platform gap between the
-# grove and the crossing, and without it the gap is far too wide to jump.
-	for plank in [[2.7, -3.2, 63.6], [2.8, -5.2, 65.8], [2.9, -3.2, 68.0]]:
+	# grove and the crossing, and without it the gap is far too wide to jump.
+	for plank in [[2.7, -3.2, 64.2], [2.8, -4.8, 66.2], [2.9, -3.2, 68.2]]:
 		_build_gated_bridge("hidden_crystal", float(plank[0]), float(plank[1]), float(plank[2]), 0.9)
 
 	_build_nature_seals()
@@ -924,9 +902,9 @@ func ruin_stations_charged() -> int:
 ##   * the summit seal sits at the top of a climb of vanishing stones.
 func _build_nature_seals() -> void:
 	var plans: Array = [
-		["grove", "guardian", Vector3(-6.2, 4.0, 92.4)],
+		["grove", "guardian", Vector3(-6.8, 4.0, 92.4)],
 		["terrace", "switch", Vector3(7.6, 4.2, 94.0)],
-		["summit", "climb", Vector3(5.6, 5.8, 102.6)],
+		["summit", "climb", Vector3(6.8, 5.8, 104.2)],
 	]
 	for plan in plans:
 		var seal := NatureSeal.new()
@@ -949,16 +927,15 @@ func _build_nature_seals() -> void:
 	feeder.solved_name = feed_puzzle
 	feeder.tutorial = "A switch on the platform beside the falling water. Something up on the terraces is waiting for it."
 	feeder.success = "Somewhere above, a seal stops being dormant."
-	feeder.position = Vector3(2.6, 1.5, 32.8)
+	feeder.position = Vector3(1.2, 1.5, 33.8)
 	add_child(feeder)
-	_record_surface(Vector3(2.6, 1.5, 32.8), 0.7)
+	_record_surface(Vector3(1.2, 1.5, 33.8), 0.7)
 
-	# The climb to the summit seal: vanishing stones, so reaching the top is the
-	# puzzle. Same staggered wave as the crossing.
+	# The climb to the summit seal: vanishing stones, spaced so neither stone sits
+	# underneath the upper grass island.
 	var climb: Array = [
-		[4.6, 2.0, 100.0, 0.0, false],
-		[5.2, 4.0, 101.0, 1.9, true],
-		[5.5, 4.9, 102.0, 0.0, true],
+		[4.7, 2.6, 99.6, 0.0, false],
+		[5.3, 4.2, 101.4, 1.9, true],
 	]
 	for entry in climb:
 		var surface := float(entry[0])
@@ -1337,25 +1314,38 @@ func _coin(surface_y: float, x: float, z: float, lift := 0.8) -> void:
 	coins_placed += 1
 
 
-## A floating rock. Solid ones are landing spots (they never move); the loose ones
-## drift up and down as decoration.
+## A floating rock island or boulder. Every rock (landing spot or decorative)
+## gets a registered CollisionShape3D matching its visual mesh so nothing is a
+## walk-through block, and solid rock islands have a flat grass top at [param surface_y]
+## so the brown rock body never pokes above the walkable surface.
 func _rock(surface_y: float, x: float, z: float, radius: float, yaw: float, solid: bool) -> Node3D:
 	var body := StaticBody3D.new()
 	body.name = "Rock_%d_%d" % [roundi(x), roundi(z)]
-	body.position = Vector3(x, surface_y - 0.35, z)
+	body.position = Vector3(x, surface_y - 0.45, z)
 	body.rotation.y = yaw
-	var rock := _sphere(body, radius, _material(ROCK), Vector3.ZERO, Vector3(1.0, 0.55, 0.9))
-	rock.name = "RockShell"
 	if solid:
-		_cylinder(body, radius * 0.82, 0.3, _material(GRASS), Vector3(0.0, 0.32, 0.0))
+		var rock := _cylinder(body, radius * 0.95, 0.68, _material(ROCK), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, radius * 0.72)
+		rock.name = "RockShell"
+		var cap := _cylinder(body, radius * 0.96, 0.22, _material(GRASS), Vector3(0.0, 0.34, 0.0))
+		cap.name = "GrassCap"
 		var shape := CollisionShape3D.new()
 		var cylinder := CylinderShape3D.new()
-		cylinder.radius = radius * 0.8
-		cylinder.height = 0.7
+		cylinder.radius = radius * 0.96
+		cylinder.height = 0.82
 		shape.shape = cylinder
+		shape.position = Vector3(0.0, 0.04, 0.0)
 		body.add_child(shape)
 		body.set_meta("bob_base", body.position.y)
-		_record_surface(Vector3(x, surface_y, z), radius * 0.8)
+		_record_surface(Vector3(x, surface_y, z), radius * 0.95)
+	else:
+		var rock := _sphere(body, radius, _material(ROCK), Vector3.ZERO, Vector3(1.0, 0.55, 0.9))
+		rock.name = "RockShell"
+		var shape := CollisionShape3D.new()
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = radius * 0.9
+		cylinder.height = maxf(0.5, radius * 1.05)
+		shape.shape = cylinder
+		body.add_child(shape)
 	add_child(body)
 	if not solid:
 		_bobbers.append(body)
@@ -1365,9 +1355,17 @@ func _rock(surface_y: float, x: float, z: float, radius: float, yaw: float, soli
 
 func _post(surface_y: float, x: float, z: float, height: float) -> void:
 	var body := StaticBody3D.new()
+	body.name = "Post_%d_%d" % [roundi(x), roundi(z)]
 	body.position = Vector3(x, surface_y, z)
 	_cylinder(body, 0.12, height, _material(BARK), Vector3(0.0, height * 0.5, 0.0))
 	_sphere(body, 0.16, _material(CAP_GLOW, CAP_GLOW), Vector3(0.0, height, 0.0))
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.14
+	cylinder.height = height
+	shape.shape = cylinder
+	shape.position = Vector3(0.0, height * 0.5, 0.0)
+	body.add_child(shape)
 	add_child(body)
 
 
@@ -1414,7 +1412,8 @@ func _flower(spot: Vector3, bulk: float, petal: Color) -> void:
 
 
 func _pillar(spot: Vector3, height: float, tilt: float, broken: bool) -> void:
-	var node := Node3D.new()
+	var node := StaticBody3D.new()
+	node.name = "Pillar_%d_%d" % [roundi(spot.x), roundi(spot.z)]
 	node.position = spot
 	node.rotation = Vector3(tilt * 0.5, spot.x * 0.4, tilt)
 	_box(node, Vector3(1.0, 0.35, 1.0), _material(STONE_DEEP), Vector3(0.0, 0.17, 0.0))
@@ -1425,14 +1424,29 @@ func _pillar(spot: Vector3, height: float, tilt: float, broken: bool) -> void:
 			Vector3(0.2, body_height + 0.5, 0.1), Vector3(12.0, 24.0, 18.0))
 	else:
 		_box(node, Vector3(1.2, 0.4, 1.2), _material(STONE_DEEP), Vector3(0.0, body_height + 0.5, 0.0))
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.48
+	cylinder.height = body_height + 0.6
+	shape.shape = cylinder
+	shape.position = Vector3(0.0, (body_height + 0.6) * 0.5, 0.0)
+	node.add_child(shape)
 	add_child(node)
 
 
 func _brazier(spot: Vector3) -> void:
-	var node := Node3D.new()
+	var node := StaticBody3D.new()
+	node.name = "Brazier_%d_%d" % [roundi(spot.x), roundi(spot.z)]
 	node.position = spot
 	_cylinder(node, 0.3, 0.9, _material(STONE_DEEP), Vector3(0.0, 0.45, 0.0), Vector3.ZERO, 0.42)
 	_sphere(node, 0.34, _material(MAGIC, MAGIC), Vector3(0.0, 1.05, 0.0), Vector3(1.0, 1.3, 1.0))
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.42
+	cylinder.height = 1.2
+	shape.shape = cylinder
+	shape.position = Vector3(0.0, 0.6, 0.0)
+	node.add_child(shape)
 	add_child(node)
 	_motes(spot.y + 1.0, spot.x, spot.z, 12, MAGIC, 3.0, 0.6)
 
@@ -1463,21 +1477,19 @@ func _arch(x: float, z: float, surface_y: float, width: float, height: float, ya
 
 
 func _pedestal(spot: Vector3) -> void:
-	var node := Node3D.new()
+	var node := StaticBody3D.new()
 	node.name = "Pedestal"
 	node.position = spot
 	_cylinder(node, 0.6, 0.25, _material(STONE_DEEP), Vector3(0.0, 0.12, 0.0), Vector3.ZERO, 0.5)
 	_cylinder(node, 0.42, 1.0, _material(STONE), Vector3(0.0, 0.75, 0.0), Vector3.ZERO, 0.34)
 	_torus(node, 0.3, 0.44, _material(MAGIC, MAGIC), Vector3(0.0, 1.35, 0.0))
-	add_child(node)
-
-
-func _cave_shell(spot: Vector3, radius: float) -> void:
-	var node := Node3D.new()
-	node.name = "CaveShell"
-	node.position = spot
-	_sphere(node, radius * 1.15, _material(ROCK_DEEP), Vector3(0.0, radius * 0.55, 0.0), Vector3(1.0, 0.8, 1.0))
-	_sphere(node, radius * 0.62, _material(ROCK), Vector3(radius * 0.9, radius * 0.35, radius * 0.5), Vector3(1.0, 0.7, 1.0))
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.55
+	cylinder.height = 1.3
+	shape.shape = cylinder
+	shape.position = Vector3(0.0, 0.65, 0.0)
+	node.add_child(shape)
 	add_child(node)
 
 
@@ -1486,12 +1498,13 @@ func _cliff(surface_y: float, x: float, z: float, height: float) -> void:
 	body.name = "Cliff"
 	body.position = Vector3(x, surface_y, z)
 	_cylinder(body, 2.6, height, _material(ROCK_DEEP), Vector3(0.0, height * 0.5, 0.0), Vector3.ZERO, 1.7)
-	_sphere(body, 2.5, _material(GRASS), Vector3(0.0, height, 0.0), Vector3(1.0, 0.3, 1.0))
+	_cylinder(body, 2.55, 0.35, _material(GRASS), Vector3(0.0, height - 0.15, 0.0))
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = 2.6
 	cylinder.height = height
 	shape.shape = cylinder
+	shape.position = Vector3(0.0, height * 0.5, 0.0)
 	body.add_child(shape)
 	add_child(body)
 	_record_surface(Vector3(x, surface_y + height, z), 2.4)

@@ -71,6 +71,7 @@ func _ready() -> void:
 	_ensure_key_action("shift_dimension", KEY_Q, JOY_BUTTON_LEFT_SHOULDER, MOUSE_BUTTON_RIGHT)
 	_ensure_key_action("attack", KEY_J, JOY_BUTTON_B)
 	_ensure_key_action("inventory", KEY_I, JOY_BUTTON_BACK)
+	_ensure_key_action("fly", KEY_9, JOY_BUTTON_LEFT_STICK)
 	# Rebound keys win over the defaults above.
 	_apply_key_binds()
 	current_level = int(get_tree().get_meta("level_number", 1))

@@ -57,6 +57,17 @@ func _build() -> void:
 	bowl.position.y = 0.85
 	add_child(bowl)
 
+	var collider := StaticBody3D.new()
+	collider.name = "PedestalBody"
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.56
+	cylinder.height = 1.0
+	shape.shape = cylinder
+	shape.position.y = 0.5
+	collider.add_child(shape)
+	add_child(collider)
+
 	_rune = MeshInstance3D.new()
 	var rune_mesh := TorusMesh.new()
 	rune_mesh.inner_radius = 0.18

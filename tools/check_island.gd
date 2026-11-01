@@ -136,6 +136,48 @@ func _ready() -> void:
 			bobbers += 1
 	print("floating props: %d" % bobbers)
 
+	# --- No yellow tile may sit below or intersect a rock, island or other tile ---
+	var pieces: Array = []
+	for child in island.get_children():
+		if not (child is Node3D):
+			continue
+		var n := child as Node3D
+		var s := n.scene_file_path
+		if s.ends_with("/platform.tscn") or n is VanishingPlatform or n.name.begins_with("Bridge_"):
+			pieces.append({"node": n, "kind": "tile", "r": 0.92})
+		elif s.ends_with("/platform_medium.tscn"):
+			pieces.append({"node": n, "kind": "tile", "r": 1.42})
+		elif s.ends_with("/platform_grass_large_round.tscn"):
+			pieces.append({"node": n, "kind": "island", "r": 2.42})
+		elif n.name.begins_with("Rock_"):
+			var shape_node := n.get_node_or_null("CollisionShape3D") as CollisionShape3D
+			var r_val := 1.2
+			if shape_node != null and shape_node.shape is CylinderShape3D:
+				r_val = (shape_node.shape as CylinderShape3D).radius
+			pieces.append({"node": n, "kind": "rock", "r": r_val})
+		elif n.name.begins_with("Slab_") or n.name == "Cliff":
+			var shape_node := n.get_node_or_null("CollisionShape3D") as CollisionShape3D
+			if shape_node != null and shape_node.shape is CylinderShape3D:
+				var cyl := shape_node.shape as CylinderShape3D
+				if cyl.radius < 8.0:
+					pieces.append({"node": n, "kind": "island", "r": cyl.radius * 0.95})
+	var tile_overlaps := 0
+	for i in pieces.size():
+		for j in range(i + 1, pieces.size()):
+			var a: Dictionary = pieces[i]
+			var b: Dictionary = pieces[j]
+			if a["kind"] != "tile" and b["kind"] != "tile":
+				continue
+			var na: Node3D = a["node"]
+			var nb: Node3D = b["node"]
+			var xz := Vector2(na.position.x - nb.position.x, na.position.z - nb.position.z).length()
+			var min_dist := float(a["r"]) + float(b["r"])
+			if xz < min_dist - 0.05:
+				tile_overlaps += 1
+				problems.append("%s at %s overlaps %s at %s (xz %.2f < %.2f)" % [
+					na.name, na.position.round(), nb.name, nb.position.round(), xz, min_dist])
+	print("tile/rock/island overlaps: %d" % tile_overlaps)
+
 	# --- The coin gate: coins are one of three keys -------------------------
 	# The portal also wants the Warden gone and the First Fragment recovered, so
 	# coins by themselves can never open it. The full three-condition case is the
