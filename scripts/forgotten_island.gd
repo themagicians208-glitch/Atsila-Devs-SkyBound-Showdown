@@ -681,15 +681,15 @@ func _build_flanks() -> void:
 		var x := float(entry[1])
 		var z := float(entry[2])
 		var radius := float(entry[3])
-		var seed := int(absf(x) + absf(z))
+		var scatter := int(absf(x) + absf(z))
 		_grass_slab(surface, x, z, radius, radius * 0.9, false)
 		_scatter_tufts(surface, x, z, radius * 0.85, 8)
-		_tree(surface, x + radius * 0.35, z + radius * 0.25, 3.6 + float(seed % 3) * 0.5, LEAF)
-		_tree(surface, x - radius * 0.4, z - radius * 0.35, 3.2 + float(seed % 2) * 0.6, LEAF_DEEP)
-		_mushroom(Vector3(x + radius * 0.55, surface, z - radius * 0.5), 1.3, seed % 2 == 0)
+		_tree(surface, x + radius * 0.35, z + radius * 0.25, 3.6 + float(scatter % 3) * 0.5, LEAF)
+		_tree(surface, x - radius * 0.4, z - radius * 0.35, 3.2 + float(scatter % 2) * 0.6, LEAF_DEEP)
+		_mushroom(Vector3(x + radius * 0.55, surface, z - radius * 0.5), 1.3, scatter % 2 == 0)
 		_flower(Vector3(x - radius * 0.6, surface, z + radius * 0.45), 1.8,
-			PETAL_PINK if seed % 2 == 0 else PETAL_BLUE)
-		_rock(surface - 0.2, x + radius * 0.85, z + radius * 0.7, radius * 0.35, float(seed), false)
+			PETAL_PINK if scatter % 2 == 0 else PETAL_BLUE)
+		_rock(surface - 0.2, x + radius * 0.85, z + radius * 0.7, radius * 0.35, float(scatter), false)
 
 
 ## Scatter the project's own grass models over a patch of ground, so the island
@@ -1005,10 +1005,10 @@ func _gate_off(puzzle: String, beyond_z: float) -> void:
 
 ## Whether a recorded ledge exists yet, given which puzzles have been solved.
 func surface_open(entry: Dictionary) -> bool:
-	for name in str(entry.get("gate", "")).split("|"):
-		if name.is_empty():
+	for gate_name in str(entry.get("gate", "")).split("|"):
+		if gate_name.is_empty():
 			continue
-		if not is_puzzle_solved(name):
+		if not is_puzzle_solved(gate_name):
 			return false
 	return true
 
@@ -1049,23 +1049,23 @@ func _register_raiser(puzzle: String, piece: Node3D) -> void:
 	_raisers[puzzle].append(piece)
 
 
-func is_puzzle_solved(name: String) -> bool:
-	return bool(_solved.get(name, false))
+func is_puzzle_solved(puzzle: String) -> bool:
+	return bool(_solved.get(puzzle, false))
 
 
 ## Solve a puzzle: open its gates, raise its bridges, say so, and announce it.
-func solve_puzzle(name: String, text := "") -> void:
-	if is_puzzle_solved(name):
+func solve_puzzle(puzzle: String, text := "") -> void:
+	if is_puzzle_solved(puzzle):
 		return
-	_solved[name] = true
-	for gate in _gates.get(name, []):
+	_solved[puzzle] = true
+	for gate in _gates.get(puzzle, []):
 		if is_instance_valid(gate):
 			gate.call("open")
-	for piece in _raisers.get(name, []):
+	for piece in _raisers.get(puzzle, []):
 		_raise_piece(piece)
 	if not text.is_empty():
 		message.emit(text)
-	puzzle_solved.emit(name, text)
+	puzzle_solved.emit(puzzle, text)
 
 
 func _raise_piece(piece: Node3D) -> void:

@@ -329,7 +329,6 @@ func _steer(target: Node3D, distance: float) -> void:
 				cos(float(Time.get_ticks_msec()) * 0.0004) * patrol_radius)
 		_aim_at(_patrol_target)
 		return
-	var to_player := target.global_position - global_position
 	if distance > 1.2:
 		_aim_at(target.global_position)
 	else:
