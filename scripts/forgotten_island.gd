@@ -307,20 +307,36 @@ func _build_crystal_grove() -> void:
 # --- D: the vanishing crossing ------------------------------------------------
 
 func _build_crossing() -> void:
-	# Built as one row of stepping stones for now; the disappearing pattern is
-	# added on top of them in the puzzle stage.
+	# The two ends of the crossing stand still; the middle five take turns
+	# vanishing (puzzle 3), so the way is a rhythm rather than a staircase.
 	var route := [
 		[3.0, -1.2, 70.2],
-		[3.0, -3.2, 72.4],
-		[3.1, -5.2, 74.6],
-		[3.2, -3.2, 76.8],
-		[3.3, -1.2, 79.0],
-		[3.4, 0.8, 81.2],
 		[3.5, 2.8, 83.4],
 	]
 	for point in route:
 		_platform(float(point[0]), float(point[1]), float(point[2]), "small", float(point[1]) * 0.5)
 	_platform(3.5, 2.8, 83.4, "grass", 0.4)
+	# Puzzle 3: the vanishing stones, staggered so neighbours are never gone at
+	# the same moment. Ghost outlines show where each one returns.
+	var vanish_at: Array = [
+		[3.0, -3.2, 72.4, 0.0],
+		[3.1, -5.2, 74.6, 1.9],
+		[3.2, -3.2, 76.8, 0.0],
+		[3.3, -1.2, 79.0, 1.9],
+		[3.4, 0.8, 81.2, 0.0],
+	]
+	for entry in vanish_at:
+		var surface := float(entry[0])
+		var x := float(entry[1])
+		var z := float(entry[2])
+		var vanish := VanishingPlatform.new()
+		vanish.name = "Vanish_%d" % roundi(z)
+		vanish.position = Vector3(x, surface - 0.5, z)
+		vanish.scene = PLATFORM
+		vanish.yaw = surface * 0.5
+		vanish.offset = float(entry[3])
+		add_child(vanish)
+		_record_surface(Vector3(x, surface, z), 0.9)
 	# The rope bridge look: two low posts either side of the crossing.
 	_post(3.6, -3.2, 62.6, 1.2)
 	_post(3.7, 1.6, 84.6, 1.2)

@@ -110,6 +110,42 @@ func _ready() -> void:
 	var closed := island.is_puzzle_solved("ancient_switch") and island.is_puzzle_solved("hidden_crystal")
 	print("both puzzles solved: %s" % closed)
 
+	# --- Puzzle 3: the vanishing crossing ----------------------------------
+	# Two things have to hold for the crossing to be a puzzle rather than a lottery:
+	# neighbours are never gone at the same moment, and every stone stands long
+	# enough to land on and jump off again.
+	var stones: Array = []
+	for node in island.get_children():
+		if node is VanishingPlatform:
+			stones.append(node as VanishingPlatform)
+	stones.sort_custom(func(a, b): return a.global_position.z < b.global_position.z)
+	print("vanishing stones: %d" % stones.size())
+	if stones.size() < 4:
+		_problems.append("the vanishing crossing has only %d stones" % stones.size())
+	for stone in stones:
+		if stone.solid_fraction() < 0.55:
+			_problems.append("%s is only standing %.0f%% of the time" % [
+				stone.name, stone.solid_fraction() * 100.0])
+	var unfair := 0
+	var steps := 0
+	while steps < 140:
+		steps += 1
+		await get_tree().process_frame
+		for i in range(stones.size() - 1):
+			if not stones[i].solid and not stones[i + 1].solid:
+				unfair += 1
+				break
+	print("over %d sampled moments, neighbours both gone: %d" % [steps, unfair])
+	if unfair > 0:
+		_problems.append("two neighbouring stones were gone at the same moment %d times" % unfair)
+	var standing := 0
+	for stone in stones:
+		if stone.solid:
+			standing += 1
+	print("stones standing right now: %d of %d" % [standing, stones.size()])
+	if standing == 0:
+		_problems.append("every vanishing stone was gone at once")
+
 	_report()
 
 
