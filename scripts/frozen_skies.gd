@@ -69,6 +69,8 @@ func _build_islands() -> void:
 			_add_frozen_tree(route[index] + Vector3(1.0, 0.0, 0.6))
 	for region in 6:
 		_add_mountain(Vector3(-7.0 + region * 2.8, 2.0 + region * 0.6, region * 22.0))
+	_add_portal(route[0] + Vector3(0.0, 0.0, -2.3), Color("#72dfff"))
+	_add_portal(route[route.size() - 1] + Vector3(0.0, 0.0, 1.8), Color("#c4f3ff"))
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):
@@ -164,6 +166,27 @@ func _add_mountain(point: Vector3) -> void:
 	mountain.position = point
 	mountain.material_override = _material(Color("#8bc9ed"), 0.15)
 	_world.add_child(mountain)
+
+func _add_portal(point: Vector3, color: Color) -> void:
+	var portal := Node3D.new()
+	portal.name = "FrozenPortal"
+	portal.position = point + Vector3(0.0, 1.4, 0.0)
+	var ring := MeshInstance3D.new()
+	var ring_mesh := TorusMesh.new()
+	ring_mesh.inner_radius = 0.95
+	ring_mesh.outer_radius = 1.12
+	ring.mesh = ring_mesh
+	ring.rotation.x = PI * 0.5
+	ring.material_override = _material(color, 1.2)
+	portal.add_child(ring)
+	var surface := MeshInstance3D.new()
+	var surface_mesh := QuadMesh.new()
+	surface_mesh.size = Vector2(1.9, 2.8)
+	surface.mesh = surface_mesh
+	surface.rotation.x = PI * 0.5
+	surface.material_override = _material(Color(color, 0.18), 0.7)
+	portal.add_child(surface)
+	_world.add_child(portal)
 
 func _build_boss_arena() -> void:
 	var centre: Vector3 = route[route.size() - 3] + Vector3(0.0, 0.0, 3.0)
