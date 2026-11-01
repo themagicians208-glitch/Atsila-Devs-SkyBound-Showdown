@@ -81,6 +81,10 @@ func _run() -> void:
 	assert(not first_bridge_shape.disabled, "Frozen Switch must open the ice bridge")
 	player.global_position = seal_list[1].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "crystal-generator seal must activate after its challenge")
+	for enemy in get_nodes_in_group("enemies"):
+		if enemy is FrozenEnemy:
+			enemy.take_hit(999, player.global_position)
+	await process_frame
 	player.global_position = seal_list[2].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")

@@ -250,8 +250,18 @@ func try_activate_nearby(player: Node3D) -> bool:
 				if _main.has_method("_on_frozen_mechanism_blocked"):
 					_main.call("_on_frozen_mechanism_blocked", "Activate the previous frozen seal first.")
 				return true
+			if index == 2 and not _frozen_enemy_encounter_cleared():
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Defeat the frozen guardians before activating the final seal.")
+				return true
 			return mechanism.activate()
 	return false
+
+func _frozen_enemy_encounter_cleared() -> bool:
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy is FrozenEnemy and is_instance_valid(enemy):
+			return false
+	return true
 
 func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 	var activated_count := 0
