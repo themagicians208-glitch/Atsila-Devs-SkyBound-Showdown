@@ -45,12 +45,15 @@ var _exit_portal_ring: MeshInstance3D
 var _exit_portal_material: StandardMaterial3D
 var _portal_energy := 0.0
 var portal_count := 0
+var waterfall_count := 0
+var cave_cluster_count := 0
 
 func build(main: Node) -> Array:
 	_main = main
 	_world = main.get("world")
 	route = _make_route()
 	_build_islands()
+	_build_environment_details()
 	_build_frozen_mechanics()
 	_build_boss_arena()
 	_build_snowfall()
@@ -263,6 +266,45 @@ func _build_islands() -> void:
 		_add_mountain(Vector3(-7.0 + region * 2.8, 2.0 + region * 0.6, region * 22.0))
 	_add_portal(route[0] + Vector3(0.0, 0.0, -2.3), Color("#72dfff"))
 	_add_portal(route[route.size() - 1] + Vector3(0.0, 0.0, 1.8), Color("#c4f3ff"), true)
+
+func _build_environment_details() -> void:
+	for index in [4, 11, 18, 25, 32, 39]:
+		_add_frozen_waterfall(route[index] + Vector3(-1.2, 0.0, 0.7))
+	for index in [21, 23, 25, 27]:
+		_add_cave_crystal_cluster(route[index] + Vector3(1.1, 0.55, 0.5))
+
+func _add_frozen_waterfall(point: Vector3) -> void:
+	waterfall_count += 1
+	var waterfall := Node3D.new()
+	waterfall.name = "FrozenWaterfall"
+	waterfall.position = point
+	for column in 3:
+		var stream := MeshInstance3D.new()
+		var stream_mesh := BoxMesh.new()
+		stream_mesh.size = Vector3(0.22, 2.0 + float(column % 2) * 0.45, 0.16)
+		stream.mesh = stream_mesh
+		stream.position = Vector3(float(column - 1) * 0.3, 1.0, 0.0)
+		stream.material_override = _material(Color("#9feeff"), 1.15)
+		waterfall.add_child(stream)
+	_world.add_child(waterfall)
+
+func _add_cave_crystal_cluster(point: Vector3) -> void:
+	cave_cluster_count += 1
+	var cluster := Node3D.new()
+	cluster.name = "FrozenCaveCrystalCluster"
+	cluster.position = point
+	for index in 4:
+		var shard := MeshInstance3D.new()
+		var shard_mesh := CylinderMesh.new()
+		shard_mesh.top_radius = 0.0
+		shard_mesh.bottom_radius = 0.16 + float(index % 2) * 0.06
+		shard_mesh.height = 0.8 + float(index) * 0.16
+		shard.mesh = shard_mesh
+		shard.position = Vector3(float(index - 1) * 0.25, shard_mesh.height * 0.5, 0.0)
+		shard.rotation.z = float(index - 1) * 0.18
+		shard.material_override = _material(Color("#74eaff"), 1.4)
+		cluster.add_child(shard)
+	_world.add_child(cluster)
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):
