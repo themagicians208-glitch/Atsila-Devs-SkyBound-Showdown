@@ -136,7 +136,10 @@ func _ready() -> void:
 			bobbers += 1
 	print("floating props: %d" % bobbers)
 
-	# --- The coin gate ------------------------------------------------------
+	# --- The coin gate: coins are one of three keys -------------------------
+	# The portal also wants the Warden gone and the First Fragment recovered, so
+	# coins by themselves can never open it. The full three-condition case is the
+	# running level below.
 	var unlocks := [0]
 	island.portal_unlocked.connect(func(): unlocks[0] += 1)
 	island.notify_coins(0)
@@ -150,16 +153,26 @@ func _ready() -> void:
 	if island.coins_needed() != 1:
 		problems.append("coins_needed() is %d one coin short, expected 1" % island.coins_needed())
 	island.notify_coins(island.coins_required)
-	if not island.is_portal_ready():
-		problems.append("the portal is NOT ready at %d coins" % island.coins_required)
-	if unlocks[0] != 1:
-		problems.append("portal_unlocked fired %d times at the requirement, expected 1" % unlocks[0])
+	if island.is_portal_ready():
+		problems.append("coins alone opened the portal, with the Warden still standing")
+	if island.portal_blocked_reason().is_empty():
+		problems.append("the portal is dormant at full coins but gives no reason")
+	if not island.portal_blocked_reason().contains("Warden"):
+		problems.append("at full coins the portal blames something other than the Warden: '%s'" % island.portal_blocked_reason())
+	if unlocks[0] != 0:
+		problems.append("portal_unlocked fired %d times on coins alone, expected 0" % unlocks[0])
 	island.notify_coins(island.coins_required + 5)
-	if unlocks[0] != 1:
-		problems.append("portal_unlocked fired %d times, expected 1" % unlocks[0])
-	print("coin gate: locked at %d, unlocked at %d" % [island.coins_required - 1, island.coins_required])
+	if unlocks[0] != 0:
+		problems.append("portal_unlocked fired %d times on coins alone, expected 0" % unlocks[0])
+	print("coin gate: locked at %d coins, still locked at %d (the Warden and the Fragment are also keys)" % [
+		island.coins_required - 1, island.coins_required])
 
-	# --- The level must refuse to finish through a dormant portal -----------
+	# --- The level must refuse a dormant portal, then really finish ---------
+	# The Fragment comes from the chest, so the whole ending is walked here - with
+	# Progress pointed at a throwaway file so a real player's save is untouched.
+	var real_progress_path: String = Progress.config_path
+	Progress.config_path = "user://progress_island_check.cfg"
+	Progress.clear()
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await get_tree().process_frame
@@ -175,10 +188,61 @@ func _ready() -> void:
 			problems.append("the level finished through the portal with 0 coins")
 		live_island.notify_coins(live_island.coins_required)
 		main.call("_on_finish_body_entered", who)
-		if not bool(hud.get("victory_overlay").visible):
-			problems.append("the level did NOT finish through a portal opened with %d coins" % live_island.coins_required)
-		print("portal gate in the running level: blocked below the requirement, opens at it")
+		if bool(hud.get("victory_overlay").visible):
+			problems.append("the level finished at full coins with the Warden still standing")
+		# Now do the rest of the ending: beat it, take the Fragment, walk in.
+		# A particular island's own Warden. The check builds one island itself earlier,
+	# so searching the tree by group would find the wrong one.
+		var warden := live_island.get_node_or_null("IslandWarden") as IslandWarden
+		if warden == null:
+			problems.append("the running level has no Warden")
+		else:
+			warden.begin_fight()
+			print("warden before the fight: state %s, health %d/%d, shielded %s" % [
+				warden.state_name(), warden.health, warden.max_health, warden.shielded])
+		var blows := 0
+		while warden != null and warden.health > 0 and warden.state_name() != "dead" and blows < 80:
+			blows += 1
+			if warden.shielded:
+				for slime in warden.summons():
+					if is_instance_valid(slime):
+						slime.take_hit(99, slime.global_position)
+				await get_tree().create_timer(0.25).timeout
+				continue
+			warden.take_hit(1, who.global_position)
+			await get_tree().physics_frame
+		print("warden after the fight: state %s, health %d/%d, shielded %s, blows %d, player dead %s" % [
+			warden.state_name(), warden.health, warden.max_health, warden.shielded, blows, who.get("is_dead")])
+		var chest: IslandChest = live_island.get_node_or_null("FragmentChest")
+		if chest == null:
+			problems.append("the chamber has no chest to take the Fragment from")
+		else:
+			who.global_position = chest.global_position + Vector3(0.0, 0.55, 2.0)
+			who.velocity = Vector3.ZERO
+			await get_tree().physics_frame
+			var opened_now := chest.try_open()
+			print("chest: try_open %s   open %s   refusal '%s'   warden defeated %s   player dead %s" % [
+				opened_now, chest.is_open, chest.blocking_reason(),
+				live_island.is_warden_defeated(), who.get("is_dead")])
+			var waited_for_fragment := 0.0
+			while waited_for_fragment < 8.0 and not chest.fragment_out:
+				waited_for_fragment += 0.1
+				await get_tree().create_timer(0.1).timeout
+			print("   after %.1fs: fragment out %s, island has it %s, portal ready %s" % [
+				waited_for_fragment, chest.fragment_out, live_island.has_fragment(),
+				live_island.is_portal_ready()])
+			if not live_island.is_portal_ready():
+				problems.append("the portal did not open with the Warden gone and the Fragment recovered")
+			main.call("_on_finish_body_entered", who)
+			await get_tree().process_frame
+			if not bool(hud.get("victory_overlay").visible):
+				problems.append("the level did NOT finish through a portal opened with all three keys")
+			print("portal gate in the running level: blocked without coins, blocked without the Warden, opens once the Warden has fallen, the Fragment is recovered and %d coins are in hand" % live_island.coins_required)
 	main.queue_free()
+	Progress.config_path = real_progress_path
+	Progress.load_progress()
+	if FileAccess.file_exists("user://progress_island_check.cfg"):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://progress_island_check.cfg"))
 
 	# --- The portal has to actually exist -----------------------------------
 	var portal: Node = island.get_node_or_null("Portal")

@@ -1380,10 +1380,11 @@ func _on_finish_body_entered(body: Node3D) -> void:
 	if body != player and body != player_two:
 		return
 	if island != null and not island.is_portal_ready():
-		# The portal is dormant until the coins are in.
+		# The portal is dormant until the guardian is gone, the Fragment is
+		# recovered and the coins are in.
 		if _portal_locked_cooldown <= 0.0:
 			_portal_locked_cooldown = 2.5
-			hud.show_finish_message("The portal is dormant - %d more coins are needed." % island.coins_needed())
+			hud.show_finish_message(island.portal_blocked_reason())
 		return
 	# Reaching the flag - or stepping through an open portal - finishes the level.
 	Engine.time_scale = 1.0

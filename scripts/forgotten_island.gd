@@ -29,6 +29,7 @@ signal message(text: String)         ## ask the HUD to show a line of text
 signal portal_unlocked               ## the coin requirement was just met
 signal puzzle_solved(name: String, text: String)
 signal warden_fell                   ## the corrupted guardian was destroyed
+signal fragment_taken                ## the First Fragment came out of the chest
 
 const PLATFORM := preload("res://objects/platform.tscn")
 const PLATFORM_MEDIUM := preload("res://objects/platform_medium.tscn")
@@ -89,6 +90,7 @@ var _crystal: IslandCrystal = null
 var _seals: Array[NatureSeal] = []
 var _stations: Array[RuinSymbol] = []
 var _warden: IslandWarden = null
+var _chest: IslandChest = null
 ## The puzzle name of the switch hidden behind the waterfall.
 const feed_puzzle := "seal_feed"
 var _symbols: Array[Node3D] = []
@@ -124,10 +126,10 @@ func build(main: Node) -> void:
 		coins_placed, coins_required, checkpoint_points.size()])
 
 
-## True once the coin requirement is met. The level can be finished through the
-## portal only then.
+## The portal answers only to all three: the guardian gone, the Fragment
+## recovered and the coins in hand.
 func is_portal_ready() -> bool:
-	return coins_collected >= coins_required
+	return coins_collected >= coins_required and is_warden_defeated() and has_fragment()
 
 
 func coins_needed() -> int:
@@ -137,11 +139,10 @@ func coins_needed() -> int:
 ## Called by the level each time a coin is picked up.
 func notify_coins(count: int) -> void:
 	coins_collected = count
-	if _unlocked or coins_collected < coins_required:
-		main_objective()
+	main_objective()
+	if _unlocked or not is_portal_ready():
 		return
 	_unlocked = true
-	main_objective()
 	message.emit("The path to the next island has opened!")
 	portal_unlocked.emit()
 
@@ -156,6 +157,10 @@ func main_objective() -> void:
 		return
 	if is_portal_ready():
 		hud.call("set_objective", "The portal on the east terrace is awake - step through it!")
+	elif not is_warden_defeated():
+		hud.call("set_objective", "Deal with the Warden in the arena  -  %d more coins too" % coins_needed())
+	elif not Progress.fragment_recovered:
+		hud.call("set_objective", "Open the Warden's chest and recover the First Fragment")
 	else:
 		hud.call("set_objective", "Explore the Forgotten Island  -  %d more coins wake the portal" % coins_needed())
 
@@ -447,6 +452,15 @@ func _build_chamber() -> void:
 	_warden = warden
 	_record_surface(Vector3(0.0, 8.0, 163.4), 1.1)
 
+	# The chest the Warden guards, at the back of the chamber.
+	var chest := IslandChest.new()
+	chest.name = "FragmentChest"
+	chest.island = self
+	chest.position = Vector3(0.0, 8.0, 163.4)
+	chest.rotation.y = PI
+	add_child(chest)
+	_chest = chest
+
 
 ## The island's answer to "is the guardian dealt with", for the chest and the
 ## portal. Both ask before they open.
@@ -457,6 +471,31 @@ func is_warden_defeated() -> bool:
 func warden_defeated() -> void:
 	message.emit("The Warden shatters.  The corruption's grip on the island breaks with it.")
 	warden_fell.emit()
+	main_objective()
+
+
+## Called by the chest once the First Fragment is out of it.
+func fragment_recovered() -> void:
+	message.emit("The chest is empty - the First Fragment is yours, and it is remembered.")
+	fragment_taken.emit()
+	main_objective()
+
+
+func has_fragment() -> bool:
+	return Progress.fragment_recovered
+
+
+## Why the portal is still dormant, in the player's own terms.
+func portal_blocked_reason() -> String:
+	if not is_warden_defeated():
+		return "The portal is dormant - the Warden in the arena still holds it."
+	if not has_fragment():
+		return "The portal is dormant - the First Fragment is still sealed in the chest."
+	if coins_collected < coins_required:
+		var missing := coins_needed()
+		return "The portal is dormant - %d more %s needed." % [
+			missing, "coin is" if missing == 1 else "coins are"]
+	return ""
 
 
 # --- H: the portal terrace ----------------------------------------------------
