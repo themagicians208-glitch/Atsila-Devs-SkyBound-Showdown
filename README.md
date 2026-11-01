@@ -37,6 +37,7 @@ Leap across floating islands, hunt down every coin, activate switches, and race 
 - 🎒 **Use your inventory** — manage collected items during a course.
 - 🪽 **Take flight when needed** — use the fly toggle while exploring and testing routes.
 - ⏱️ **Freeze time** — use a brief time-freeze to help plan tricky moves.
+- ❄️ **Survive Frozen Skies** — cross slippery ice, crystal routes, and the Frost Titan's arena in Level 3.
 - ⚠️ **Read the hazards** — dodge spinning sweepers, falling platforms, hurdles, and maze walls.
 - 🎢 **Take on the Gauntlet** — balance on see-saws, cross rotating logs, handle slippery and sticky zones, ride bounce pads and fan tunnels, slide down ramps, and avoid rolling barrels.
 - 💛 **Use checkpoints** — reach checkpoint beacons to save your respawn point.
@@ -86,6 +87,8 @@ For more detail on route sizes and mechanics, see **[COURSES.md](COURSES.md)**.
 | Shift dimension | Q / right click | Left bumper (LB) | L1 | L |
 | Freeze time briefly | F | Y | Triangle ($\triangle$) | B / East |
 | Activate a nearby switch | E | X | Square ($\square$) | X / West |
+| Ice Shield (Level 3) | K | Left trigger | L2 | ZL |
+| Frost Dash (Level 3) | L | Right bumper (RB) | R1 | ZR |
 | Attack | J | B | Circle ($\bigcirc$) | B / East |
 | Inventory | I | View button | Touchpad / View | Minus / View |
 | Fly toggle | 9 | Left stick click | Left stick click | Left stick click |

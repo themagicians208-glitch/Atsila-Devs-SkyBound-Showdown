@@ -6,9 +6,9 @@ Press **Q** to shift between Material and Mirror dimensions. Mirror platforms si
 
 | # | Course | Route size | Main challenges |
 | --- | --- | --- | --- |
-| 1 | **Cloud Hop** | 15 platforms | Gentle climb, sky hoops, rotating sweepers, falling platforms, and an anti-gravity zone |
+| 1 | **Forgotten Island** | Hand-built island | Shadow creatures, a corrupted Warden, switches, checkpoints, a fragment chest, and a coin-gated portal |
 | 2 | **Switchback Sprint** | 20 platforms | Moving platforms, jump hurdles, rotating sweepers, falling platforms, and an anti-gravity zone |
-| 3 | **Moonflip Maze** | 25 platforms | Maze walls, timed phase platforms, rotating sweepers, and falling platforms |
+| 3 | **Frozen Skies** | 42 frozen platforms | Slippery ice, crystal routes, Frost Slimes, Frost Wolves, Crystal Phantoms, and the Frost Titan |
 | 4 | **Rising Ruins** | 30 platforms | Climbing route, maze walls, moving and timed platforms, rotating sweepers, falling platforms, and an anti-gravity zone |
 | 5 | **Sky Crown** | 36 platforms | The longest of the first five courses, with golden gates, crown spires, more sweepers, and an anti-gravity zone |
 | 6 | **Gimmick Gauntlet** | 42 platforms | See-saws, rotating logs, slippery and sticky zones, bounce pads, fan tunnels, a slide, rolling barrels, moving and timed platforms, hurdles, and maze walls |
@@ -43,4 +43,4 @@ The glowing upright hoops are decorative route markers. They have no collision a
 
 ## Level progression
 
-The home screen allows direct access to any of the six courses. Completing a course offers the next one; completing Gimmick Gauntlet cycles back to Cloud Hop for another run.
+The home screen allows direct access to any of the six courses. Completing a course offers the next one; completing Gimmick Gauntlet cycles back to Forgotten Island for another run.
