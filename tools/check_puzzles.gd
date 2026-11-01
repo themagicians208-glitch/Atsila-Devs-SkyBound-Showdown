@@ -67,14 +67,14 @@ func _ready() -> void:
 	if not gate.opened:
 		_problems.append("the gate did not open when its switch was pressed")
 
-	# --- Puzzle 2: the crystal, hidden in the cave --------------------------
+	# --- Puzzle 2: the crystal, out on the forest path ----------------------
 	player.global_position = crystal.global_position + Vector3(0.4, 0.6, 0.4)
 	player.velocity = Vector3.ZERO
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	print("walking into the crystal: carried %s" % crystal.carried)
 	if not crystal.carried:
-		_problems.append("walking into the hidden crystal did not pick it up")
+		_problems.append("walking into the crystal did not pick it up")
 
 	# Carrying it to the pedestal and pressing interact there.
 	player.global_position = pedestal.global_position + Vector3(0.0, 0.6, 1.6)
@@ -154,7 +154,7 @@ func _ready() -> void:
 			if not grove.awakened:
 				_problems.append("the grove seal still refuses with its guardian gone")
 
-		# The terrace seal waits for the switch hidden behind the waterfall.
+		# The terrace seal waits for the switch beside the waterfall.
 		player.global_position = terrace.global_position + Vector3(0.0, 0.6, 1.8)
 		player.velocity = Vector3.ZERO
 		await get_tree().physics_frame
@@ -165,9 +165,9 @@ func _ready() -> void:
 			terrace.awakened, terrace.blocking_reason()])
 		if terrace.awakened:
 			_problems.append("the terrace seal opened before its hidden switch was thrown")
-		var hidden: IslandSwitch = island.get_node_or_null("HiddenSwitch")
+		var hidden: IslandSwitch = island.get_node_or_null("SealSwitch")
 		if hidden == null:
-			_problems.append("the hidden switch behind the waterfall is missing")
+			_problems.append("the switch beside the waterfall is missing")
 		else:
 			hidden.activate()
 			await get_tree().physics_frame

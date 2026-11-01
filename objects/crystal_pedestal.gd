@@ -1,7 +1,7 @@
 class_name CrystalPedestal
 extends Node3D
 
-## The grove's ancient pedestal. Carrying the hidden crystal up to it and pressing
+## The grove's ancient pedestal. Carrying the crystal up to it and pressing
 ## interact sets the crystal in place: the pedestal lights up and the island's
 ## bridge to the vanishing crossing rises out of the mist.
 

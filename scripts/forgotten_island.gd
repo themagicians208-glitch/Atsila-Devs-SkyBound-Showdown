@@ -8,7 +8,7 @@ extends Node3D
 ## into eight areas:
 ##
 ##   A Start Glade         z   0 - 11   spawn, stone arch, flowers         4 coins
-##   B Forest Path         z  13 - 33   stepping stones, cave, waterfall  10 coins
+##   B Forest Path         z  13 - 33   stepping stones, cave, waterfall  12 coins
 ##   C Crystal Grove       z  35 - 61   trees, glowing mushrooms, upper route  9 coins
 ##   D Vanishing Crossing  z  63 - 84   stepping stones over the chasm     5 coins
 ##   E Seal Terraces       z  88 - 115  three side terraces, the long path 5 coins
@@ -16,7 +16,7 @@ extends Node3D
 ##   G Warden's Arena      z 145 - 167  circular arena floor               1 coin
 ##   H Portal Terrace      z 162 - 174  the coin-gated portal to level 2   1 coin
 ##
-## 38 coins in total, [member coins_required] of them needed for the portal.
+## 40 coins in total, [member coins_required] of them needed for the portal.
 ##
 ## Conventions used by every helper here:
 ##   * heights are the WALKABLE SURFACE, never a node origin - the project's
@@ -91,7 +91,7 @@ var _seals: Array[NatureSeal] = []
 var _stations: Array[RuinSymbol] = []
 var _warden: IslandWarden = null
 var _chest: IslandChest = null
-## The puzzle name of the switch hidden behind the waterfall.
+## The puzzle name of the switch that wakes the dormant terrace seal.
 const feed_puzzle := "seal_feed"
 var _symbols: Array[Node3D] = []
 var _portal_disc: MeshInstance3D
@@ -302,7 +302,7 @@ func _build_crystal_grove() -> void:
 	for point in route:
 		_platform(float(point[0]), float(point[1]), float(point[2]), str(point[3]), float(point[1]) * 0.3)
 
-	# The pedestal that holds the hidden crystal is built with the puzzles; the
+	# The pedestal that holds the crystal is built with the puzzles; the
 # grove only reserves the clearing for it.
 	_tree(1.8, -4.4, 40.0, 4.4, LEAF)
 	_tree(1.8, 4.6, 42.6, 4.0, LEAF_DEEP)
@@ -585,7 +585,7 @@ func _on_portal_prompt_entered(body: Node3D) -> void:
 
 # --- Coins --------------------------------------------------------------------
 
-## Every hidden coin on the island, in one place so the hunt can be judged at a
+## Every coin on the island, in one place so the hunt can be judged at a
 ## glance. [surface, x, z, lift] - the lift is how far above the surface it floats.
 func _place_coins() -> void:
 	var spots: Array = [
@@ -596,6 +596,8 @@ func _place_coins() -> void:
 		[0.0, 0.0, 4.4, 1.9],           # on the stone arch
 		# B. forest path
 		[0.4, 2.0, 15.2, 0.8],          # on the path
+		[1.1, -0.6, 25.4, 0.8],         # on the path, either side of the crystal
+		[1.1, 2.6, 27.2, 0.8],
 		[1.4, 4.4, 30.6, 0.8],          # on the path
 		[1.2, -3.6, 20.5, 0.8],         # inside the cave
 		[1.2, -4.4, 20.9, 1.1],
@@ -748,7 +750,7 @@ func _spawn_slimes() -> void:
 ## the dev checks can prove the island is closed before and open afterwards.
 ##
 ##   1 ancient_switch   a glowing switch in the glade   -> the stone gate north of it
-##   2 hidden_crystal   the crystal in the cave, carried to the grove's pedestal
+##   2 hidden_crystal   the crystal on the path, carried to the grove's pedestal
 ##                                                      -> the bridge to the crossing
 func _build_puzzles() -> void:
 	# 1. The ancient switch, beside the arch, and the gate it opens.
@@ -771,12 +773,14 @@ func _build_puzzles() -> void:
 	# Everything north of the wall is behind that puzzle until it is solved.
 	_gate_off("ancient_switch", 10.2)
 
-	# 2. The crystal, hidden inside the cave above the forest path, and the
-	#    pedestal that wants it in the grove.
+	# 2. The crystal, out on the forest path where nobody can miss it, and the
+	#    pedestal that wants it in the grove. It used to sit inside the cave: the
+	#    cave kept its coins, so exploring it still pays, but nothing the route
+	#    depends on is hidden away.
 	_crystal = IslandCrystal.new()
-	_crystal.name = "HiddenCrystal"
+	_crystal.name = "PathCrystal"
 	_crystal.island = self
-	_crystal.position = Vector3(-3.1, 1.2, 21.0)
+	_crystal.position = Vector3(0.2, 1.1, 26.2)
 	add_child(_crystal)
 
 	var pedestal := CrystalPedestal.new()
@@ -912,7 +916,7 @@ func ruin_stations_charged() -> int:
 ## Each answers a different challenge, and all three together open the way into
 ## the ancient ruins:
 ##   * the grove seal is warded by the Shadow Slimes patrolling that terrace,
-##   * the terrace seal is dormant until a switch hidden behind the waterfall is
+##   * the terrace seal is dormant until the switch beside the waterfall is
 ##     thrown,
 ##   * the summit seal sits at the top of a climb of vanishing stones.
 func _build_nature_seals() -> void:
@@ -932,17 +936,19 @@ func _build_nature_seals() -> void:
 		_seals.append(seal)
 		_record_surface(plan[2], 0.9)
 
-	# The switch that feeds the terrace seal, tucked behind the waterfall on the
-	# west edge.
-	var hidden := IslandSwitch.new()
-	hidden.name = "HiddenSwitch"
-	hidden.island = self
-	hidden.solved_name = feed_puzzle
-	hidden.tutorial = "A switch hidden behind the falling water. Something up on the terraces is waiting for it."
-	hidden.success = "Somewhere above, a seal stops being dormant."
-	hidden.position = Vector3(6.6, -1.2, 31.4)
-	add_child(hidden)
-	_record_surface(Vector3(6.6, -1.2, 31.4), 0.7)
+	# The switch that feeds the terrace seal, standing on the platform beside the
+	# waterfall where the path walks right past it. It used to be tucked behind the
+	# falling water; the coins behind the water are still there for anyone who hops
+	# through, but the way on no longer depends on finding them.
+	var feeder := IslandSwitch.new()
+	feeder.name = "SealSwitch"
+	feeder.island = self
+	feeder.solved_name = feed_puzzle
+	feeder.tutorial = "A switch on the platform beside the falling water. Something up on the terraces is waiting for it."
+	feeder.success = "Somewhere above, a seal stops being dormant."
+	feeder.position = Vector3(2.6, 1.5, 32.8)
+	add_child(feeder)
+	_record_surface(Vector3(2.6, 1.5, 32.8), 0.7)
 
 	# The climb to the summit seal: vanishing stones, so reaching the top is the
 	# puzzle. Same staggered wave as the crossing.

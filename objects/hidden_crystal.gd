@@ -1,9 +1,9 @@
 class_name IslandCrystal
 extends Node3D
 
-## The hidden crystal of the Forgotten Island. It waits where it was hidden -
-## inside the cave above the forest path - until a player walks into it, then
-## rides above their head until it is placed in the grove's pedestal.
+## The crystal of the Forgotten Island. It stands in the open on the forest path,
+## where anyone walking past will pick it up, and then rides above their head
+## until it is placed in the grove's pedestal.
 
 signal picked_up
 
@@ -64,7 +64,7 @@ func _build() -> void:
 	glow.material_override = glow_material
 	_gem.add_child(glow)
 
-	# A soft light so it is findable in the dark of the cave without a map.
+	# A soft light so it reads as something worth walking into.
 	var light := OmniLight3D.new()
 	light.light_color = Color("#8ce7ff")
 	light.light_energy = 1.1
@@ -107,5 +107,5 @@ func pick_up(who: Node3D) -> void:
 	_carrier = who
 	Audio.play("res://sounds/coin.ogg")
 	if island != null:
-		island.message.emit("You found the hidden crystal! Carry it to the pedestal in the crystal grove.")
+		island.message.emit("The grove's crystal! Carry it to the pedestal in the crystal grove.")
 	picked_up.emit()
