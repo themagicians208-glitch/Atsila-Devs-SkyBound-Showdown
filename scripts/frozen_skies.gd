@@ -40,6 +40,10 @@ var environment_thawed := false
 var _crystal_gate: StaticBody3D
 var _boss_gate: StaticBody3D
 var boss_arena_locked := false
+var _exit_portal_ring: MeshInstance3D
+var _exit_portal_material: StandardMaterial3D
+var _portal_energy := 0.0
+var portal_count := 0
 
 func build(main: Node) -> Array:
 	_main = main
@@ -109,6 +113,12 @@ func region_name_for_checkpoint(checkpoint_index: int) -> String:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _exit_portal_ring != null and _main != null:
+		var current_coins := int(_main.get("coins_collected"))
+		var target_energy := 1.0 if is_portal_ready(current_coins) else 0.0
+		_portal_energy = move_toward(_portal_energy, target_energy, delta * 0.8)
+		_exit_portal_ring.rotate_y(delta * (0.45 + _portal_energy * 1.4))
+		_exit_portal_material.emission_energy_multiplier = 0.35 + _portal_energy * 1.8
 	for index in _moving_platforms.size():
 		var platform := _moving_platforms[index]
 		if not is_instance_valid(platform):
@@ -226,7 +236,7 @@ func _build_islands() -> void:
 	for region in 6:
 		_add_mountain(Vector3(-7.0 + region * 2.8, 2.0 + region * 0.6, region * 22.0))
 	_add_portal(route[0] + Vector3(0.0, 0.0, -2.3), Color("#72dfff"))
-	_add_portal(route[route.size() - 1] + Vector3(0.0, 0.0, 1.8), Color("#c4f3ff"))
+	_add_portal(route[route.size() - 1] + Vector3(0.0, 0.0, 1.8), Color("#c4f3ff"), true)
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):
@@ -337,7 +347,8 @@ func _add_mountain(point: Vector3) -> void:
 	mountain.material_override = _material(Color("#8bc9ed"), 0.15)
 	_world.add_child(mountain)
 
-func _add_portal(point: Vector3, color: Color) -> void:
+func _add_portal(point: Vector3, color: Color, is_exit := false) -> void:
+	portal_count += 1
 	var portal := Node3D.new()
 	portal.name = "FrozenPortal"
 	portal.position = point + Vector3(0.0, 1.4, 0.0)
@@ -347,7 +358,11 @@ func _add_portal(point: Vector3, color: Color) -> void:
 	ring_mesh.outer_radius = 1.12
 	ring.mesh = ring_mesh
 	ring.rotation.x = PI * 0.5
-	ring.material_override = _material(color, 1.2)
+	var ring_material := _material(color, 1.2)
+	ring.material_override = ring_material
+	if is_exit:
+		_exit_portal_ring = ring
+		_exit_portal_material = ring_material
 	portal.add_child(ring)
 	var surface := MeshInstance3D.new()
 	var surface_mesh := QuadMesh.new()
