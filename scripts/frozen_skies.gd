@@ -27,6 +27,7 @@ func build(main: Node) -> Array:
 	_build_islands()
 	_build_frozen_mechanics()
 	_build_boss_arena()
+	_build_snowfall()
 	_place_coins()
 	_place_enemies()
 	return route
@@ -223,6 +224,32 @@ func _add_portal(point: Vector3, color: Color) -> void:
 	surface.material_override = _material(Color(color, 0.18), 0.7)
 	portal.add_child(surface)
 	_world.add_child(portal)
+
+func _build_snowfall() -> void:
+	var particles := GPUParticles3D.new()
+	particles.name = "FrozenSnowfall"
+	particles.amount = 180
+	particles.lifetime = 5.0
+	particles.visibility_aabb = AABB(Vector3(-18.0, -2.0, -4.0), Vector3(36.0, 16.0, 140.0))
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.08, 0.08)
+	particles.draw_pass_1 = flake
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#effcff")
+	material.emission_enabled = true
+	material.emission = Color("#dffaff")
+	flake.material = material
+	var process := ParticleProcessMaterial.new()
+	process.direction = Vector3(0.1, -1.0, 0.0)
+	process.spread = 12.0
+	process.initial_velocity_min = 1.0
+	process.initial_velocity_max = 2.4
+	process.gravity = Vector3(0.0, -0.2, 0.0)
+	process.scale_min = 0.5
+	process.scale_max = 1.4
+	particles.process_material = process
+	particles.position = Vector3(0.0, 9.0, 55.0)
+	_world.add_child(particles)
 
 func _build_boss_arena() -> void:
 	var centre: Vector3 = route[route.size() - 3] + Vector3(0.0, 0.0, 3.0)
