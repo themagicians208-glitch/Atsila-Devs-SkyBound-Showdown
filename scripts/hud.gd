@@ -38,6 +38,11 @@ var pause_save_button: Button
 var inventory_button: Button
 var inventory_overlay: ColorRect
 var inventory_rows: VBoxContainer
+## The boss bar, shown while the island's Warden is on its feet.
+var boss_panel: PanelContainer
+var boss_name_label: Label
+var boss_phase_label: Label
+var boss_bar: ProgressBar
 var combat_level := 1
 var combat_level_name := ""
 var _players: Array = []
@@ -53,7 +58,85 @@ func _ready() -> void:
 	_build_pause_menu()
 	_build_inventory_button()
 	_build_inventory()
+	_build_boss_bar()
 	_update_coin_counter(0)
+
+
+## The boss bar: a name, a health strip and the phase it is in. Hidden until a
+## boss wakes up.
+func _build_boss_bar() -> void:
+	boss_panel = PanelContainer.new()
+	boss_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	boss_panel.offset_left = -310
+	boss_panel.offset_top = 166
+	boss_panel.offset_right = 310
+	boss_panel.offset_bottom = 246
+	var style := _hud_panel_style(Color(0.09, 0.06, 0.15, 0.82), Color("#b06bff"))
+	style.set_corner_radius_all(12)
+	style.content_margin_left = 22
+	style.content_margin_right = 22
+	style.content_margin_top = 10
+	style.content_margin_bottom = 12
+	boss_panel.add_theme_stylebox_override("panel", style)
+	boss_panel.visible = false
+	add_child(boss_panel)
+
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 4)
+	boss_panel.add_child(layout)
+
+	var headings := HBoxContainer.new()
+	layout.add_child(headings)
+
+	boss_name_label = Label.new()
+	boss_name_label.text = "THE CORRUPTED ISLAND WARDEN"
+	boss_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	boss_name_label.add_theme_font_override("font", UI_FONT)
+	boss_name_label.add_theme_font_size_override("font_size", 18)
+	boss_name_label.add_theme_color_override("font_color", Color("#e6d6ff"))
+	headings.add_child(boss_name_label)
+
+	boss_phase_label = Label.new()
+	boss_phase_label.text = "PHASE 1"
+	boss_phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	boss_phase_label.add_theme_font_override("font", UI_FONT)
+	boss_phase_label.add_theme_font_size_override("font_size", 18)
+	boss_phase_label.add_theme_color_override("font_color", Color("#ff9d6b"))
+	headings.add_child(boss_phase_label)
+
+	boss_bar = ProgressBar.new()
+	boss_bar.custom_minimum_size = Vector2(560, 22)
+	boss_bar.show_percentage = false
+	boss_bar.max_value = 1.0
+	boss_bar.value = 1.0
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.06, 0.05, 0.1, 0.9)
+	bar_bg.set_corner_radius_all(6)
+	boss_bar.add_theme_stylebox_override("background", bar_bg)
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color("#b06bff")
+	bar_fill.set_corner_radius_all(6)
+	boss_bar.add_theme_stylebox_override("fill", bar_fill)
+	layout.add_child(boss_bar)
+
+
+func show_boss(boss_name: String) -> void:
+	boss_name_label.text = boss_name
+	boss_phase_label.text = "PHASE 1"
+	boss_bar.value = 1.0
+	boss_panel.visible = true
+
+
+func update_boss(health: int, max_health: int, phase: int) -> void:
+	if max_health <= 0:
+		return
+	boss_bar.max_value = float(max_health)
+	boss_bar.value = float(health)
+	boss_phase_label.text = "PHASE %d" % phase
+
+
+func hide_boss() -> void:
+	boss_panel.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:

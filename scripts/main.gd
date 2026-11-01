@@ -305,6 +305,20 @@ func _build_island() -> void:
 		_add_checkpoint(node.checkpoint_points[index], index)
 	finish.position = node.portal_position
 	_apply_dimension_visibility()
+	_bind_island_boss()
+
+
+## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
+## every hit, gone when it falls.
+func _bind_island_boss() -> void:
+	var warden := get_tree().get_first_node_in_group("island_warden") as IslandWarden
+	if warden == null:
+		return
+	warden.woke.connect(func(): hud.show_boss("THE CORRUPTED ISLAND WARDEN"))
+	warden.health_changed.connect(func(health: int, max_health: int, phase: int):
+		hud.update_boss(health, max_health, phase)
+	)
+	warden.defeated.connect(hud.hide_boss)
 
 
 func _on_island_message(text: String) -> void:
@@ -1002,6 +1016,7 @@ func _reset_enemies() -> void:
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if node.has_method("reset_to_home"):
 			node.call("reset_to_home")
+	hud.hide_boss()
 
 
 func _get_mirror_platform_point(route: Array, index: int) -> Vector3:

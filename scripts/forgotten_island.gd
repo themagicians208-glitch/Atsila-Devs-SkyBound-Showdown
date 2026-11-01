@@ -28,6 +28,7 @@ extends Node3D
 signal message(text: String)         ## ask the HUD to show a line of text
 signal portal_unlocked               ## the coin requirement was just met
 signal puzzle_solved(name: String, text: String)
+signal warden_fell                   ## the corrupted guardian was destroyed
 
 const PLATFORM := preload("res://objects/platform.tscn")
 const PLATFORM_MEDIUM := preload("res://objects/platform_medium.tscn")
@@ -87,6 +88,7 @@ var _raisers: Dictionary = {}
 var _crystal: IslandCrystal = null
 var _seals: Array[NatureSeal] = []
 var _stations: Array[RuinSymbol] = []
+var _warden: IslandWarden = null
 ## The puzzle name of the switch hidden behind the waterfall.
 const feed_puzzle := "seal_feed"
 var _symbols: Array[Node3D] = []
@@ -110,6 +112,7 @@ func build(main: Node) -> void:
 	_build_seal_terraces()
 	_build_ruins_approach()
 	_build_arena()
+	_build_chamber()
 	_build_portal_terrace()
 	_build_flanks()
 	_build_puzzles()
@@ -427,6 +430,35 @@ func _build_arena() -> void:
 	_motes(8.0, 0.0, 156.0, 40, MAGIC, 7.0)
 
 
+# --- G2: the guardian's chamber ----------------------------------------------
+
+## The Warden holds the far end of the arena, with the sealed chest behind it.
+## It stays dormant until a player steps into the arena, and it resets itself
+## whenever the level respawns someone (see IslandWarden.reset_to_home).
+func _build_chamber() -> void:
+	var warden := IslandWarden.new()
+	warden.name = "IslandWarden"
+	warden.home = Vector3(0.0, 8.0, 160.5)
+	warden.arena_radius = 7.5
+	warden.set_island(self)
+	add_child(warden)
+	warden.global_position = warden.home
+	warden.rotation.y = PI
+	_warden = warden
+	_record_surface(Vector3(0.0, 8.0, 163.4), 1.1)
+
+
+## The island's answer to "is the guardian dealt with", for the chest and the
+## portal. Both ask before they open.
+func is_warden_defeated() -> bool:
+	return _warden == null or not is_instance_valid(_warden) or _warden.is_defeated
+
+
+func warden_defeated() -> void:
+	message.emit("The Warden shatters.  The corruption's grip on the island breaks with it.")
+	warden_fell.emit()
+
+
 # --- H: the portal terrace ----------------------------------------------------
 
 func _build_portal_terrace() -> void:
@@ -648,7 +680,7 @@ func _spawn_slimes() -> void:
 		[5.6, 0.0, 122.0, 3],     # F - the ruins floor, and a pair on it: the ruin
 		[5.6, -3.4, 124.0, 3],    #     asks for company while the symbols are turned
 		[5.6, 3.4, 124.8, 3],
-		[8.0, 0.0, 156.0, 3],     # G - the arena
+		[8.0, 8.0, 156.0, 3],     # G - the arena, on the arena floor itself
 	]
 	for plan in plans:
 		var slime: ShadowSlime = SLIME.new()
