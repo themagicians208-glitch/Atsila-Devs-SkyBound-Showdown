@@ -329,10 +329,10 @@ func _build_frozen_skies() -> void:
 	world.add_child(node)
 	frozen_skies = node
 	route_points = node.build(self)
-	player.position = route_points[0] + Vector3(0.0, 0.55, 0.0)
+	active_checkpoint = clampi(Progress.frozen_checkpoint_index, 0, 38)
+	player.position = route_points[active_checkpoint] + Vector3(0.0, 0.55, 0.0)
 	player.velocity = Vector3.ZERO
 	checkpoint_position = player.position
-	active_checkpoint = 0
 	for checkpoint_index in [0, 9, 18, 29, 38]:
 		_add_checkpoint(route_points[checkpoint_index], checkpoint_index)
 	finish.position = route_points[route_points.size() - 1] + Vector3(0.0, 1.0, 0.0)
@@ -1065,6 +1065,8 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 		return
 	active_checkpoint = checkpoint_index
 	checkpoint_position = respawn_point
+	if frozen_skies != null:
+		Progress.set_frozen_checkpoint(checkpoint_index)
 	flag_material.albedo_color = Color("#ffe25a")
 	flag_material.emission = Color("#ffc928")
 	if frozen_skies != null:

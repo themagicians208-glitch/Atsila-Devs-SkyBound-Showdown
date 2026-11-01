@@ -15,6 +15,7 @@ func _run() -> void:
 	await process_frame
 	assert(instance.get("current_level") == 3, "level 3 must be selected")
 	assert(get_root().get_node("Progress").second_fragment_recovered, "Level 3 must preserve the Second Fragment")
+	assert(get_root().get_node("Progress").frozen_checkpoint_index == 0, "Frozen Skies must start at its arrival checkpoint")
 	assert(instance.get("frozen_skies") != null, "Frozen Skies builder must be active")
 	var world: Node = instance.get_node("World")
 	assert(world.get_node_or_null("FrostTitan") != null, "Frost Titan must spawn")
