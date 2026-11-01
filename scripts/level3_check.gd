@@ -23,6 +23,7 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
 	assert(instance.get("frozen_skies").region_names.size() == 6, "Frozen Skies needs six named regions")
 	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
+	assert(instance.get("mirror_dimension") == false, "Frozen Skies must preserve the material dimension on arrival")
 	var first_bridge: Node = instance.get("frozen_skies")._ice_bridges[0]
 	var first_bridge_shape: CollisionShape3D = first_bridge.find_children("*", "CollisionShape3D", true, false)[0]
 	assert(first_bridge_shape.disabled, "Frozen Switch bridge must start closed")

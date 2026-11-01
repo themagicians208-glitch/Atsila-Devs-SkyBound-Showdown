@@ -337,6 +337,7 @@ func _build_frozen_skies() -> void:
 	for checkpoint_index in [0, 9, 18, 29, 38]:
 		_add_checkpoint(route_points[checkpoint_index], checkpoint_index)
 	finish.position = route_points[route_points.size() - 1] + Vector3(0.0, 1.0, 0.0)
+	_apply_dimension_visibility()
 
 
 func _bind_frozen_boss(boss: Node) -> void:
