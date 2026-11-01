@@ -375,6 +375,14 @@ func _on_frozen_crystal_light_solved() -> void:
 	hud.set_objective("Crystal light aligned. Continue through Frozen Crystal Caves.")
 	_update_frozen_progress_hud()
 
+func _on_frozen_generator_progress(current: int, total: int) -> void:
+	_update_frozen_progress_hud()
+	if current >= total:
+		hud.show_finish_message("All three crystal generators are charged. The cave door opens!")
+		hud.set_objective("Continue through the Shattered Ice Fortress.")
+	else:
+		hud.set_objective("Activate the crystal generators: %d / %d" % [current, total])
+
 func _on_frozen_mechanism_blocked(message: String) -> void:
 	hud.show_finish_message(message)
 
@@ -398,7 +406,8 @@ func _update_frozen_progress_hud() -> void:
 		frozen_skies.mechanisms.size(),
 		Progress.crystal_light_solved,
 		Progress.third_fragment_recovered,
-		active_checkpoint)
+		active_checkpoint,
+		Progress.frozen_generators_activated)
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on

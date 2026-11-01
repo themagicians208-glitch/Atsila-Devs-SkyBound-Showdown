@@ -42,9 +42,11 @@ func _run() -> void:
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
 	assert(instance.get_node("HUD").frozen_progress_hint != null, "Frozen Skies needs progression HUD")
+	assert(instance.get_node("HUD").frozen_progress_hint.text.contains("GENERATORS 0/3"), "Frozen HUD must show generator progress")
 	assert(not instance.get("frozen_skies").arrival_cinematic_complete, "arrival portal must begin opening")
 	assert(instance.get("frozen_skies").waterfall_count == 6, "Frozen Skies needs frozen waterfalls")
 	assert(instance.get("frozen_skies").cave_cluster_count == 4, "Frozen Crystal Caves need crystal clusters")
+	assert(instance.get("frozen_skies")._crystal_generators.size() == 3, "Crystal Cave needs three generators")
 	var player: Node = instance.get_node("Player")
 	var crystals: Array = crystal_puzzle.get("_crystals")
 	for index in crystals.size():
@@ -86,6 +88,12 @@ func _run() -> void:
 	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
 	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")
+	var generators: Array = instance.get("frozen_skies")._crystal_generators
+	for generator in generators:
+		player.global_position = generator.global_position
+		assert(instance.get("frozen_skies").try_activate_nearby(player), "Crystal Activation must activate cave generators")
+	assert(get_root().get_node("Progress").frozen_generators_activated == 3, "all three cave generators must activate")
+	assert(instance.get("frozen_skies")._cave_gate.opened, "three generators must open the cave door")
 	player._activate_ice_shield()
 	assert(player.ice_shield_active, "Ice Shield must activate")
 	var health_before_shield: float = player.health

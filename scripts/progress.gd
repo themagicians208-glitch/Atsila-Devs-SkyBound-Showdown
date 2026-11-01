@@ -23,6 +23,7 @@ var frozen_seals_activated := 0
 var frozen_coin_ids: Array[String] = []
 var frost_titan_defeated := false
 var crystal_light_solved := false
+var frozen_generators_activated := 0
 var frozen_checkpoint_index := 0
 
 
@@ -46,6 +47,7 @@ func load_progress() -> void:
 		frozen_coin_ids.append(str(coin_id))
 	frost_titan_defeated = bool(config.get_value("frozen_skies", "frost_titan_defeated", false))
 	crystal_light_solved = bool(config.get_value("frozen_skies", "crystal_light_solved", false))
+	frozen_generators_activated = int(config.get_value("frozen_skies", "frozen_generators_activated", 0))
 	frozen_checkpoint_index = int(config.get_value("frozen_skies", "frozen_checkpoint_index", 0))
 
 
@@ -61,6 +63,7 @@ func save_progress() -> void:
 	config.set_value("frozen_skies", "frozen_coin_ids", PackedStringArray(frozen_coin_ids))
 	config.set_value("frozen_skies", "frost_titan_defeated", frost_titan_defeated)
 	config.set_value("frozen_skies", "crystal_light_solved", crystal_light_solved)
+	config.set_value("frozen_skies", "frozen_generators_activated", frozen_generators_activated)
 	config.set_value("frozen_skies", "frozen_checkpoint_index", frozen_checkpoint_index)
 	config.save(config_path)
 
@@ -120,6 +123,10 @@ func mark_crystal_light_solved() -> void:
 	crystal_light_solved = true
 	save_progress()
 
+func set_frozen_generators_activated(value: int) -> void:
+	frozen_generators_activated = clampi(value, 0, 3)
+	save_progress()
+
 func set_frozen_checkpoint(index: int) -> void:
 	frozen_checkpoint_index = maxi(0, index)
 	save_progress()
@@ -137,6 +144,7 @@ func clear() -> void:
 	frozen_coin_ids.clear()
 	frost_titan_defeated = false
 	crystal_light_solved = false
+	frozen_generators_activated = 0
 	frozen_checkpoint_index = 0
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))
