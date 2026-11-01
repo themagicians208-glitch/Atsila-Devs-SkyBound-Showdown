@@ -14,6 +14,7 @@ func _run() -> void:
 	root.add_child(instance)
 	await process_frame
 	assert(instance.get("current_level") == 3, "level 3 must be selected")
+	assert(instance.get_node("HUD").level_heading.text.contains("FROZEN SKIES"), "Level 3 HUD must be titled Frozen Skies")
 	assert(get_root().get_node("Progress").second_fragment_recovered, "Level 3 must preserve the Second Fragment")
 	assert(get_root().get_node("Progress").frozen_checkpoint_index == 0, "Frozen Skies must start at its arrival checkpoint")
 	assert(instance.get("frozen_skies") != null, "Frozen Skies builder must be active")

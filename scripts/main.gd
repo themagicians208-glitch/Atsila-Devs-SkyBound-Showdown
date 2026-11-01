@@ -24,7 +24,7 @@ const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
 const FROZEN_SKIES_SCRIPT := preload("res://scripts/frozen_skies.gd")
 
-const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Frozen Skies", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
