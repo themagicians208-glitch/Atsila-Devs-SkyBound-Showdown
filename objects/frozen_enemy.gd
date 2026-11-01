@@ -20,6 +20,9 @@ var _dead := false
 var _time := 0.0
 var _touch_cooldown := 0.0
 var _projectile_cooldown := 1.8
+var _lunge_time := 0.0
+var _lunge_cooldown := 0.0
+var _lunge_direction := Vector3.ZERO
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -87,6 +90,7 @@ func _physics_process(delta: float) -> void:
 	_time += delta
 	_touch_cooldown = maxf(_touch_cooldown - delta, 0.0)
 	_projectile_cooldown = maxf(_projectile_cooldown - delta, 0.0)
+	_lunge_cooldown = maxf(_lunge_cooldown - delta, 0.0)
 	_visual.position.y = sin(_time * 3.0) * 0.1
 	_visual.rotation.y += delta * 0.45
 	var target := _nearest_player()
@@ -96,12 +100,23 @@ func _physics_process(delta: float) -> void:
 		return
 	var offset := target.global_position - global_position
 	var distance := offset.length()
+	if variant == "Frost Wolf" and _lunge_time > 0.0:
+		_lunge_time -= delta
+		global_position += _lunge_direction * 2.2 * delta
+		if _lunge_time <= 0.0:
+			_lunge_cooldown = 1.1
+		return
 	if distance > detect_range:
 		if variant == "Crystal Phantom":
 			_patrol_phantom()
 		return
 	if variant == "Crystal Phantom" and _projectile_cooldown <= 0.0:
 		_launch_projectile(target)
+	if variant == "Frost Wolf" and distance < 2.4 and _lunge_cooldown <= 0.0:
+		_lunge_direction = Vector3(offset.x, 0.0, offset.z).normalized()
+		_lunge_time = 0.18
+		Audio.play("res://sounds/jump.ogg")
+		return
 	var speed := _movement_speed(target)
 	if variant == "Crystal Phantom":
 		global_position += offset.normalized() * speed * delta

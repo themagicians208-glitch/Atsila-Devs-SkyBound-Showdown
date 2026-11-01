@@ -42,6 +42,9 @@ func _run() -> void:
 	assert(crystal_gate.opened, "crystal light puzzle must open its gate")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
 	assert(is_equal_approx(wolf._movement_speed(player), float(player.movement_speed) * 1.10), "Frost Wolf must be 110% of player speed")
+	wolf.global_position = player.global_position + Vector3(0.0, 0.0, 1.8)
+	wolf._physics_process(0.016)
+	assert(wolf._lunge_time > 0.0, "Frost Wolf must have an icy lunge attack")
 	var shadow_slime_script: GDScript = load("res://objects/shadow_slime.gd")
 	var original_slime: Node = shadow_slime_script.new()
 	assert(wolf.attack_damage < original_slime.contact_damage, "Frost Wolf attack must be lower than the original Shadow Slime")
