@@ -59,6 +59,13 @@ func _run() -> void:
 	assert(titan.phase == 4, "Frost Titan must enter the final phase")
 	instance.get("frozen_skies").thaw_environment()
 	assert(instance.get("frozen_skies").environment_thawed, "fragment recovery must thaw Frozen Skies")
+	var frozen: Node = instance.get("frozen_skies")
+	assert(not frozen.is_portal_ready(52), "Level 4 portal must stay locked before boss and fragment")
+	frozen.boss_defeated = true
+	get_root().get_node("Progress").recover_third_fragment()
+	assert(not frozen.is_portal_ready(49), "Level 4 portal must require 50 coins")
+	assert(frozen.is_portal_ready(50), "Level 4 portal must open at 50 coins after boss and fragment")
+	get_root().get_node("Progress").clear()
 	print("LEVEL3 Frozen Skies smoke passed: coins=", get_nodes_in_group("collectible_coins").size())
 	quit()
 
