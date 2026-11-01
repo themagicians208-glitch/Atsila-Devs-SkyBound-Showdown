@@ -34,6 +34,8 @@ Leap across floating islands, hunt down every coin, activate switches, and race 
 - 🏃 **Move with precision** — run, jump, and double-jump across the islands.
 - ⚔️ **Master the Combat** — unlock attack moves to clear your path.
 - 🎭 **Choose your Hero** — play as Nattie, Isabelle, or the Raccoon, each with unique styles.
+- 🎒 **Use your inventory** — manage collected items during a course.
+- 🪽 **Take flight when needed** — use the fly toggle while exploring and testing routes.
 - ⏱️ **Freeze time** — use a brief time-freeze to help plan tricky moves.
 - ⚠️ **Read the hazards** — dodge spinning sweepers, falling platforms, hurdles, and maze walls.
 - 🎢 **Take on the Gauntlet** — balance on see-saws, cross rotating logs, handle slippery and sticky zones, ride bounce pads and fan tunnels, slide down ramps, and avoid rolling barrels.
@@ -62,7 +64,7 @@ Race against your friends or tackle the courses together.
 
 | # | Course | Your challenge |
 |---|---|---|
-| 1 | **Cloud Hop** | Find your rhythm on a gentle climb through floating sky hoops. |
+| 1 | **Forgotten Island** | Explore a dangerous island, defeat its guardians, recover the First Fragment, and awaken the portal. |
 | 2 | **Switchback Sprint** | Keep moving through a winding route with jump hurdles and moving platforms. |
 | 3 | **Moonflip Maze** | Find the openings, read the route, and time your jumps. |
 | 4 | **Rising Ruins** | Climb through broken-column scenery and increasingly tricky obstacles. |
@@ -84,6 +86,9 @@ For more detail on route sizes and mechanics, see **[COURSES.md](COURSES.md)**.
 | Shift dimension | Q / right click | Left bumper (LB) | L1 | L |
 | Freeze time briefly | F | Y | Triangle ($\triangle$) | B / East |
 | Activate a nearby switch | E | X | Square ($\square$) | X / West |
+| Attack | J | B | Circle ($\bigcirc$) | B / East |
+| Inventory | I | View button | Touchpad / View | Minus / View |
+| Fly toggle | 9 | Left stick click | Left stick click | Left stick click |
 | Zoom camera | Mouse wheel | Triggers | Triggers | Triggers |
 | Navigate menus / select | Mouse click | D-pad or left stick / A | D-pad / Cross ($\times$) | D-pad / A |
 | Return / back | Esc | B | Circle ($\bigcirc$) | B / East |
