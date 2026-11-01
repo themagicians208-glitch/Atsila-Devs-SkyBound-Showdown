@@ -434,6 +434,11 @@ func _build_game_hud() -> void:
 	level_heading.add_theme_font_override("font", UI_FONT)
 	level_heading.add_theme_font_size_override("font_size", 19)
 	level_heading.add_theme_color_override("font_color", Color("#8ce7ff"))
+	# A shadow, because this line sits over bright scenery - a waterfall or a
+	# glowing mushroom washes thin cyan text out completely without one.
+	level_heading.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	level_heading.add_theme_constant_override("shadow_offset_x", 2)
+	level_heading.add_theme_constant_override("shadow_offset_y", 2)
 	add_child(level_heading)
 
 	controls_hint = Label.new()

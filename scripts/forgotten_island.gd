@@ -148,7 +148,9 @@ func notify_coins(count: int) -> void:
 
 
 ## The line shown across the top of the screen. It follows the coin hunt until the
-## portal is awake, then points at the portal.
+## portal is awake, then points at the portal. The Warden and the Fragment are only
+## named once the player has actually got that far - telling someone about the
+## final chamber in the first ten seconds spoils the island.
 func main_objective() -> void:
 	if get_node_or_null("/root/Settings") == null:
 		return
@@ -157,12 +159,17 @@ func main_objective() -> void:
 		return
 	if is_portal_ready():
 		hud.call("set_objective", "The portal on the east terrace is awake - step through it!")
-	elif not is_warden_defeated():
-		hud.call("set_objective", "Deal with the Warden in the arena  -  %d more coins too" % coins_needed())
-	elif not Progress.fragment_recovered:
-		hud.call("set_objective", "Open the Warden's chest and recover the First Fragment")
 	else:
-		hud.call("set_objective", "Explore the Forgotten Island  -  %d more coins wake the portal" % coins_needed())
+		var deep := false
+		var who: Node3D = _main.get("player") as Node3D if _main != null else null
+		if who != null:
+			deep = who.global_position.z > 110.0
+		if deep and not is_warden_defeated():
+			hud.call("set_objective", "Deal with the Warden in the arena  -  %d more coins too" % coins_needed())
+		elif deep and not Progress.fragment_recovered:
+			hud.call("set_objective", "Open the Warden's chest and recover the First Fragment")
+		else:
+			hud.call("set_objective", "Explore the Forgotten Island  -  %d more coins wake the portal" % coins_needed())
 
 
 func _hud() -> Node:

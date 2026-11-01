@@ -18,7 +18,7 @@ const ROTATING_LOG_SCRIPT := preload("res://scripts/rotating_log.gd")
 const ROLLING_BARREL_SCRIPT := preload("res://scripts/rolling_barrel.gd")
 const SLIPPERY_SCRIPT := preload("res://scripts/slippery_zone.gd")
 const STICKY_SCRIPT := preload("res://scripts/sticky_zone.gd")
-const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")
+const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")	
 const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
@@ -937,12 +937,15 @@ func _press_switch(lever: Node3D) -> void:
 
 
 func _add_checkpoint(point: Vector3, checkpoint_index: int) -> void:
+	# The trigger goes on before the checkpoint joins the world: a collision shape
+	# that is attached to something already inside the tree is not registered by
+	# the physics server, and a checkpoint nobody can trigger is a checkpoint that
+	# silently sends a player back to the start of the level.
 	var checkpoint := Node3D.new()
 	checkpoint.name = "Checkpoint_%02d" % checkpoint_index
 	checkpoint.add_to_group("course_checkpoints")
 	checkpoint.set_meta("checkpoint_index", checkpoint_index)
 	checkpoint.position = point
-	world.add_child(checkpoint)
 
 	var area := Area3D.new()
 	area.name = "CheckpointTrigger"
@@ -955,6 +958,7 @@ func _add_checkpoint(point: Vector3, checkpoint_index: int) -> void:
 	trigger_shape.shape = sphere
 	area.add_child(trigger_shape)
 	checkpoint.add_child(area)
+	world.add_child(checkpoint)
 
 	var pole := MeshInstance3D.new()
 	var pole_mesh := CylinderMesh.new()
