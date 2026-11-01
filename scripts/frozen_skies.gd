@@ -17,6 +17,7 @@ var fragment_recovered := false
 var _world: Node3D
 var _main: Node
 var _chest: FrozenFragmentChest
+var _titan: FrostTitan
 var mechanisms: Array[FrozenMechanism] = []
 var frozen_seals_complete := false
 
@@ -69,6 +70,8 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 	if activated_count == 3:
 		Progress.unlock_crystal_activation()
 		frozen_seals_complete = true
+		if _titan != null:
+			_titan.unlock()
 	if _main.has_method("_on_frozen_mechanism_progress"):
 		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
@@ -128,21 +131,23 @@ func _place_enemies() -> void:
 		_spawn_enemy("Frost Wolf", route[index] + Vector3(0.0, 1.0, 0.0))
 	for index in [18, 28, 36]:
 		_spawn_enemy("Crystal Phantom", route[index] + Vector3(0.0, 3.0, 0.0))
-	var titan: Node3D = FROST_TITAN.new()
-	titan.name = "FrostTitan"
-	titan.position = route[route.size() - 3] + Vector3(0.0, 2.2, 3.0)
-	_world.add_child(titan)
+	_titan = FROST_TITAN.new()
+	_titan.name = "FrostTitan"
+	_titan.position = route[route.size() - 3] + Vector3(0.0, 2.2, 3.0)
+	_world.add_child(_titan)
 	_chest = FRAGMENT_CHEST.new()
 	_chest.name = "ThirdFragmentChest"
 	_chest.position = route[route.size() - 3] + Vector3(2.5, 0.0, 2.5)
 	_world.add_child(_chest)
-	titan.defeated.connect(_on_boss_defeated)
+	_titan.defeated.connect(_on_boss_defeated)
+	if frozen_seals_complete:
+		_titan.unlock()
 	_chest.fragment_recovered.connect(func():
 		if _main.has_method("_on_frozen_fragment_recovered"):
 			_main.call("_on_frozen_fragment_recovered")
 	)
 	if _main.has_method("_bind_frozen_boss"):
-		_main.call("_bind_frozen_boss", titan)
+		_main.call("_bind_frozen_boss", _titan)
 
 func _spawn_enemy(kind: String, where: Vector3) -> void:
 	var enemy: FrozenEnemy = FROZEN_ENEMY.new()

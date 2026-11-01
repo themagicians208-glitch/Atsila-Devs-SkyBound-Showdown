@@ -26,6 +26,10 @@ func _run() -> void:
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]
 	assert(is_equal_approx(slime._movement_speed(player), float(player.movement_speed) * 0.50), "Frost Slime must be 50% of player speed")
 	var titan: Node = world.get_node("FrostTitan")
+	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
+	for mechanism in instance.get("frozen_skies").mechanisms:
+		mechanism.activate()
+	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
 	titan.take_hit(10, player.global_position)
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
 	titan.take_hit(12, player.global_position)

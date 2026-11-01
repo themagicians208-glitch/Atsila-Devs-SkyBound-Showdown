@@ -6,6 +6,7 @@ signal health_changed(health: int, maximum: int, phase: int)
 
 @export var max_health := 32
 @export var contact_damage := 2.0
+@export var locked := true
 var health := 32
 var phase := 1
 var _time := 0.0
@@ -66,6 +67,8 @@ func _crystal_material() -> StandardMaterial3D:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
+	if locked:
+		return
 	_time += delta
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_attack_flash = maxf(0.0, _attack_flash - delta)
@@ -95,7 +98,7 @@ func _perform_phase_attack(target: Node3D) -> void:
 			target.call("take_damage", 12.0, global_position, "frost_titan_absolute_frost")
 
 func take_hit(amount: int, from: Vector3) -> bool:
-	if _dead:
+	if _dead or locked:
 		return false
 	health -= amount
 	phase = 1 if health > max_health * 0.7 else (2 if health > max_health * 0.35 else 3)
@@ -105,4 +108,8 @@ func take_hit(amount: int, from: Vector3) -> bool:
 		defeated.emit()
 		queue_free()
 	return true
+
+func unlock() -> void:
+	locked = false
+	health_changed.emit(health, max_health, phase)
 
