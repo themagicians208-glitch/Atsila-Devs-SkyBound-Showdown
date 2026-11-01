@@ -360,6 +360,10 @@ func _on_frozen_mechanism_progress(current: int, total: int) -> void:
 	else:
 		hud.set_objective("Activate the frozen mechanisms: %d / %d" % [current, total])
 
+func _on_frozen_crystal_light_solved() -> void:
+	hud.show_finish_message("Crystal light aligned! The frozen gate responds.")
+	hud.set_objective("Crystal light aligned. Continue through Frozen Crystal Caves.")
+
 func _update_frozen_ability_hud() -> void:
 	if frozen_skies == null:
 		return

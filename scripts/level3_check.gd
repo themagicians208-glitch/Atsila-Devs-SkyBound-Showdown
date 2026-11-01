@@ -20,6 +20,8 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
 	assert(instance.get("frozen_skies").region_names.size() == 6, "Frozen Skies needs six named regions")
 	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
+	var crystal_puzzle: Node = world.get_node("CrystalLightPuzzle")
+	assert(not crystal_puzzle.is_solved, "crystal light puzzle starts unsolved")
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
 	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")
@@ -27,6 +29,12 @@ func _run() -> void:
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	var player: Node = instance.get_node("Player")
+	var crystals: Array = crystal_puzzle.get("_crystals")
+	for index in crystals.size():
+		player.global_position = crystals[index].global_position
+		for turn in range(index + 1):
+			assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
+	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
 	assert(is_equal_approx(wolf._movement_speed(player), float(player.movement_speed) * 1.10), "Frost Wolf must be 110% of player speed")
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]

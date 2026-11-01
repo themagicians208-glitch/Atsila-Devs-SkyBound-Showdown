@@ -8,6 +8,7 @@ const FROST_TITAN := preload("res://objects/frost_titan.gd")
 const FRAGMENT_CHEST := preload("res://objects/frozen_fragment_chest.gd")
 const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
 const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
+const CRYSTAL_LIGHT := preload("res://objects/crystal_light_puzzle.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
@@ -31,6 +32,7 @@ var mechanisms: Array[FrozenMechanism] = []
 var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
 var _time := 0.0
+var _crystal_light: Node3D
 
 func build(main: Node) -> Array:
 	_main = main
@@ -44,7 +46,18 @@ func build(main: Node) -> Array:
 	_place_enemies()
 	_build_moving_ice_platforms()
 	_build_unstable_ice()
+	_build_crystal_light_puzzle()
 	return route
+
+func _build_crystal_light_puzzle() -> void:
+	_crystal_light = CRYSTAL_LIGHT.new()
+	_crystal_light.name = "CrystalLightPuzzle"
+	_crystal_light.position = route[18] + Vector3(0.0, 0.65, 1.8)
+	_world.add_child(_crystal_light)
+	_crystal_light.solved.connect(func():
+		if _main.has_method("_on_frozen_crystal_light_solved"):
+			_main.call("_on_frozen_crystal_light_solved")
+	)
 
 func region_name_for_checkpoint(checkpoint_index: int) -> String:
 	var region_index := 0
@@ -107,6 +120,8 @@ func _build_frozen_mechanics() -> void:
 	frozen_seals_complete = Progress.frozen_seals_activated >= mechanisms.size()
 
 func try_activate_nearby(player: Node3D) -> bool:
+	if _crystal_light != null and _crystal_light.try_interact(player):
+		return true
 	for mechanism in mechanisms:
 		if not mechanism.is_activated and mechanism.global_position.distance_to(player.global_position) <= 2.4:
 			return mechanism.activate()
