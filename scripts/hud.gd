@@ -13,6 +13,7 @@ var victory_subtitle: Label
 var replay_button: Button
 var controls_hint: Label
 var objective_hint: Label
+var frozen_ability_hint: Label
 ## When true the objective stays on screen after the controls hint fades.
 var objective_persistent := false
 var controls_tween: Tween
@@ -313,6 +314,15 @@ func set_objective(text: String, persistent := true) -> void:
 	objective_hint.visible = true
 	objective_hint.modulate.a = 1.0
 	objective_persistent = persistent
+
+func set_frozen_abilities(unlocked: Array[String]) -> void:
+	if not is_instance_valid(frozen_ability_hint):
+		return
+	if unlocked.is_empty():
+		frozen_ability_hint.visible = false
+		return
+	frozen_ability_hint.text = "ICE ABILITIES  •  " + "  |  ".join(unlocked)
+	frozen_ability_hint.visible = true
 
 func _on_coin_collected(coins):
 	_update_coin_counter(coins)
@@ -652,6 +662,22 @@ func _build_game_hud() -> void:
 	objective_hint.add_theme_constant_override("shadow_offset_x", 2)
 	objective_hint.add_theme_constant_override("shadow_offset_y", 3)
 	add_child(objective_hint)
+
+	frozen_ability_hint = Label.new()
+	frozen_ability_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frozen_ability_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	frozen_ability_hint.offset_left = -520
+	frozen_ability_hint.offset_top = 68
+	frozen_ability_hint.offset_right = 520
+	frozen_ability_hint.offset_bottom = 96
+	frozen_ability_hint.add_theme_font_override("font", UI_FONT)
+	frozen_ability_hint.add_theme_font_size_override("font_size", 16)
+	frozen_ability_hint.add_theme_color_override("font_color", Color("#b9f5ff"))
+	frozen_ability_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	frozen_ability_hint.add_theme_constant_override("shadow_offset_x", 2)
+	frozen_ability_hint.add_theme_constant_override("shadow_offset_y", 2)
+	frozen_ability_hint.visible = false
+	add_child(frozen_ability_hint)
 
 	shift_timer_label = Label.new()
 	shift_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

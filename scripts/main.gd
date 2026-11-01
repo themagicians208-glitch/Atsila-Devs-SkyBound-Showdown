@@ -96,6 +96,7 @@ func _ready() -> void:
 		coins_collected = Progress.frozen_coins_collected()
 		hud.show_finish_message("LEVEL 3 - FROZEN SKIES")
 		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
+		_update_frozen_ability_hud()
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
@@ -353,10 +354,23 @@ func _on_frozen_fragment_recovered() -> void:
 
 
 func _on_frozen_mechanism_progress(current: int, total: int) -> void:
+	_update_frozen_ability_hud()
 	if current >= total:
 		hud.set_objective("All three frozen seals are active. Defeat the Frost Titan.")
 	else:
 		hud.set_objective("Activate the frozen mechanisms: %d / %d" % [current, total])
+
+func _update_frozen_ability_hud() -> void:
+	if frozen_skies == null:
+		return
+	var unlocked: Array[String] = []
+	if Progress.ice_shield_unlocked:
+		unlocked.append("K Ice Shield")
+	if Progress.frost_dash_unlocked:
+		unlocked.append("L Frost Dash")
+	if Progress.crystal_activation_unlocked:
+		unlocked.append("E Crystal Activation")
+	hud.set_frozen_abilities(unlocked)
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
