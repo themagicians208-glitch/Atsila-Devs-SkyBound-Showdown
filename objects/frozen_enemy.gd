@@ -49,13 +49,55 @@ func _build() -> void:
 	_body_material.emission_enabled = true
 	_body_material.emission = Color("#48c9ff") * 0.35
 	_body_material.roughness = 0.28
+	if variant == "Crystal Phantom":
+		_body_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_body_material.albedo_color = Color(0.85, 0.98, 1.0, 0.68)
 	var body := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.55 if variant == "Frost Wolf" else 0.42
-	mesh.height = 1.0 if variant == "Frost Wolf" else 0.78
+	var mesh: PrimitiveMesh
+	if variant == "Crystal Phantom":
+		mesh = CylinderMesh.new()
+		(mesh as CylinderMesh).top_radius = 0.18
+		(mesh as CylinderMesh).bottom_radius = 0.5
+		(mesh as CylinderMesh).height = 1.15
+	else:
+		mesh = SphereMesh.new()
+		(mesh as SphereMesh).radius = 0.55 if variant == "Frost Wolf" else 0.42
+		(mesh as SphereMesh).height = 1.0 if variant == "Frost Wolf" else 0.78
 	body.mesh = mesh
 	body.material_override = _body_material
 	_visual.add_child(body)
+	if variant == "Frost Wolf":
+		for side in [-1.0, 1.0]:
+			for front in [-1.0, 1.0]:
+				var leg := MeshInstance3D.new()
+				var leg_mesh := CapsuleMesh.new()
+				leg_mesh.radius = 0.12
+				leg_mesh.height = 0.62
+				leg.mesh = leg_mesh
+				leg.position = Vector3(side * 0.32, -0.48, front * 0.28)
+				leg.material_override = _body_material
+				_visual.add_child(leg)
+			var tail := MeshInstance3D.new()
+			var tail_mesh := CylinderMesh.new()
+			tail_mesh.top_radius = 0.03
+			tail_mesh.bottom_radius = 0.16
+			tail_mesh.height = 0.85
+			tail.mesh = tail_mesh
+			tail.position = Vector3(0.0, 0.15, -0.65)
+			tail.rotation.x = -0.7
+			tail.material_override = _crystal_material()
+			_visual.add_child(tail)
+	if variant == "Crystal Phantom":
+		for index in 3:
+			var shard := MeshInstance3D.new()
+			var shard_mesh := CylinderMesh.new()
+			shard_mesh.top_radius = 0.0
+			shard_mesh.bottom_radius = 0.1
+			shard_mesh.height = 0.42
+			shard.mesh = shard_mesh
+			shard.position = Vector3((index - 1) * 0.42, 0.35 + (index % 2) * 0.25, 0.0)
+			shard.material_override = _crystal_material()
+			_visual.add_child(shard)
 	for i in 3:
 		var crystal := MeshInstance3D.new()
 		var cone := CylinderMesh.new()
