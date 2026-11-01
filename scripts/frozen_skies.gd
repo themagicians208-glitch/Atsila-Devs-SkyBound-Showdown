@@ -34,6 +34,7 @@ var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
 var _time := 0.0
 var _crystal_light: Node3D
+var _ice_bridges: Array[StaticBody3D] = []
 var _snowfall: GPUParticles3D
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
 var environment_thawed := false
@@ -153,6 +154,9 @@ func _build_frozen_mechanics() -> void:
 	for index in [10, 20, 30]:
 		_main.call("_add_zone", route[index], Vector3(2.5, 1.2, 2.5), SLIPPERY, Color("#8fe7ff"))
 		_add_ice_bridge(route[index])
+	if Progress.frozen_seals_activated > 0:
+		for bridge in _ice_bridges:
+			_open_ice_bridge(bridge)
 	for entry in [["Frozen Switch", 5], ["Crystal Generator", 18], ["Frozen Seal", 31]]:
 		var mechanism: FrozenMechanism = FROZEN_MECHANISM.new()
 		mechanism.name = str(entry[0]).replace(" ", "")
@@ -190,6 +194,8 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 	Progress.set_frozen_seals_activated(activated_count)
 	if activated_count == 1:
 		Progress.unlock_ice_shield()
+		if not _ice_bridges.is_empty():
+			_open_ice_bridge(_ice_bridges[0])
 	if activated_count == 2:
 		Progress.unlock_frost_dash()
 	if activated_count == 3:
@@ -202,13 +208,33 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
 func _add_ice_bridge(point: Vector3) -> void:
-	var bridge := MeshInstance3D.new()
+	var bridge := StaticBody3D.new()
+	bridge.name = "IceBridge"
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(3.4, 0.12, 1.0)
-	bridge.mesh = mesh
+	var visual := MeshInstance3D.new()
+	visual.mesh = mesh
+	visual.material_override = _material(Color("#a8efff"), 0.8)
+	bridge.add_child(visual)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = mesh.size
+	shape.shape = box
+	bridge.add_child(shape)
 	bridge.position = point + Vector3(0.0, 0.58, 1.8)
-	bridge.material_override = _material(Color("#a8efff"), 0.8)
 	_world.add_child(bridge)
+	_ice_bridges.append(bridge)
+	if _ice_bridges.size() == 1 and Progress.frozen_seals_activated < 1:
+		shape.set_deferred("disabled", true)
+		visual.visible = false
+
+func _open_ice_bridge(bridge: StaticBody3D) -> void:
+	if not is_instance_valid(bridge):
+		return
+	for shape in bridge.find_children("*", "CollisionShape3D", true, false):
+		(shape as CollisionShape3D).disabled = false
+	for visual in bridge.find_children("*", "MeshInstance3D", true, false):
+		(visual as MeshInstance3D).visible = true
 
 func _make_route() -> Array:
 	var points: Array = []

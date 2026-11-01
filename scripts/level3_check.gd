@@ -23,6 +23,9 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
 	assert(instance.get("frozen_skies").region_names.size() == 6, "Frozen Skies needs six named regions")
 	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
+	var first_bridge: Node = instance.get("frozen_skies")._ice_bridges[0]
+	var first_bridge_shape: CollisionShape3D = first_bridge.find_children("*", "CollisionShape3D", true, false)[0]
+	assert(first_bridge_shape.disabled, "Frozen Switch bridge must start closed")
 	var crystal_puzzle: Node = world.get_node("CrystalLightPuzzle")
 	assert(not crystal_puzzle.is_solved, "crystal light puzzle starts unsolved")
 	var crystal_gate: Node = world.get_node("CrystalLightGate")
@@ -65,6 +68,7 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "blocked seal interaction must be handled")
 	player.global_position = seal_list[0].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "first seal must activate")
+	assert(not first_bridge_shape.disabled, "Frozen Switch must open the ice bridge")
 	player.global_position = seal_list[1].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "crystal-generator seal must activate after its challenge")
 	player.global_position = seal_list[2].global_position
