@@ -385,16 +385,6 @@ func bind_players(players: Array) -> void:
 
 
 func _build_inventory_button() -> void:
-	fly_button = _hud_button("FLY: OFF  (9)", Color("#27496f"), Color.WHITE)
-	fly_button.custom_minimum_size = Vector2(160, 42)
-	fly_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	fly_button.offset_left = -376
-	fly_button.offset_top = 24
-	fly_button.offset_right = -216
-	fly_button.offset_bottom = 66
-	fly_button.pressed.connect(toggle_fly_mode)
-	add_child(fly_button)
-
 	inventory_button = _hud_button("INVENTORY  (I)", Color("#27496f"), Color.WHITE)
 	inventory_button.custom_minimum_size = Vector2(180, 42)
 	inventory_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -404,6 +394,16 @@ func _build_inventory_button() -> void:
 	inventory_button.offset_bottom = 66
 	inventory_button.pressed.connect(toggle_inventory)
 	add_child(inventory_button)
+
+	fly_button = _hud_button("FLY: OFF  (9)", Color("#27496f"), Color.WHITE)
+	fly_button.custom_minimum_size = Vector2(180, 42)
+	fly_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	fly_button.offset_left = -206
+	fly_button.offset_top = 74
+	fly_button.offset_right = -26
+	fly_button.offset_bottom = 116
+	fly_button.pressed.connect(toggle_fly_mode)
+	add_child(fly_button)
 
 
 func toggle_fly_mode() -> void:
