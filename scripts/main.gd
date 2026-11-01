@@ -1061,7 +1061,11 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 			Progress.unlock_frost_dash()
 		if checkpoint_index >= 29:
 			Progress.unlock_crystal_activation()
-	hud.show_finish_message("Checkpoint reached! Fall back here if you miss a jump.")
+		var region := frozen_skies.region_name_for_checkpoint(checkpoint_index)
+		hud.show_finish_message("Checkpoint reached: %s" % region)
+		hud.set_objective("Explore %s" % region)
+	else:
+		hud.show_finish_message("Checkpoint reached! Fall back here if you miss a jump.")
 
 
 func respawn_player(who: CharacterBody3D = null) -> void:

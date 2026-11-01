@@ -12,6 +12,14 @@ const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
 var route: Array = []
+var region_names := [
+	"Frozen Arrival",
+	"Crystal Snowfields",
+	"Slippery Ice Valley",
+	"Frozen Crystal Caves",
+	"The Shattered Ice Fortress",
+	"Frost Titan's Sanctuary",
+]
 var coins_placed := 0
 var boss_defeated := false
 var fragment_recovered := false
@@ -37,6 +45,18 @@ func build(main: Node) -> Array:
 	_build_moving_ice_platforms()
 	_build_unstable_ice()
 	return route
+
+func region_name_for_checkpoint(checkpoint_index: int) -> String:
+	var region_index := 0
+	if checkpoint_index >= 38:
+		region_index = 5
+	elif checkpoint_index >= 29:
+		region_index = 4
+	elif checkpoint_index >= 18:
+		region_index = 3
+	elif checkpoint_index >= 9:
+		region_index = 1
+	return region_names[region_index]
 
 func _process(delta: float) -> void:
 	_time += delta

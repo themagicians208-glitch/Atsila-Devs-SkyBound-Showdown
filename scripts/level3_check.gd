@@ -18,6 +18,8 @@ func _run() -> void:
 	assert(world.get_node_or_null("FrostTitan") != null, "Frost Titan must spawn")
 	assert(world.get_node_or_null("ThirdFragmentChest") != null, "Third Fragment chest must spawn")
 	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
+	assert(instance.get("frozen_skies").region_names.size() == 6, "Frozen Skies needs six named regions")
+	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
 	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")
