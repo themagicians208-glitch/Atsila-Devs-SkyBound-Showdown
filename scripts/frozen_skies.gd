@@ -635,9 +635,12 @@ func is_portal_ready(coins: int) -> bool:
 	return boss_defeated and Progress.third_fragment_recovered and coins >= coins_required
 
 func portal_blocked_reason(coins: int) -> String:
+	var missing: Array[String] = []
 	if not boss_defeated:
-		return "Defeat the Frost Titan to unlock the portal."
+		missing.append("Defeat the Frost Titan")
 	if not Progress.third_fragment_recovered:
-		return "Recover the Third Fragment of the Eternal Tree."
-	return "%d more coins are needed to unlock the portal." % maxi(0, coins_required - coins)
+		missing.append("Recover the Third Fragment")
+	if coins < coins_required:
+		missing.append("Coins %d/%d (%d more needed)" % [coins, coins_required, coins_required - coins])
+	return "Portal locked: " + " • ".join(missing)
 
