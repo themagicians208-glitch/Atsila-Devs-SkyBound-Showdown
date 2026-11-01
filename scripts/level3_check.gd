@@ -33,6 +33,9 @@ func _run() -> void:
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
 	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")
+	for frozen_enemy in world.get_tree().get_nodes_in_group("enemies"):
+		if frozen_enemy is FrozenEnemy:
+			assert(frozen_enemy.get_node_or_null("FrostParticles") != null, "Frozen enemies need frost particles")
 	assert(world.find_children("MovingIcePlatform*", "Node3D", true, false).size() >= 5, "Frozen Skies needs moving ice platforms")
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")

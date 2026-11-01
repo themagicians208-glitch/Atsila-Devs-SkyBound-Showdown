@@ -76,6 +76,31 @@ func _build() -> void:
 		eye.material_override = _crystal_material()
 		eye.position = Vector3(0.14 * side, 0.1, 0.34)
 		_visual.add_child(eye)
+	_build_frost_particles()
+
+func _build_frost_particles() -> void:
+	var particles := GPUParticles3D.new()
+	particles.name = "FrostParticles"
+	particles.amount = 12
+	particles.lifetime = 1.6
+	particles.preprocess = 0.8
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.09, 0.09)
+	var material := _crystal_material()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flake.material = material
+	particles.draw_pass_1 = flake
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process.emission_sphere_radius = 0.45
+	process.direction = Vector3(0.0, 1.0, 0.0)
+	process.spread = 35.0
+	process.initial_velocity_min = 0.15
+	process.initial_velocity_max = 0.5
+	process.gravity = Vector3(0.0, 0.2, 0.0)
+	particles.process_material = process
+	particles.position.y = 0.45
+	add_child(particles)
 
 func _crystal_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -115,7 +140,9 @@ func _physics_process(delta: float) -> void:
 	if variant == "Frost Wolf" and distance < 2.4 and _lunge_cooldown <= 0.0:
 		_lunge_direction = Vector3(offset.x, 0.0, offset.z).normalized()
 		_lunge_time = 0.18
-		Audio.play("res://sounds/jump.ogg")
+		var audio := get_node_or_null("/root/Audio")
+		if audio != null:
+			audio.play("res://sounds/jump.ogg")
 		return
 	var speed := _movement_speed(target)
 	if variant == "Crystal Phantom":
