@@ -4,6 +4,8 @@ func _init() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	# Smoke tests must start from a known progression state, not a developer save.
+	get_root().get_node("Progress").clear()
 	set_meta("level_number", 3)
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	assert(packed != null, "main scene must load")
@@ -34,6 +36,8 @@ func _run() -> void:
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
 	titan.take_hit(12, player.global_position)
 	assert(titan.phase == 3, "Frost Titan must enter phase 3")
+	titan.take_hit(8, player.global_position)
+	assert(titan.phase == 4, "Frost Titan must enter the final phase")
 	print("LEVEL3 Frozen Skies smoke passed: coins=", get_nodes_in_group("collectible_coins").size())
 	quit()
 

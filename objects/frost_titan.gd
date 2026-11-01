@@ -4,7 +4,7 @@ class_name FrostTitan
 signal defeated
 signal health_changed(health: int, maximum: int, phase: int)
 
-@export var max_health := 32
+@export var max_health := 40
 @export var contact_damage := 2.0
 @export var locked := true
 var health := 32
@@ -15,6 +15,7 @@ var _visual: Node3D
 var _material: StandardMaterial3D
 var _attack_cooldown := 2.0
 var _attack_flash := 0.0
+var _warning: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -56,6 +57,16 @@ func _build() -> void:
 		crystal.position = Vector3((i % 3 - 1) * 0.7, 1.2 + (i / 3) * 0.7, 0.9)
 		crystal.rotation.x = -0.35
 		_visual.add_child(crystal)
+	_warning = MeshInstance3D.new()
+	var warning_mesh := TorusMesh.new()
+	warning_mesh.inner_radius = 2.1
+	warning_mesh.outer_radius = 2.25
+	_warning.mesh = warning_mesh
+	_warning.position.y = -2.0
+	_warning.rotation.x = PI / 2.0
+	_warning.material_override = _crystal_material()
+	_warning.visible = false
+	add_child(_warning)
 
 func _crystal_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -81,10 +92,14 @@ func _physics_process(delta: float) -> void:
 		target.call("take_damage", contact_damage, global_position, "frost_titan")
 	if _attack_cooldown <= 0.0:
 		_perform_phase_attack(target)
+	elif _warning != null:
+		_warning.visible = _attack_cooldown < 0.55
+		_warning.scale = Vector3.ONE * (1.0 + sin(_time * 12.0) * 0.08)
 
 func _perform_phase_attack(target: Node3D) -> void:
-	_attack_cooldown = 3.0 if phase == 1 else (2.2 if phase == 2 else 1.6)
+	_attack_cooldown = 3.0 if phase == 1 else (2.2 if phase == 2 else (1.8 if phase == 3 else 1.35))
 	_attack_flash = 0.3
+	_warning.visible = false
 	Audio.play("res://sounds/land.ogg")
 	var distance := global_position.distance_to(target.global_position)
 	if phase == 1:
@@ -93,15 +108,18 @@ func _perform_phase_attack(target: Node3D) -> void:
 	elif phase == 2:
 		if distance < 11.0 and target.has_method("take_damage"):
 			target.call("take_damage", 7.0, global_position, "frost_titan_crystal_storm")
-	else:
+	elif phase == 3:
 		if distance < 13.0 and target.has_method("take_damage"):
-			target.call("take_damage", 12.0, global_position, "frost_titan_absolute_frost")
+			target.call("take_damage", 12.0, global_position, "frost_titan_disappearance")
+	else:
+		if distance < 15.0 and target.has_method("take_damage"):
+			target.call("take_damage", 14.0, global_position, "frost_titan_absolute_frost")
 
 func take_hit(amount: int, from: Vector3) -> bool:
 	if _dead or locked:
 		return false
 	health -= amount
-	phase = 1 if health > max_health * 0.7 else (2 if health > max_health * 0.35 else 3)
+	phase = 1 if health > max_health * 0.75 else (2 if health > max_health * 0.5 else (3 if health > max_health * 0.25 else 4))
 	health_changed.emit(maxi(health, 0), max_health, phase)
 	if health <= 0:
 		_dead = true
