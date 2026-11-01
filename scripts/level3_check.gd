@@ -58,6 +58,16 @@ func _run() -> void:
 	player.global_position = seal_list[2].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
+	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
+	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
+	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")
+	player._activate_ice_shield()
+	assert(player.ice_shield_active, "Ice Shield must activate")
+	var health_before_shield: float = player.health
+	player.take_damage(100.0, player.global_position, "test")
+	assert(is_equal_approx(player.health, health_before_shield), "Ice Shield must block damage")
+	player._start_frost_dash()
+	assert(player.is_dashing, "Frost Dash must activate")
 	titan.take_hit(10, player.global_position)
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
 	titan.take_hit(12, player.global_position)
