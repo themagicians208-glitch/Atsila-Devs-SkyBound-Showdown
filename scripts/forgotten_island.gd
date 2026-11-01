@@ -242,7 +242,6 @@ func _build_start_glade() -> void:
 func _build_forest_path() -> void:
 	var route := [
 		[0.2, 0.0, 13.0, "medium"],
-		[0.4, 2.0, 15.2, "small"],
 		[0.6, 4.0, 17.4, "small"],
 		[0.7, 2.2, 19.6, "medium"],
 		[0.8, 0.2, 21.8, "small"],
@@ -328,12 +327,7 @@ func _build_crystal_grove() -> void:
 func _build_crossing() -> void:
 	# The two ends of the crossing stand still; the middle five take turns
 	# vanishing (puzzle 3), so the way is a rhythm rather than a staircase.
-	var route := [
-		[3.0, -1.2, 70.2],
-		[3.5, 2.8, 83.4],
-	]
-	for point in route:
-		_platform(float(point[0]), float(point[1]), float(point[2]), "small", float(point[1]) * 0.5)
+	_platform(3.0, -1.2, 70.2, "small", -1.2 * 0.5)
 	_platform(3.5, 2.8, 83.4, "grass", 0.4)
 	# Puzzle 3: the vanishing stones, staggered so neighbours are never gone at
 	# the same moment. Ghost outlines show where each one returns.
@@ -595,7 +589,7 @@ func _place_coins() -> void:
 		[0.0, -5.6, 4.6, 1.0],          # behind a mushroom
 		[0.0, 0.0, 4.4, 1.9],           # on the stone arch
 		# B. forest path
-		[0.4, 2.0, 15.2, 0.8],          # on the path
+		[0.6, 4.0, 17.4, 0.8],          # on the path
 		[1.1, -0.6, 25.4, 0.8],         # on the path, either side of the crystal
 		[1.1, 2.6, 27.2, 0.8],
 		[1.4, 4.4, 30.6, 0.8],          # on the path
@@ -1435,14 +1429,27 @@ func _brazier(spot: Vector3) -> void:
 
 
 func _arch(x: float, z: float, surface_y: float, width: float, height: float, yaw: float) -> void:
-	var node := Node3D.new()
+	var node := StaticBody3D.new()
+	node.name = "Arch_%d_%d" % [roundi(x), roundi(z)]
 	node.position = Vector3(x, surface_y, z)
 	node.rotation.y = yaw
 	for side in [-1.0, 1.0]:
 		_box(node, Vector3(0.8, height, 0.8), _material(STONE), Vector3(side * width * 0.5, height * 0.5, 0.0))
 		_box(node, Vector3(1.0, 0.35, 1.0), _material(STONE_DEEP), Vector3(side * width * 0.5, 0.18, 0.0))
+		var pillar_shape := CollisionShape3D.new()
+		var pillar_box := BoxShape3D.new()
+		pillar_box.size = Vector3(0.8, height, 0.8)
+		pillar_shape.shape = pillar_box
+		pillar_shape.position = Vector3(side * width * 0.5, height * 0.5, 0.0)
+		node.add_child(pillar_shape)
 	_box(node, Vector3(width + 0.9, 0.75, 1.0), _material(STONE), Vector3(0.0, height + 0.2, 0.0))
 	_box(node, Vector3(width * 0.5, 0.5, 0.9), _material(STONE_DEEP), Vector3(0.0, height + 0.7, 0.0), Vector3(0.0, 0.0, 6.0))
+	var lintel_shape := CollisionShape3D.new()
+	var lintel_box := BoxShape3D.new()
+	lintel_box.size = Vector3(width + 0.9, 1.1, 1.0)
+	lintel_shape.shape = lintel_box
+	lintel_shape.position = Vector3(0.0, height + 0.35, 0.0)
+	node.add_child(lintel_shape)
 	add_child(node)
 
 
