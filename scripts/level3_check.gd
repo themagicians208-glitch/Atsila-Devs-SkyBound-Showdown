@@ -48,6 +48,11 @@ func _run() -> void:
 	original_slime.free()
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]
 	assert(is_equal_approx(slime._movement_speed(player), float(player.movement_speed) * 0.50), "Frost Slime must be 50% of player speed")
+	var phantom: Node = world.find_children("CrystalPhantom", "Node3D", true, false)[0]
+	player.global_position = Vector3(0.0, 0.0, -20.0)
+	var phantom_before: Vector3 = phantom.global_position
+	phantom._physics_process(0.5)
+	assert(not phantom.global_position.is_equal_approx(phantom_before), "Crystal Phantom must patrol when not chasing")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
 	var seal_list: Array = instance.get("frozen_skies").mechanisms

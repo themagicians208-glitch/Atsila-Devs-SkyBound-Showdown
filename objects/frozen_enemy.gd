@@ -91,10 +91,14 @@ func _physics_process(delta: float) -> void:
 	_visual.rotation.y += delta * 0.45
 	var target := _nearest_player()
 	if target == null:
+		if variant == "Crystal Phantom":
+			_patrol_phantom()
 		return
 	var offset := target.global_position - global_position
 	var distance := offset.length()
 	if distance > detect_range:
+		if variant == "Crystal Phantom":
+			_patrol_phantom()
 		return
 	if variant == "Crystal Phantom" and _projectile_cooldown <= 0.0:
 		_launch_projectile(target)
@@ -110,6 +114,12 @@ func _physics_process(delta: float) -> void:
 	if distance < 1.0 and _touch_cooldown <= 0.0 and target.has_method("take_damage"):
 		target.call("take_damage", attack_damage, global_position, "frozen_enemy")
 		_touch_cooldown = 1.0
+
+func _patrol_phantom() -> void:
+	global_position = _home + Vector3(
+		sin(_time * 0.7) * 2.2,
+		sin(_time * 1.4) * 0.7,
+		cos(_time * 0.7) * 1.6)
 
 func _launch_projectile(target: Node3D) -> void:
 	_projectile_cooldown = 2.8
