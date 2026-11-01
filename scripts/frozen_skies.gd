@@ -122,8 +122,17 @@ func _build_frozen_mechanics() -> void:
 func try_activate_nearby(player: Node3D) -> bool:
 	if _crystal_light != null and _crystal_light.try_interact(player):
 		return true
-	for mechanism in mechanisms:
+	for index in mechanisms.size():
+		var mechanism := mechanisms[index]
 		if not mechanism.is_activated and mechanism.global_position.distance_to(player.global_position) <= 2.4:
+			if index == 1 and not Progress.crystal_light_solved:
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Align the crystal light first.")
+				return true
+			if index > 0 and not mechanisms[index - 1].is_activated:
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Activate the previous frozen seal first.")
+				return true
 			return mechanism.activate()
 	return false
 

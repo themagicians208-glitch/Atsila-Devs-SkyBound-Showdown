@@ -41,8 +41,15 @@ func _run() -> void:
 	assert(is_equal_approx(slime._movement_speed(player), float(player.movement_speed) * 0.50), "Frost Slime must be 50% of player speed")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
-	for mechanism in instance.get("frozen_skies").mechanisms:
-		mechanism.activate()
+	var seal_list: Array = instance.get("frozen_skies").mechanisms
+	player.global_position = seal_list[1].global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "blocked seal interaction must be handled")
+	player.global_position = seal_list[0].global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "first seal must activate")
+	player.global_position = seal_list[1].global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "crystal-generator seal must activate after its challenge")
+	player.global_position = seal_list[2].global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
 	titan.take_hit(10, player.global_position)
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
