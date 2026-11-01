@@ -170,6 +170,8 @@ func region_name_for_checkpoint(checkpoint_index: int) -> String:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if Progress.third_fragment_recovered:
+		fragment_recovered = true
 	if not arrival_cinematic_complete:
 		_arrival_time += delta
 		if _arrival_portal_ring != null:

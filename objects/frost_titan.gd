@@ -118,14 +118,25 @@ func _perform_phase_attack(target: Node3D) -> void:
 		if distance < 11.0 and target.has_method("take_damage"):
 			target.call("take_damage", 7.0, global_position, "frost_titan_crystal_storm")
 	elif phase == 3:
-		# The warning ring marks the disappearance window before the Titan shifts.
-		global_position = target.global_position + Vector3(0.0, 0.0, 5.0)
-		if distance < 13.0 and target.has_method("take_damage"):
-			target.call("take_damage", 12.0, global_position, "frost_titan_disappearance")
+		_phase3_disappear(target)
 	else:
 		_spawn_ice_hazard(target.global_position + Vector3(1.5, 0.0, 0.0))
 		if distance < 15.0 and target.has_method("take_damage"):
 			target.call("take_damage", 14.0, global_position, "frost_titan_absolute_frost")
+
+func _phase3_disappear(target: Node3D) -> void:
+	# The warning ring stays visible during the short snow-disappearance window.
+	_warning.visible = true
+	_warning.scale = Vector3.ONE * 0.45
+	var warning_tween := create_tween()
+	warning_tween.tween_property(_warning, "scale", Vector3.ONE * 1.4, 0.3)
+	await get_tree().create_timer(0.35).timeout
+	if _dead or not is_instance_valid(target):
+		return
+	global_position = target.global_position + Vector3(0.0, 0.0, 5.0)
+	_warning.visible = false
+	if global_position.distance_to(target.global_position) < 13.0 and target.has_method("take_damage"):
+		target.call("take_damage", 12.0, global_position, "frost_titan_disappearance")
 
 func take_hit(amount: int, from: Vector3) -> bool:
 	if _dead or locked:
