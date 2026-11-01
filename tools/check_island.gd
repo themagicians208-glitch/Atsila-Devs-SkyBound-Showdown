@@ -49,14 +49,53 @@ func _ready() -> void:
 	if start < 0:
 		problems.append("nothing to stand on at the spawn point")
 	else:
-		var reached := _reachable(surfaces, start)
-		var unreachable := 0
+		# Phase 1: exactly as the player finds it. Anything behind a puzzle has to
+		# be out of reach, or solving that puzzle would not open anything.
+		if island.is_puzzle_solved("ancient_switch") or island.is_puzzle_solved("hidden_crystal"):
+			problems.append("a puzzle is already marked solved before anyone played")
+		var closed := _indices(surfaces, false)
+		var reached_closed := _reachable(surfaces, start, closed)
 		for i in surfaces.size():
+			var gate := str(surfaces[i].get("gate", ""))
+			if not gate.is_empty() and reached_closed.has(i):
+				problems.append("the piece gated by '%s' at %s is reachable before that puzzle is solved" % [
+					gate, surfaces[i]["point"]])
+		print("as found: %d of %d ledges reachable, %d behind puzzles (%s)" % [
+			reached_closed.size(), closed.size(), surfaces.size() - closed.size(),
+			island.get_puzzle_names()])
+
+		# The wall has to be wide enough to actually seal the way past it.
+		var wall: Node3D = island.get_node_or_null("AncientGate")
+		if wall == null:
+			problems.append("the ancient gate is missing")
+		else:
+			var wall_width := float(wall.get("width"))
+			var wall_z := wall.global_position.z
+			var half_needed := 0.0
+			for entry in surfaces:
+				var point: Vector3 = entry["point"]
+				if absf(point.z - wall_z) < 3.0:
+					half_needed = maxf(half_needed, absf(point.x) + float(entry["radius"]))
+			if wall_width * 0.5 < half_needed:
+				problems.append("the gate is %.1f wide but the island is %.1f across at z %.1f, so it can be walked around" % [
+					wall_width, half_needed * 2.0, wall_z])
+			else:
+				print("the gate spans %.1f against an island %.1f across at z %.1f" % [
+					wall_width, half_needed * 2.0, wall_z])
+
+		# Phase 2: every puzzle solved, so the whole island has to connect.
+		island.solve_all_puzzles()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var all_open := _indices(surfaces, true)
+		var reached := _reachable(surfaces, start, all_open)
+		var unreachable := 0
+		for i in all_open:
 			if not reached.has(i):
 				unreachable += 1
 				var point: Vector3 = surfaces[i]["point"]
 				problems.append("ledge at (%.1f, %.1f, %.1f) cannot be reached from the spawn" % [point.x, point.y, point.z])
-		print("reachable ledges: %d of %d" % [surfaces.size() - unreachable, surfaces.size()])
+		print("puzzles solved: %d of %d ledges reachable" % [reached.size(), all_open.size()])
 
 		# The portal has to be standable-on and reachable, or the level can't end.
 		var portal_surface := _nearest_surface(surfaces, island.portal_position)
@@ -175,13 +214,30 @@ func _nearest_surface(surfaces: Array, spot: Vector3) -> int:
 	return best
 
 
-## Which ledges can be walked to from [param start], following one-way jumps.
-func _reachable(surfaces: Array, start: int) -> Dictionary:
-	var seen := {start: true}
-	var queue: Array[int] = [start]
+## Every ledge index, optionally including the ones a puzzle has to be solved for.
+func _indices(surfaces: Array, include_gated: bool) -> Array[int]:
+	var list: Array[int] = []
+	for i in surfaces.size():
+		if include_gated or str(surfaces[i].get("gate", "")).is_empty():
+			list.append(i)
+	return list
+
+
+## Which ledges can be walked to from [param start], following one-way jumps and
+## only using the ledges in [param allowed].
+func _reachable(surfaces: Array, start: int, allowed: Array[int] = []) -> Dictionary:
+	var usable := allowed
+	if usable.is_empty():
+		usable = _indices(surfaces, true)
+	var seen := {}
+	if start in usable:
+		seen[start] = true
+	var queue: Array[int] = []
+	if start in usable:
+		queue.append(start)
 	while not queue.is_empty():
 		var current: int = queue.pop_back()
-		for i in surfaces.size():
+		for i in usable:
 			if seen.has(i):
 				continue
 			if _can_hop(surfaces[current], surfaces[i]):

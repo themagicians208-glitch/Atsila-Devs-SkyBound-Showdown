@@ -27,6 +27,7 @@ extends Node3D
 
 signal message(text: String)         ## ask the HUD to show a line of text
 signal portal_unlocked               ## the coin requirement was just met
+signal puzzle_solved(name: String, text: String)
 
 const PLATFORM := preload("res://objects/platform.tscn")
 const PLATFORM_MEDIUM := preload("res://objects/platform_medium.tscn")
@@ -75,10 +76,15 @@ var slimes_placed := 0
 
 var _main: Node = null
 var _materials: Dictionary = {}
-## Every walkable surface on the island: {position (on the surface), radius}. The
-## coin checks in tools/ use this to prove each coin can be reached on foot.
+## Every walkable surface on the island: {position (on the surface), radius, gate}.
+## The coin and reachability checks in tools/ use this to prove each coin can be
+## reached on foot once the puzzles that open the way have been solved.
 var _surfaces: Array[Dictionary] = []
 var _bobbers: Array[Node3D] = []
+var _solved: Dictionary = {}
+var _gates: Dictionary = {}
+var _raisers: Dictionary = {}
+var _crystal: IslandCrystal = null
 var _symbols: Array[Node3D] = []
 var _portal_disc: MeshInstance3D
 var _portal_inner: MeshInstance3D
@@ -102,6 +108,7 @@ func build(main: Node) -> void:
 	_build_arena()
 	_build_portal_terrace()
 	_build_flanks()
+	_build_puzzles()
 	_spawn_slimes()
 	_build_backdrop()
 	_place_coins()
@@ -276,8 +283,8 @@ func _build_crystal_grove() -> void:
 	for point in route:
 		_platform(float(point[0]), float(point[1]), float(point[2]), str(point[3]), float(point[1]) * 0.3)
 
-	# The pedestal that will hold the hidden crystal (wired up in a later stage).
-	_pedestal(Vector3(0.6, 1.8, 41.6))
+	# The pedestal that holds the hidden crystal is built with the puzzles; the
+# grove only reserves the clearing for it.
 	_tree(1.8, -4.4, 40.0, 4.4, LEAF)
 	_tree(1.8, 4.6, 42.6, 4.0, LEAF_DEEP)
 	_tree(2.2, -4.8, 50.0, 4.8, LEAF)
@@ -303,9 +310,6 @@ func _build_crossing() -> void:
 	# Built as one row of stepping stones for now; the disappearing pattern is
 	# added on top of them in the puzzle stage.
 	var route := [
-		[2.7, -3.2, 63.6],
-		[2.8, -5.2, 65.8],
-		[2.9, -3.2, 68.0],
 		[3.0, -1.2, 70.2],
 		[3.0, -3.2, 72.4],
 		[3.1, -5.2, 74.6],
@@ -637,6 +641,160 @@ func _spawn_slimes() -> void:
 		slimes_placed += 1
 
 
+# --- Puzzles ------------------------------------------------------------------
+
+## Every puzzle on the island, built here so the whole chain can be read in one
+## place. Each one registers the gates it opens, and any piece of the route that
+## only exists once a puzzle is solved is recorded against that puzzle's name, so
+## the dev checks can prove the island is closed before and open afterwards.
+##
+##   1 ancient_switch   a glowing switch in the glade   -> the stone gate north of it
+##   2 hidden_crystal   the crystal in the cave, carried to the grove's pedestal
+##                                                      -> the bridge to the crossing
+func _build_puzzles() -> void:
+	# 1. The ancient switch, beside the arch, and the gate it opens.
+	var switch_node := IslandSwitch.new()
+	switch_node.name = "AncientSwitch"
+	switch_node.island = self
+	switch_node.position = Vector3(5.4, 0.0, 1.2)
+	add_child(switch_node)
+	_record_surface(Vector3(5.4, 0.0, 1.2), 0.7)
+
+	var gate := IslandGate.new()
+	gate.name = "AncientGate"
+	gate.solved_name = "ancient_switch"
+	gate.position = Vector3(0.0, 0.0, 10.2)
+	# Wide enough to span the neck of the glade: at this z the island is only about
+	# five units across, so nothing fits around the ends of the wall.
+	gate.width = 6.5
+	add_child(gate)
+	_register_gate("ancient_switch", gate)
+	# Everything north of the wall is behind that puzzle until it is solved.
+	_gate_off("ancient_switch", 10.2)
+
+	# 2. The crystal, hidden inside the cave above the forest path, and the
+	#    pedestal that wants it in the grove.
+	_crystal = IslandCrystal.new()
+	_crystal.name = "HiddenCrystal"
+	_crystal.island = self
+	_crystal.position = Vector3(-3.1, 1.2, 21.0)
+	add_child(_crystal)
+
+	var pedestal := CrystalPedestal.new()
+	pedestal.name = "CrystalPedestal"
+	pedestal.island = self
+	pedestal.position = Vector3(0.6, 1.8, 41.6)
+	add_child(pedestal)
+	_record_surface(Vector3(0.6, 1.8, 41.6), 0.8)
+
+	# The bridge the pedestal raises: it fills the three-platform gap between the
+# grove and the crossing, and without it the gap is far too wide to jump.
+	for plank in [[2.7, -3.2, 63.6], [2.8, -5.2, 65.8], [2.9, -3.2, 68.0]]:
+		_build_gated_bridge("hidden_crystal", float(plank[0]), float(plank[1]), float(plank[2]), 0.9)
+
+
+## Mark every ledge north of a wall as lying behind that puzzle. The wall is the
+## only way past, so nothing beyond it can be reached until its gate opens - and
+## the checks in tools/ rely on this being true.
+func _gate_off(puzzle: String, beyond_z: float) -> void:
+	for entry in _surfaces:
+		if not str(entry.get("gate", "")).is_empty():
+			continue
+		var point: Vector3 = entry["point"]
+		if point.z > beyond_z:
+			entry["gate"] = puzzle
+
+
+## A plank bridge that does not exist until its puzzle is solved. It is recorded
+## as walkable ground straight away, tagged with the puzzle that raises it.
+func _build_gated_bridge(puzzle: String, surface_y: float, x: float, z: float, radius: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "Bridge_%s_%d" % [puzzle, roundi(z)]
+	body.position = Vector3(x, surface_y - 0.35, z)
+	body.visible = false
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(radius * 2.0, 0.5, radius * 2.0)
+	shape.shape = box
+	for child in [shape]:
+		(child as CollisionShape3D).set_deferred("disabled", true)
+	body.add_child(shape)
+	_box(body, Vector3(radius * 2.0, 0.16, radius * 2.0), _material(Color("#b08968")), Vector3(0.0, 0.25, 0.0))
+	_box(body, Vector3(radius * 1.1, 0.1, radius * 2.1), _material(Color("#8a6a4f")), Vector3(0.0, 0.34, 0.0))
+	var rune := _torus(body, 0.22, 0.3, _material(PORTAL_BLUE, PORTAL_BLUE), Vector3(0.0, 0.4, 0.0), Vector3(90.0, 0.0, 0.0))
+	rune.name = "BridgeRune"
+	add_child(body)
+	_record_surface(Vector3(x, surface_y, z), radius, puzzle)
+	_register_raiser(puzzle, body)
+
+
+## Open a gate, or raise a gate bridge.
+func _register_gate(puzzle: String, gate: Node) -> void:
+	if not _gates.has(puzzle):
+		_gates[puzzle] = []
+	_gates[puzzle].append(gate)
+
+
+func _register_raiser(puzzle: String, piece: Node3D) -> void:
+	if not _raisers.has(puzzle):
+		_raisers[puzzle] = []
+	_raisers[puzzle].append(piece)
+
+
+func is_puzzle_solved(name: String) -> bool:
+	return bool(_solved.get(name, false))
+
+
+## Solve a puzzle: open its gates, raise its bridges, say so, and announce it.
+func solve_puzzle(name: String, text := "") -> void:
+	if is_puzzle_solved(name):
+		return
+	_solved[name] = true
+	for gate in _gates.get(name, []):
+		if is_instance_valid(gate):
+			gate.call("open")
+	for piece in _raisers.get(name, []):
+		_raise_piece(piece)
+	if not text.is_empty():
+		message.emit(text)
+	puzzle_solved.emit(name, text)
+
+
+func _raise_piece(piece: Node3D) -> void:
+	piece.visible = true
+	for child in piece.find_children("*", "CollisionShape3D", true, false):
+		(child as CollisionShape3D).set_deferred("disabled", false)
+	if piece is CollisionObject3D:
+		pass
+	var start := piece.position
+	piece.position = start + Vector3(0.0, -4.0, 0.0)
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(piece, "position", start, 0.9)
+	Audio.play("res://sounds/break.ogg")
+
+
+## Solve everything without playing through it. The dev checks use this to prove
+## the whole island is reachable once the puzzles are done.
+func solve_all_puzzles() -> void:
+	solve_puzzle("ancient_switch")
+	var pedestal := get_node_or_null("CrystalPedestal")
+	if pedestal != null:
+		pedestal.call("fill")
+	else:
+		solve_puzzle("hidden_crystal")
+
+
+func find_crystal() -> IslandCrystal:
+	return _crystal if is_instance_valid(_crystal) else null
+
+
+## Which puzzles this island knows about, for the checks in tools/.
+func get_puzzle_names() -> Array:
+	return _solved.keys() if not _solved.is_empty() else ["ancient_switch", "hidden_crystal"]
+
+
 ## Distant islands and clouds, far enough out that the island feels like one peak
 ## in a floating range.
 func _build_backdrop() -> void:
@@ -821,9 +979,10 @@ func _platform(surface_y: float, x: float, z: float, kind := "medium", yaw := 0.
 	return node
 
 
-## Remember a walkable spot so the coin check can prove it is reachable.
-func _record_surface(spot: Vector3, radius: float) -> void:
-	_surfaces.append({"point": spot, "radius": radius})
+## Remember a walkable spot so the checks can prove it is reachable. [param gate]
+## names the puzzle that has to be solved before it exists at all.
+func _record_surface(spot: Vector3, radius: float, gate := "") -> void:
+	_surfaces.append({"point": spot, "radius": radius, "gate": gate})
 
 
 ## Nearest walkable surface to a spot, as [distance past the ledge edge, height
