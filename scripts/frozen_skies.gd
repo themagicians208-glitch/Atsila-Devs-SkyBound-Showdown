@@ -7,6 +7,7 @@ const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
 const FRAGMENT_CHEST := preload("res://objects/frozen_fragment_chest.gd")
 const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
+const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
@@ -34,6 +35,7 @@ func build(main: Node) -> Array:
 	_place_coins()
 	_place_enemies()
 	_build_moving_ice_platforms()
+	_build_unstable_ice()
 	return route
 
 func _process(delta: float) -> void:
@@ -58,6 +60,13 @@ func _build_moving_ice_platforms() -> void:
 		_world.add_child(platform)
 		_moving_platforms.append(platform)
 		_add_ice_cap(origin)
+
+func _build_unstable_ice() -> void:
+	for index in [23, 25, 27, 29]:
+		var platform: Node3D = UNSTABLE_ICE.new()
+		platform.name = "UnstableIce_%02d" % index
+		platform.position = route[index] + Vector3(0.0, 0.65, 1.5)
+		_world.add_child(platform)
 
 func _build_frozen_mechanics() -> void:
 	# Reuse the main level's switch/gate implementation for the first frozen seal.
