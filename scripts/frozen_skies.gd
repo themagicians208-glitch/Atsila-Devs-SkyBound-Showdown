@@ -359,6 +359,7 @@ func _place_enemies() -> void:
 		_chest.unlock()
 		_unlock_boss_arena()
 	_chest.fragment_recovered.connect(func():
+		fragment_recovered = true
 		if _main.has_method("_on_frozen_fragment_recovered"):
 			_main.call("_on_frozen_fragment_recovered")
 	)

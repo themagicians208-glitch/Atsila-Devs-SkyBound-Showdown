@@ -106,6 +106,7 @@ func _run() -> void:
 	chest._on_body_entered(player)
 	await create_timer(1.0).timeout
 	assert(get_root().get_node("Progress").third_fragment_recovered, "chest must recover the Third Fragment")
+	assert(frozen.fragment_recovered, "Frozen Skies must record the recovered Fragment")
 	frozen.thaw_environment()
 	assert(frozen.environment_thawed, "fragment recovery must thaw Frozen Skies")
 	assert(not frozen.is_portal_ready(52), "Level 4 portal must stay locked before boss and fragment")
