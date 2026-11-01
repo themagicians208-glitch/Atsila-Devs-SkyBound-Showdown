@@ -1,6 +1,8 @@
 extends Node3D
 class_name FrostTitan
 
+const ICE_PROJECTILE := preload("res://objects/ice_projectile.gd")
+
 signal defeated
 signal health_changed(health: int, maximum: int, phase: int)
 
@@ -106,9 +108,17 @@ func _perform_phase_attack(target: Node3D) -> void:
 		if distance < 7.0 and target.has_method("take_damage"):
 			target.call("take_damage", 10.0, global_position, "frost_titan_shockwave")
 	elif phase == 2:
+		var projectile: IceProjectile = ICE_PROJECTILE.new()
+		projectile.damage = 6.0
+		projectile.speed = 7.0
+		projectile.global_position = global_position + Vector3(0.0, 1.0, 0.0)
+		get_parent().add_child(projectile)
+		projectile.launch(target)
 		if distance < 11.0 and target.has_method("take_damage"):
 			target.call("take_damage", 7.0, global_position, "frost_titan_crystal_storm")
 	elif phase == 3:
+		# The warning ring marks the disappearance window before the Titan shifts.
+		global_position = target.global_position + Vector3(0.0, 0.0, 5.0)
 		if distance < 13.0 and target.has_method("take_damage"):
 			target.call("take_damage", 12.0, global_position, "frost_titan_disappearance")
 	else:
