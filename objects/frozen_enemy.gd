@@ -166,8 +166,8 @@ func _patrol_phantom() -> void:
 func _launch_projectile(target: Node3D) -> void:
 	_projectile_cooldown = 2.8
 	var projectile: IceProjectile = ICE_PROJECTILE.new()
-	projectile.global_position = global_position + Vector3(0.0, 0.2, 0.0)
 	get_parent().add_child(projectile)
+	projectile.global_position = global_position + Vector3(0.0, 0.2, 0.0)
 	projectile.launch(target)
 
 func _movement_speed(target: Node3D) -> float:
