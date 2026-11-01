@@ -82,6 +82,8 @@ func _ready() -> void:
 	local_coop = bool(get_tree().get_meta("local_coop", false))
 	online = bool(get_tree().get_meta("online", false))
 	_build_level(current_level)
+	if frozen_skies != null:
+		Audio.play_music("res://sounds/pixelland.mp3")
 	_aim_starting_camera()
 	coin_goal = get_tree().get_nodes_in_group("collectible_coins").size()
 	if island != null:
@@ -94,7 +96,7 @@ func _ready() -> void:
 	elif frozen_skies != null:
 		coin_goal = frozen_skies.coins_required
 		coins_collected = Progress.frozen_coins_collected()
-		hud.show_finish_message("LEVEL 3 - FROZEN SKIES")
+		hud.show_finish_message("LEVEL 3 – FROZEN SKIES")
 		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 		_update_frozen_ability_hud()
 	else:
@@ -1501,7 +1503,7 @@ func _go_to_next_level() -> void:
 		next_level = 1
 	get_tree().set_meta("level_number", next_level)
 	if next_level == 3:
-		hud.play_level_transition("LEVEL 3  •  FROZEN SKIES", func(): get_tree().reload_current_scene())
+		hud.play_level_transition("LEVEL 3 – FROZEN SKIES", func(): get_tree().reload_current_scene())
 	else:
 		get_tree().reload_current_scene()
 
