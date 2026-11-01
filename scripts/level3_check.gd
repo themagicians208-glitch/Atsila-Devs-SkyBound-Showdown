@@ -22,6 +22,8 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
 	var crystal_puzzle: Node = world.get_node("CrystalLightPuzzle")
 	assert(not crystal_puzzle.is_solved, "crystal light puzzle starts unsolved")
+	var crystal_gate: Node = world.get_node("CrystalLightGate")
+	assert(not crystal_gate.opened, "crystal gate starts closed")
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
 	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")
@@ -35,6 +37,7 @@ func _run() -> void:
 		for turn in range(index + 1):
 			assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
 	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
+	assert(crystal_gate.opened, "crystal light puzzle must open its gate")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
 	assert(is_equal_approx(wolf._movement_speed(player), float(player.movement_speed) * 1.10), "Frost Wolf must be 110% of player speed")
 	var shadow_slime_script: GDScript = load("res://objects/shadow_slime.gd")

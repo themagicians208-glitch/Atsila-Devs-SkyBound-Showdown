@@ -9,6 +9,7 @@ const FRAGMENT_CHEST := preload("res://objects/frozen_fragment_chest.gd")
 const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
 const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
 const CRYSTAL_LIGHT := preload("res://objects/crystal_light_puzzle.gd")
+const PUZZLE_GATE := preload("res://objects/puzzle_gate.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
@@ -36,6 +37,7 @@ var _crystal_light: Node3D
 var _snowfall: GPUParticles3D
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
 var environment_thawed := false
+var _crystal_gate: StaticBody3D
 
 func build(main: Node) -> Array:
 	_main = main
@@ -50,6 +52,7 @@ func build(main: Node) -> Array:
 	_build_moving_ice_platforms()
 	_build_unstable_ice()
 	_build_crystal_light_puzzle()
+	_build_crystal_gate()
 	if Progress.third_fragment_recovered:
 		thaw_environment()
 	return route
@@ -60,9 +63,35 @@ func _build_crystal_light_puzzle() -> void:
 	_crystal_light.position = route[18] + Vector3(0.0, 0.65, 1.8)
 	_world.add_child(_crystal_light)
 	_crystal_light.solved.connect(func():
+		if _crystal_gate != null:
+			_crystal_gate.open()
 		if _main.has_method("_on_frozen_crystal_light_solved"):
 			_main.call("_on_frozen_crystal_light_solved")
 	)
+
+func _build_crystal_gate() -> void:
+	_crystal_gate = StaticBody3D.new()
+	_crystal_gate.name = "CrystalLightGate"
+	_crystal_gate.set_script(PUZZLE_GATE)
+	var from_point: Vector3 = route[18]
+	var to_point: Vector3 = route[19]
+	_crystal_gate.position = (from_point + to_point) * 0.5 + Vector3(0.0, 1.5, 0.0)
+	var direction := to_point - from_point
+	direction.y = 0.0
+	_crystal_gate.rotation.y = atan2(direction.x, direction.z)
+	var size := Vector3(3.5, 2.2, 0.3)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	_crystal_gate.add_child(shape)
+	var visual := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	visual.mesh = mesh
+	visual.material_override = _material(Color("#62e8ff"), 1.4)
+	_crystal_gate.add_child(visual)
+	_world.add_child(_crystal_gate)
 
 func region_name_for_checkpoint(checkpoint_index: int) -> String:
 	var region_index := 0
