@@ -43,6 +43,12 @@ var boss_panel: PanelContainer
 var boss_name_label: Label
 var boss_phase_label: Label
 var boss_bar: ProgressBar
+## Player health and stamina bars in the top-left below the coin counter.
+var status_panel: PanelContainer
+var health_bar: ProgressBar
+var health_label: Label
+var stamina_bar: ProgressBar
+var stamina_label: Label
 var combat_level := 1
 var combat_level_name := ""
 var _players: Array = []
@@ -53,6 +59,7 @@ func _ready() -> void:
 	# close the inventory it opened.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_game_hud()
+	_build_status_bars()
 	_build_victory_overlay()
 	_build_death_overlay()
 	_build_pause_menu()
@@ -60,6 +67,140 @@ func _ready() -> void:
 	_build_inventory()
 	_build_boss_bar()
 	_update_coin_counter(0)
+
+
+func _process(_delta: float) -> void:
+	if _players.is_empty():
+		return
+	var primary: Node = _players[0] as Node
+	if primary == null or not is_instance_valid(primary):
+		return
+	if primary.get("health") != null and primary.get("max_health") != null:
+		update_health(float(primary.get("health")), float(primary.get("max_health")))
+	if primary.get("stamina") != null and primary.get("max_stamina") != null:
+		update_stamina(float(primary.get("stamina")), float(primary.get("max_stamina")))
+
+
+func _build_status_bars() -> void:
+	status_panel = PanelContainer.new()
+	status_panel.name = "StatusPanel"
+	status_panel.offset_left = 48
+	status_panel.offset_top = 124
+	status_panel.offset_right = 308
+	status_panel.offset_bottom = 204
+	var style := _hud_panel_style(Color(0.07, 0.11, 0.18, 0.82), Color("#5aa8e8"))
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 10
+	status_panel.add_theme_stylebox_override("panel", style)
+	add_child(status_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	status_panel.add_child(vbox)
+
+	# Health row
+	var hp_box := VBoxContainer.new()
+	hp_box.add_theme_constant_override("separation", 2)
+	vbox.add_child(hp_box)
+
+	var hp_header := HBoxContainer.new()
+	hp_box.add_child(hp_header)
+
+	var hp_title := Label.new()
+	hp_title.text = "HP"
+	hp_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_title.add_theme_font_override("font", UI_FONT)
+	hp_title.add_theme_font_size_override("font_size", 14)
+	hp_title.add_theme_color_override("font_color", Color("#ff8a9c"))
+	hp_header.add_child(hp_title)
+
+	health_label = Label.new()
+	health_label.text = "100%"
+	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	health_label.add_theme_font_override("font", UI_FONT)
+	health_label.add_theme_font_size_override("font_size", 14)
+	health_label.add_theme_color_override("font_color", Color("#ffe7ea"))
+	hp_header.add_child(health_label)
+
+	health_bar = ProgressBar.new()
+	health_bar.name = "HealthBar"
+	health_bar.custom_minimum_size = Vector2(228, 12)
+	health_bar.show_percentage = false
+	health_bar.max_value = 100.0
+	health_bar.value = 100.0
+	var hp_bg := StyleBoxFlat.new()
+	hp_bg.bg_color = Color(0.14, 0.05, 0.08, 0.9)
+	hp_bg.set_corner_radius_all(5)
+	health_bar.add_theme_stylebox_override("background", hp_bg)
+	var hp_fill := StyleBoxFlat.new()
+	hp_fill.bg_color = Color("#ff5b72")
+	hp_fill.set_corner_radius_all(5)
+	health_bar.add_theme_stylebox_override("fill", hp_fill)
+	hp_box.add_child(health_bar)
+
+	# Stamina row
+	var st_box := VBoxContainer.new()
+	st_box.add_theme_constant_override("separation", 2)
+	vbox.add_child(st_box)
+
+	var st_header := HBoxContainer.new()
+	st_box.add_child(st_header)
+
+	var st_title := Label.new()
+	st_title.text = "STAMINA"
+	st_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	st_title.add_theme_font_override("font", UI_FONT)
+	st_title.add_theme_font_size_override("font_size", 14)
+	st_title.add_theme_color_override("font_color", Color("#6ef2b8"))
+	st_header.add_child(st_title)
+
+	stamina_label = Label.new()
+	stamina_label.text = "100%"
+	stamina_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stamina_label.add_theme_font_override("font", UI_FONT)
+	stamina_label.add_theme_font_size_override("font_size", 14)
+	stamina_label.add_theme_color_override("font_color", Color("#e2fff2"))
+	st_header.add_child(stamina_label)
+
+	stamina_bar = ProgressBar.new()
+	stamina_bar.name = "StaminaBar"
+	stamina_bar.custom_minimum_size = Vector2(228, 12)
+	stamina_bar.show_percentage = false
+	stamina_bar.max_value = 100.0
+	stamina_bar.value = 100.0
+	var st_bg := StyleBoxFlat.new()
+	st_bg.bg_color = Color(0.05, 0.14, 0.11, 0.9)
+	st_bg.set_corner_radius_all(5)
+	stamina_bar.add_theme_stylebox_override("background", st_bg)
+	var st_fill := StyleBoxFlat.new()
+	st_fill.bg_color = Color("#3ae09e")
+	st_fill.set_corner_radius_all(5)
+	stamina_bar.add_theme_stylebox_override("fill", st_fill)
+	st_box.add_child(stamina_bar)
+
+
+func update_health(current: float, maximum: float) -> void:
+	if health_bar == null or maximum <= 0.0:
+		return
+	health_bar.max_value = maximum
+	health_bar.value = clampf(current, 0.0, maximum)
+	var pct := roundi((clampf(current, 0.0, maximum) / maximum) * 100.0)
+	if health_label != null:
+		health_label.text = "%d%%" % pct
+
+
+func update_stamina(current: float, maximum: float) -> void:
+	if stamina_bar == null or maximum <= 0.0:
+		return
+	stamina_bar.max_value = maximum
+	stamina_bar.value = clampf(current, 0.0, maximum)
+	var pct := roundi((clampf(current, 0.0, maximum) / maximum) * 100.0)
+	if stamina_label != null:
+		stamina_label.text = "%d%%" % pct
 
 
 ## The boss bar: a name, a health strip and the phase it is in. Hidden until a
@@ -189,7 +330,17 @@ func show_victory(level_number: int, total_levels: int) -> void:
 	replay_button.grab_focus()
 	get_tree().paused = true
 
-func show_death() -> void:
+func show_death(cause: String = "fall") -> void:
+	if cause == "slime":
+		death_heading.text = "SLIMED!"
+		death_subtitle.text = "A Shadow Slime drained the last of your health. Try again?"
+	elif cause == "enemy" or cause == "warden":
+		death_heading.text = "STRUCK DOWN"
+		death_subtitle.text = "You were overwhelmed in battle. Try again?"
+	else:
+		death_heading.text = "YOU FELL"
+		death_subtitle.text = "The sky swallowed you whole. Try again?"
+
 	death_overlay.visible = true
 	death_overlay.modulate.a = 1.0
 
@@ -213,6 +364,16 @@ func set_level_info(level_number: int, level_name: String) -> void:
 ## Which players the inventory lists. Called again when local co-op adds player 2.
 func bind_players(players: Array) -> void:
 	_players = players
+	if not _players.is_empty() and _players[0] != null:
+		var primary: Node = _players[0] as Node
+		if primary.has_signal("health_changed") and not primary.is_connected("health_changed", update_health):
+			primary.connect("health_changed", update_health)
+		if primary.has_signal("stamina_changed") and not primary.is_connected("stamina_changed", update_stamina):
+			primary.connect("stamina_changed", update_stamina)
+		if primary.get("health") != null and primary.get("max_health") != null:
+			update_health(float(primary.get("health")), float(primary.get("max_health")))
+		if primary.get("stamina") != null and primary.get("max_stamina") != null:
+			update_stamina(float(primary.get("stamina")), float(primary.get("max_stamina")))
 
 
 func _build_inventory_button() -> void:
@@ -319,6 +480,12 @@ func _fill_inventory() -> void:
 		if character.is_empty():
 			character = "Jamal"
 		inventory_rows.add_child(_inventory_row("Character", character, Color.WHITE))
+		if player.get("health") != null and player.get("max_health") != null:
+			var hp_pct := roundi((float(player.get("health")) / maxf(float(player.get("max_health")), 1.0)) * 100.0)
+			inventory_rows.add_child(_inventory_row("Health", "%d%%" % hp_pct, Color("#ff8a9c")))
+		if player.get("stamina") != null and player.get("max_stamina") != null:
+			var st_pct := roundi((float(player.get("stamina")) / maxf(float(player.get("max_stamina")), 1.0)) * 100.0)
+			inventory_rows.add_child(_inventory_row("Stamina", "%d%%" % st_pct, Color("#6ef2b8")))
 		inventory_rows.add_child(_inventory_row("Slash", "J / pad B", Color("#fff3d6")))
 		inventory_rows.add_child(_inventory_row("Aim the slash", "hold forward = up, back in mid-air = down", Color("#9fc4e8")))
 

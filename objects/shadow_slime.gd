@@ -30,7 +30,9 @@ const GRAVITY := 22.0
 enum State { PATROL, CHASE, WINDUP, RECOVER, DEFEATED }
 
 @export var max_health := 2
-@export var contact_damage := 1
+@export var contact_damage := 4.0
+@export var hit_hp_fraction := 0.04
+@export var death_message := "A Shadow Slime dissolves into purple mist!"
 @export var touch_range := 0.95
 ## Distance at which it notices a player, and the larger distance at which it
 ## gives up and goes home.
@@ -468,14 +470,16 @@ func _dissolve(delta: float) -> void:
 		queue_free()
 
 
-## The touch that ends a run, the same way the sentry's does.
+## A single slime hit takes 4% of the player's maximum HP.
 func _check_touch(target: Node3D) -> void:
 	if _defeated or _touch_cooldown > 0.0:
 		return
 	if global_position.distance_to(target.global_position) > touch_range:
 		return
 	if target.has_method("take_damage"):
-		target.call("take_damage", contact_damage, global_position)
+		var max_hp: float = float(target.get("max_health")) if target.get("max_health") != null else 100.0
+		var dmg: float = max_hp * hit_hp_fraction
+		target.call("take_damage", dmg, global_position, "slime")
 		_touch_cooldown = 1.0
 
 

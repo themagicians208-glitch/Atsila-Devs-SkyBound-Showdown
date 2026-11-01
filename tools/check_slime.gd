@@ -167,19 +167,48 @@ func _ready() -> void:
 	if is_instance_valid(subject):
 		_problems.append("it never dissolved away")
 
-	# --- 6. Touching one is fatal -------------------------------------------
+	# --- 6. A single hit takes 4% HP, and lethal slime hits show a distinct death message ---
+	var hud: Node = main.get("hud") as Node
+	if hud.get("health_bar") == null or hud.get("stamina_bar") == null:
+		_problems.append("HUD is missing health_bar or stamina_bar")
 	var hunter: ShadowSlime = slimes[1]
 	var died_player := [false]
 	player.died.connect(func(): died_player[0] = true)
+	player.call("reset_vitals")
+	var start_hp := float(player.get("health"))
+	var max_hp := float(player.get("max_health"))
 	player.global_position = Vector3(0.0, 0.6, 0.0)
 	player.velocity = Vector3.ZERO
 	hunter.place_at(Vector3(0.0, 0.05, 0.3))
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	print("touch: player dead %s, death screen %s" % [died_player[0], (main.get("hud") as Node).get("death_overlay").visible])
+	var after_one_hit := float(player.get("health"))
+	var expected_after_one := start_hp - max_hp * 0.04
+	print("single slime hit: HP %.1f -> %.1f (expected %.1f, dead %s)" % [
+		start_hp, after_one_hit, expected_after_one, died_player[0]])
+	if not is_equal_approx(after_one_hit, expected_after_one):
+		_problems.append("a single slime hit took %.1f HP instead of 4%% (%.1f)" % [
+			start_hp - after_one_hit, max_hp * 0.04])
+	if died_player[0]:
+		_problems.append("a single 4%% slime hit killed a full-health player")
+
+	# Now drop the player to 4% HP and let the slime deal the finishing 4% hit.
+	player.set("health", max_hp * 0.04)
+	hunter.set("_touch_cooldown", 0.0)
+	player.global_position = Vector3(0.0, 0.6, 0.0)
+	hunter.global_position = Vector3(0.0, 0.05, 0.3)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var death_title: String = (hud.get("death_heading") as Label).text
+	var death_sub: String = (hud.get("death_subtitle") as Label).text
+	print("lethal slime hit: player dead %s, death screen %s, heading '%s' / '%s'" % [
+		died_player[0], hud.get("death_overlay").visible, death_title, death_sub])
 	if not died_player[0]:
-		_problems.append("touching a Shadow Slime did not end the run")
+		_problems.append("the finishing slime hit did not end the run")
+	if death_title == "YOU FELL":
+		_problems.append("slime death message is still the default fall message ('%s')" % death_title)
 
 	print("")
 	if _problems.is_empty():

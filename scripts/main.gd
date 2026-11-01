@@ -997,6 +997,8 @@ func respawn_player(who: CharacterBody3D = null) -> void:
 	Engine.time_scale = 1.0
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	target.is_dead = false
+	if target.has_method("reset_vitals"):
+		target.call("reset_vitals")
 	target.slippery = false
 	target.sticky = false
 	target.external_velocity = Vector3.ZERO
@@ -1415,7 +1417,8 @@ func _on_player_died(who: CharacterBody3D) -> void:
 		respawn_player(who)
 	else:
 		Engine.time_scale = 1.0
-		hud.show_death()
+		var cause := str(who.get("last_death_cause")) if who != null and who.get("last_death_cause") != null else "fall"
+		hud.show_death(cause)
 
 
 func _on_retry_pressed() -> void:

@@ -2,6 +2,8 @@ extends CharacterBody3D
 
 signal coin_collected
 signal died
+signal health_changed(current: float, maximum: float)
+signal stamina_changed(current: float, maximum: float)
 
 @export_subgroup("Components")
 @export var view: Node3D
@@ -45,6 +47,14 @@ signal died
 @export var pogo_strength := 6.2
 @export var hurt_knockback := 5.5
 
+@export_subgroup("Vitals")
+@export var max_health: float = 100.0
+@export var max_stamina: float = 100.0
+@export var dash_stamina_cost: float = 25.0
+@export var dash_stamina_drain: float = 20.0
+@export var attack_stamina_cost: float = 8.0
+@export var stamina_regen_rate: float = 24.0
+
 var movement_velocity: Vector3
 var rotation_direction: float
 var gravity = 0
@@ -59,6 +69,9 @@ var jumps_remaining := 2
 var coins = 0
 
 var is_dead := false
+var health: float = 100.0
+var stamina: float = 100.0
+var last_death_cause: String = "fall"
 
 # Floating name tag shown above the player (local co-op / online).
 var player_name := ""
@@ -129,6 +142,7 @@ func _ready() -> void:
 	add_to_group("player")
 	_ensure_combat_actions()
 	_build_slash()
+	reset_vitals()
 
 
 func set_player_index(index: int) -> void:
@@ -255,7 +269,7 @@ func _physics_process(delta):
 	# Falling into the void is fatal
 
 	if position.y < -10:
-		die()
+		die("fall")
 
 	# Animation for scale (jumping and landing)
 
@@ -461,9 +475,13 @@ func set_wind(lift: float) -> void:
 # Dash skill
 
 func _start_dash() -> void:
+	if stamina < 5.0:
+		return
 	is_dashing = true
 	dash_time_left = dash_duration
 	dash_bob = 0.0
+	stamina = maxf(0.0, stamina - dash_stamina_cost)
+	stamina_changed.emit(stamina, max_stamina)
 	Audio.play("res://sounds/jump.ogg")
 
 
@@ -476,10 +494,16 @@ func _end_dash() -> void:
 func _update_dash(delta: float) -> void:
 	if is_dashing:
 		dash_time_left -= delta
-		if dash_time_left <= 0.0:
+		stamina = maxf(0.0, stamina - dash_stamina_drain * delta)
+		stamina_changed.emit(stamina, max_stamina)
+		if dash_time_left <= 0.0 or stamina <= 0.0:
 			_end_dash()
-	elif dash_cooldown_left > 0.0:
-		dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
+	else:
+		if dash_cooldown_left > 0.0:
+			dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
+		if stamina < max_stamina:
+			stamina = minf(max_stamina, stamina + stamina_regen_rate * delta)
+			stamina_changed.emit(stamina, max_stamina)
 
 
 func handle_dash_animation(delta: float) -> void:
@@ -505,9 +529,20 @@ func collect_coin():
 
 # Dying
 
-func die() -> void:
+func reset_vitals() -> void:
+	health = max_health
+	stamina = max_stamina
+	last_death_cause = "fall"
+	health_changed.emit(health, max_health)
+	stamina_changed.emit(stamina, max_stamina)
+
+
+func die(cause: String = "fall") -> void:
 	if is_dead:
 		return
+	last_death_cause = cause
+	health = 0.0
+	health_changed.emit(health, max_health)
 	is_dead = true
 	velocity = Vector3.ZERO
 	movement_velocity = Vector3.ZERO
@@ -572,6 +607,8 @@ func _swing() -> void:
 		return
 	attack_cooldown_left = attack_cooldown
 	attack_timer = attack_time
+	stamina = maxf(0.0, stamina - attack_stamina_cost)
+	stamina_changed.emit(stamina, max_stamina)
 	attack_dir = 0
 	# In the air, holding back aims the nail straight down; holding forward aims
 	# it up. Both are camera-relative, like the movement keys.
@@ -691,9 +728,10 @@ func _ensure_combat_actions() -> void:
 		InputMap.action_add_event(action_attack, attack_button)
 
 
-## Touched by an enemy: knocked away from it, and that is the run over - the same
-## as falling off the route. There are no masks to lose.
-func take_damage(_amount: int = 1, from: Vector3 = Vector3.ZERO) -> void:
+## Touched by an enemy: a single Shadow Slime hit takes 4% of the player's max
+## HP and knocks them back; other hazards/boss hits take the specified damage
+## (or remain fatal when contact_damage is 1).
+func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: String = "enemy") -> void:
 	if is_dead:
 		return
 	Audio.play("res://sounds/land.ogg")
@@ -703,8 +741,20 @@ func take_damage(_amount: int = 1, from: Vector3 = Vector3.ZERO) -> void:
 		away = -Vector3(sin(rotation.y), 0.0, cos(rotation.y))
 	knockback = away.normalized() * hurt_knockback
 	model.scale = Vector3(1.35, 0.7, 1.35)
-	knockback = Vector3.ZERO
-	die()
+	if source == "slime":
+		var slime_dmg: float = max_health * 0.04 if amount <= 0.0 else amount
+		health = maxf(0.0, health - slime_dmg)
+		health_changed.emit(health, max_health)
+		if health <= 0.0:
+			knockback = Vector3.ZERO
+			die("slime")
+		return
+	var fatal_or_amount: float = max_health if amount <= 1.0 else amount
+	health = maxf(0.0, health - fatal_or_amount)
+	health_changed.emit(health, max_health)
+	if health <= 0.0:
+		knockback = Vector3.ZERO
+		die(source)
 
 
 func set_anti_gravity(enabled: bool) -> void:

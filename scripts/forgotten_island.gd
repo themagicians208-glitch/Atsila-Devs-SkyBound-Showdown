@@ -724,11 +724,20 @@ func _spawn_slimes() -> void:
 		[5.6, 3.4, 124.8, 3],
 		[8.0, 8.0, 156.0, 3],     # G - the arena, on the arena floor itself
 	]
+	var slime_death_lines: Array[String] = [
+		"A Shadow Slime dissolves into purple mist!",
+		"The dark jelly pops and scatters into harmless motes!",
+		"Another Shadow Slime fades back into the shadows!",
+		"The corrupted blob shatters into violet sparks!",
+	]
 	for plan in plans:
 		var slime: ShadowSlime = SLIME.new()
 		slime.name = "ShadowSlime_%02d" % slimes_placed
 		slime.position = Vector3(float(plan[1]), float(plan[0]) + 0.05, float(plan[2]))
 		slime.set("max_health", int(plan[3]))
+		var death_line: String = slime_death_lines[slimes_placed % slime_death_lines.size()]
+		slime.set("death_message", death_line)
+		slime.defeated.connect(func(): message.emit(death_line))
 		if plan.size() > 4:
 			# The terrace guards patrol tightly: their terrace is only 2.5 across.
 			slime.set("patrol_radius", float(plan[4]))
