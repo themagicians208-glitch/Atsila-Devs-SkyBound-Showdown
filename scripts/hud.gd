@@ -13,6 +13,8 @@ var victory_subtitle: Label
 var replay_button: Button
 var controls_hint: Label
 var objective_hint: Label
+## When true the objective stays on screen after the controls hint fades.
+var objective_persistent := false
 var controls_tween: Tween
 var shift_timer_label: Label
 var controls_tween_shift: Tween
@@ -32,16 +34,52 @@ var pause_menu_button: Button
 var pause_resume_button: Button
 var pause_save_button: Button
 
+# Inventory: the button in the corner and the panel it opens.
+var inventory_button: Button
+var inventory_overlay: ColorRect
+var inventory_rows: VBoxContainer
+var combat_level := 1
+var combat_level_name := ""
+var _players: Array = []
+var _coins := 0
+
 func _ready() -> void:
+	# The HUD keeps working while the game is paused, so the inventory key can
+	# close the inventory it opened.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_game_hud()
 	_build_victory_overlay()
 	_build_death_overlay()
 	_build_pause_menu()
+	_build_inventory_button()
+	_build_inventory()
 	_update_coin_counter(0)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# In local co-op each slot gets its own inventory key, so player 2 can open
+	# the shared panel too.
+	for action in ["inventory", "p1_inventory", "p2_inventory"]:
+		if InputMap.has_action(action) and event.is_action_pressed(action) \
+				and not event.is_echo():
+			toggle_inventory()
+			get_viewport().set_input_as_handled()
+			return
 
 func set_coin_goal(amount: int) -> void:
 	coin_goal = amount
 	_update_coin_counter(0)
+
+
+## Set the objective line. A persistent objective (the island's coin hunt) stays
+## on screen after the controls hint has faded; the default one fades with it.
+func set_objective(text: String, persistent := true) -> void:
+	if not is_instance_valid(objective_hint):
+		return
+	objective_hint.text = text
+	objective_hint.visible = true
+	objective_hint.modulate.a = 1.0
+	objective_persistent = persistent
 
 func _on_coin_collected(coins):
 	_update_coin_counter(coins)
@@ -80,7 +118,157 @@ func hide_death() -> void:
 	death_overlay.visible = false
 
 func set_level_info(level_number: int, level_name: String) -> void:
+	combat_level = level_number
+	combat_level_name = level_name
 	level_heading.text = "LEVEL %d  •  %s" % [level_number, level_name.to_upper()]
+	if inventory_overlay != null and inventory_overlay.visible:
+		_fill_inventory()
+
+
+# --- The inventory -------------------------------------------------------------
+
+## Which players the inventory lists. Called again when local co-op adds player 2.
+func bind_players(players: Array) -> void:
+	_players = players
+
+
+func _build_inventory_button() -> void:
+	inventory_button = _hud_button("INVENTORY  (I)", Color("#27496f"), Color.WHITE)
+	inventory_button.custom_minimum_size = Vector2(180, 42)
+	inventory_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	inventory_button.offset_left = -206
+	inventory_button.offset_top = 24
+	inventory_button.offset_right = -26
+	inventory_button.offset_bottom = 66
+	inventory_button.pressed.connect(toggle_inventory)
+	add_child(inventory_button)
+
+
+func _build_inventory() -> void:
+	inventory_overlay = ColorRect.new()
+	inventory_overlay.color = Color(0, 0, 0, 0.62)
+	inventory_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	inventory_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	inventory_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	inventory_overlay.visible = false
+	add_child(inventory_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	inventory_overlay.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(430, 0)
+	panel.add_theme_stylebox_override("panel", _hud_panel_style(Color("#172433"), Color("#ffd66b")))
+	center.add_child(panel)
+
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 12)
+	layout.add_theme_constant_override("margin_left", 26)
+	layout.add_theme_constant_override("margin_right", 26)
+	layout.add_theme_constant_override("margin_top", 20)
+	layout.add_theme_constant_override("margin_bottom", 20)
+	panel.add_child(layout)
+
+	var heading := Label.new()
+	heading.text = "INVENTORY"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_override("font", UI_FONT)
+	heading.add_theme_font_size_override("font_size", 34)
+	heading.add_theme_color_override("font_color", Color("#ffe078"))
+	layout.add_child(heading)
+
+	inventory_rows = VBoxContainer.new()
+	inventory_rows.add_theme_constant_override("separation", 6)
+	layout.add_child(inventory_rows)
+
+	var close := _hud_button("CLOSE  (I)", Color("#315784"), Color.WHITE)
+	close.pressed.connect(close_inventory)
+	layout.add_child(close)
+
+	var hint := Label.new()
+	hint.text = "Slash with J, or B on a pad. Hold forward to aim it up, or hold back in\nmid-air to aim it down and pogo off a sentry. Touching one ends the run."
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_override("font", UI_FONT)
+	hint.add_theme_font_size_override("font_size", 14)
+	hint.add_theme_color_override("font_color", Color("#9fc4e8"))
+	layout.add_child(hint)
+
+
+func _inventory_row(label: String, value: String, color: Color) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var name_label := Label.new()
+	name_label.text = label
+	name_label.custom_minimum_size = Vector2(150, 0)
+	name_label.add_theme_font_override("font", UI_FONT)
+	name_label.add_theme_font_size_override("font_size", 19)
+	name_label.add_theme_color_override("font_color", Color("#9fc4e8"))
+	row.add_child(name_label)
+	var value_label := Label.new()
+	value_label.text = value
+	value_label.add_theme_font_override("font", UI_FONT)
+	value_label.add_theme_font_size_override("font_size", 19)
+	value_label.add_theme_color_override("font_color", color)
+	row.add_child(value_label)
+	return row
+
+
+func _fill_inventory() -> void:
+	if inventory_rows == null:
+		return
+	for child in inventory_rows.get_children():
+		inventory_rows.remove_child(child)
+		child.queue_free()
+
+	for index in _players.size():
+		var player = _players[index]
+		if player == null:
+			continue
+		var who := "PLAYER %d" % (index + 1) if _players.size() > 1 else "PLAYER"
+		var heading := Label.new()
+		heading.text = who
+		heading.add_theme_font_override("font", UI_FONT)
+		heading.add_theme_font_size_override("font_size", 24)
+		heading.add_theme_color_override("font_color", Color("#ffd451") if index == 0 else Color("#8fe0ff"))
+		inventory_rows.add_child(heading)
+
+		var character := str(player.get("character_id"))
+		if character.is_empty():
+			character = "Jamal"
+		inventory_rows.add_child(_inventory_row("Character", character, Color.WHITE))
+		inventory_rows.add_child(_inventory_row("Slash", "J / pad B", Color("#fff3d6")))
+		inventory_rows.add_child(_inventory_row("Aim the slash", "hold forward = up, back in mid-air = down", Color("#9fc4e8")))
+
+	inventory_rows.add_child(_inventory_row("Coins",
+		"%d / %d" % [_coins, coin_goal], Color("#ffd451")))
+	inventory_rows.add_child(_inventory_row("Level",
+		"%d  •  %s" % [combat_level, combat_level_name.to_upper()], Color.WHITE))
+
+
+func toggle_inventory() -> void:
+	if inventory_overlay == null:
+		return
+	if inventory_overlay.visible:
+		close_inventory()
+	else:
+		open_inventory()
+
+
+func open_inventory() -> void:
+	if inventory_overlay == null or pause_overlay.visible:
+		return
+	_fill_inventory()
+	inventory_overlay.visible = true
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func close_inventory() -> void:
+	if inventory_overlay == null:
+		return
+	inventory_overlay.visible = false
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func show_controls_hint() -> void:
 	if not is_instance_valid(controls_hint) or not is_instance_valid(objective_hint):
@@ -97,17 +285,25 @@ func show_controls_hint() -> void:
 	controls_tween.parallel().tween_property(objective_hint, "modulate:a", 0.0, 1.0)
 	controls_tween.tween_callback(func():
 		controls_hint.visible = false
-		objective_hint.visible = false
+		if not objective_persistent:
+			objective_hint.visible = false
 	)
 
 func _update_coin_counter(coins: int) -> void:
+	_coins = coins
 	if is_instance_valid(coins_label):
 		coins_label.text = "🪙 %d / %02d" % [coins, coin_goal]
 		var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		coins_label.scale = Vector2(1.2, 1.2)
 		tween.tween_property(coins_label, "scale", Vector2(1.0, 1.0), 0.2)
+	if inventory_overlay != null and inventory_overlay.visible:
+		_fill_inventory()
 
 func toggle_pause() -> void:
+	# The inventory and the pause menu are both modal; close one before opening
+	# the other, so the game never ends up paused with neither showing.
+	if inventory_overlay != null and inventory_overlay.visible:
+		close_inventory()
 	var is_paused = !pause_overlay.visible
 	pause_overlay.visible = is_paused
 	get_tree().paused = is_paused
@@ -158,7 +354,7 @@ func _build_game_hud() -> void:
 	add_child(level_heading)
 
 	controls_hint = Label.new()
-	controls_hint.text = "WASD / STICK MOVE   MOUSE / RIGHT STICK LOOK   CLICK / SPACE / A JUMP\nRIGHT CLICK / Q / LB SHIFT   F / Y FREEZE   E / X INTERACT   ESC / B MENU\nF1: SHOW HELP"
+	controls_hint.text = "WASD / STICK MOVE   MOUSE / RIGHT STICK LOOK   CLICK / SPACE / A JUMP\nRIGHT CLICK / Q / LB SHIFT   F / Y FREEZE   E / X INTERACT   ESC / B MENU\nJ / B SLASH   I INVENTORY      F1: SHOW HELP"
 	controls_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	controls_hint.offset_left = -540

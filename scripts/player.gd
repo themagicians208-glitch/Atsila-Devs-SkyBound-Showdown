@@ -14,6 +14,7 @@ signal died
 @export var action_jump := "jump"
 @export var action_dash := "dash"
 @export var action_time_freeze := "time_freeze"
+@export var action_attack := "attack"
 
 @export_subgroup("Properties")
 @export var movement_speed = 250
@@ -31,6 +32,18 @@ signal died
 @export var dash_speed_multiplier := 2.0
 @export var dash_duration := 1.0
 @export var dash_cooldown := 10.0
+
+# --- Fighting, in the spirit of Hollow Knight ---------------------------------
+# Slash an enemy for the fun of it; a down-slash on one bounces the player back
+# into the air, which is the pogo. Being touched by one is fatal, the same way
+# falling off the route is.
+@export_subgroup("Combat")
+@export var attack_damage := 1
+@export var attack_range := 2.1
+@export var attack_time := 0.18           # how long the slash stays visible
+@export var attack_cooldown := 0.28
+@export var pogo_strength := 6.2
+@export var hurt_knockback := 5.5
 
 var movement_velocity: Vector3
 var rotation_direction: float
@@ -72,6 +85,17 @@ var sticky := false                    # velcro: kills horizontal momentum
 var external_velocity := Vector3.ZERO  # conveyor push (log rollers, slides)
 var wind_lift := 0.0                   # fan tunnel updraft
 
+# Combat state
+var attack_dir := 0                    # 0 forward, 1 up, -1 down
+var attack_timer := 0.0
+var attack_cooldown_left := 0.0
+var knockback := Vector3.ZERO
+var _slash: MeshInstance3D
+var _slash_material: StandardMaterial3D
+var _slash_life := 0.0
+var _slash_base := Vector3.ONE
+var _swing_amount := 0.0               # 0..1 through an attack, drives the pose
+
 @onready var particles_trail = $ParticlesTrail
 @onready var sound_footsteps = $SoundFootsteps
 @onready var model: Node3D = $Character
@@ -102,6 +126,9 @@ func _ready() -> void:
 	if model.has_method("set_player_index"):
 		model.set_player_index(player_index)
 
+	add_to_group("player")
+	_ensure_combat_actions()
+	_build_slash()
 
 
 func set_player_index(index: int) -> void:
@@ -125,6 +152,8 @@ func _apply_character_choice() -> void:
 	if existing != null and existing.scene_file_path == scene_path:
 		return
 	var replacement: Node3D = load(scene_path).instantiate()
+	# Retire the old character first, or it still owns the name and the new one
+	# ends up as "@Node3D@15", which anything looking it up by name would miss.
 	if existing != null:
 		remove_child(existing)
 		existing.queue_free()
@@ -133,6 +162,8 @@ func _apply_character_choice() -> void:
 	replacement.set("player_index", player_index)
 	model = replacement
 	animation = _find_animation_player(model)
+
+
 func _jump_has_mouse_binding() -> bool:
 	for event in InputMap.action_get_events("jump"):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -189,6 +220,7 @@ func _physics_process(delta):
 		_start_dash()
 
 	_update_dash(delta)
+	_update_combat(delta)
 
 	# Handle functions
 
@@ -204,8 +236,8 @@ func _physics_process(delta):
 	var control := 3.0 if slippery else 10.0
 	applied_velocity = velocity.lerp(movement_velocity, delta * control)
 	applied_velocity.y = -gravity
-	applied_velocity.x += external_velocity.x
-	applied_velocity.z += external_velocity.z
+	applied_velocity.x += external_velocity.x + knockback.x
+	applied_velocity.z += external_velocity.z + knockback.z
 	if sticky:
 		applied_velocity.x = 0.0
 		applied_velocity.z = 0.0
@@ -499,6 +531,180 @@ func _activate_time_freeze() -> void:
 func _end_time_freeze() -> void:
 	Engine.time_scale = 1.0
 	time_freeze_active = false
+
+
+# --- Fighting ----------------------------------------------------------------
+#
+# The slash is a short forward swipe with a forgiving arc in front of the player.
+# Holding forward swings it upward, holding back in mid-air swings it down - and a
+# down-slash that lands throws the player back up, which is the pogo.
+
+func _update_combat(delta: float) -> void:
+	attack_cooldown_left = maxf(attack_cooldown_left - delta, 0.0)
+	attack_timer = maxf(attack_timer - delta, 0.0)
+	knockback = knockback.lerp(Vector3.ZERO, delta * 7.0)
+	_update_slash(delta)
+	_update_swing()
+
+	if Input.is_action_just_pressed(action_attack):
+		_swing()
+
+
+## Drive the character's own limb animation through the swing, so it looks like
+## the character is doing the attacking and not just a flash in front of them.
+func _update_swing() -> void:
+	if model == null or not model.has_method("set_swing"):
+		return
+	if attack_timer <= 0.0:
+		if _swing_amount > 0.0:
+			_swing_amount = 0.0
+			model.call("set_swing", 0.0, attack_dir)
+		return
+	var progress := 1.0 - attack_timer / maxf(attack_time, 0.01)
+	_swing_amount = sin(progress * PI)
+	model.call("set_swing", _swing_amount, attack_dir)
+
+
+func _swing() -> void:
+	if is_dead:
+		return
+	if attack_cooldown_left > 0.0:
+		return
+	attack_cooldown_left = attack_cooldown
+	attack_timer = attack_time
+	attack_dir = 0
+	# In the air, holding back aims the nail straight down; holding forward aims
+	# it up. Both are camera-relative, like the movement keys.
+	if not is_on_floor() and Input.is_action_pressed(action_back):
+		attack_dir = -1
+	elif Input.is_action_pressed(action_forward):
+		attack_dir = 1
+	_show_slash()
+	Audio.play("res://sounds/break.ogg")
+
+	var hits := _hit_enemies()
+	if hits > 0 and attack_dir == -1 and not is_on_floor():
+		# Pogo: the nail bounces the player off the enemy.
+		gravity = -pogo_strength
+		jumps_remaining = maxi(jumps_remaining, 1)
+		model.scale = Vector3(0.8, 1.3, 0.8)
+		Audio.play("res://sounds/coin.ogg")
+
+
+## Everything in the "enemies" group that the swing reaches. Returns how many
+## were hit.
+func _hit_enemies() -> int:
+	var hits := 0
+	var facing := Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+	var origin := global_position + Vector3(0.0, 0.55, 0.0)
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or not enemy.has_method("take_hit"):
+			continue
+		var offset := enemy.global_position - origin
+		var reached := false
+		if attack_dir == -1:
+			# The downward swing reaches a little further, so landing a pogo on a
+			# floating enemy works without pixel-perfect timing.
+			reached = offset.y < -0.1 and offset.length() < attack_range + 0.7
+		elif attack_dir == 1:
+			reached = offset.y > 0.1 and offset.length() < attack_range + 0.3
+		else:
+			var flat := Vector3(offset.x, 0.0, offset.z)
+			reached = flat.length() < attack_range and absf(offset.y) < 1.4 \
+					and (flat.length() < 0.4 or facing.dot(flat.normalized()) > 0.3)
+		if reached and bool(enemy.call("take_hit", attack_damage, global_position)):
+			hits += 1
+	if hits > 0:
+		knockback -= facing * 1.2
+	return hits
+
+
+func _build_slash() -> void:
+	_slash_material = StandardMaterial3D.new()
+	_slash_material.albedo_color = Color(1.0, 1.0, 1.0, 0.9)
+	_slash_material.emission_enabled = true
+	_slash_material.emission = Color(1.0, 1.0, 1.0)
+	_slash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_slash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_slash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_slash_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = 14
+	mesh.rings = 6
+
+	_slash = MeshInstance3D.new()
+	_slash.name = "Slash"
+	_slash.mesh = mesh
+	_slash.material_override = _slash_material
+	_slash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_slash.visible = false
+	add_child(_slash)
+
+
+func _show_slash() -> void:
+	if _slash == null:
+		return
+	match attack_dir:
+		-1:
+			_slash.position = Vector3(0.0, -0.85, 0.35)
+			_slash_base = Vector3(1.15, 0.16, 1.15)
+		1:
+			_slash.position = Vector3(0.0, 1.25, 0.35)
+			_slash_base = Vector3(1.0, 0.16, 1.0)
+		_:
+			_slash.position = Vector3(0.0, 0.62, 1.05)
+			_slash_base = Vector3(1.2, 0.5, 0.16)
+	_slash.scale = _slash_base
+	_slash.visible = true
+	_slash_life = 1.0
+
+
+func _update_slash(delta: float) -> void:
+	if _slash_life <= 0.0 or _slash == null:
+		return
+	_slash_life = maxf(_slash_life - delta / maxf(attack_time, 0.01), 0.0)
+	if _slash_life <= 0.0:
+		_slash.visible = false
+		return
+	_slash.scale = _slash_base * lerpf(0.75, 1.25, 1.0 - _slash_life)
+	_slash_material.albedo_color.a = _slash_life
+	_slash_material.emission = Color(1, 1, 1) * (0.6 + 0.4 * _slash_life)
+
+
+func _ensure_combat_actions() -> void:
+	# main.gd builds the per-slot co-op versions of these; single player and
+	# online use them as they are.
+	if not InputMap.has_action(action_attack):
+		InputMap.add_action(action_attack)
+		InputMap.action_set_deadzone(action_attack, 0.5)
+		var attack_key := InputEventKey.new()
+		attack_key.physical_keycode = KEY_J
+		attack_key.device = -1
+		InputMap.action_add_event(action_attack, attack_key)
+		var attack_button := InputEventJoypadButton.new()
+		attack_button.button_index = JOY_BUTTON_B
+		attack_button.device = -1
+		InputMap.action_add_event(action_attack, attack_button)
+
+
+## Touched by an enemy: knocked away from it, and that is the run over - the same
+## as falling off the route. There are no masks to lose.
+func take_damage(_amount: int = 1, from: Vector3 = Vector3.ZERO) -> void:
+	if is_dead:
+		return
+	Audio.play("res://sounds/land.ogg")
+	var away := global_position - from
+	away.y = 0.0
+	if away.length_squared() < 0.01:
+		away = -Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+	knockback = away.normalized() * hurt_knockback
+	model.scale = Vector3(1.35, 0.7, 1.35)
+	knockback = Vector3.ZERO
+	die()
 
 
 func set_anti_gravity(enabled: bool) -> void:

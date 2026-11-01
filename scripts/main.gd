@@ -6,6 +6,8 @@ const PLATFORM_GRASS := preload("res://objects/platform_grass_large_round.tscn")
 const PLATFORM_FALLING := preload("res://objects/platform_falling.tscn")
 const COIN := preload("res://objects/coin.tscn")
 const FLAG := preload("res://models/flag.glb")
+# Built from primitives in code, so it needs no scene file of its own.
+const ENEMY := preload("res://objects/enemy.gd")
 const GRAVITY_ZONE_SCRIPT := preload("res://scripts/anti_gravity_zone.gd")
 const SPINNING_HAZARD_SCRIPT := preload("res://scripts/spinning_hazard.gd")
 const MOVING_PLATFORM_SCRIPT := preload("res://objects/moving_platform.gd")
@@ -19,8 +21,9 @@ const STICKY_SCRIPT := preload("res://scripts/sticky_zone.gd")
 const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")
 const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const PLAYER_SCENE := preload("res://objects/player.tscn")
+const ISLAND := preload("res://scenes/forgotten_island.tscn")
 
-const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
@@ -41,6 +44,13 @@ var active_checkpoint := 0
 var local_coop := false
 var player_two: CharacterBody3D
 var coins_collected := 0
+## Level 1 is the hand-laid Forgotten Island instead of a generated course.
+var island: ForgottenIsland = null
+## Stops the dormant portal from spamming its message while the player stands in it.
+var _portal_locked_cooldown := 0.0
+
+# Route points of the current level (world space). Used to aim the starting camera.
+var route_points: Array = []
 
 # Online co-op (ENet)
 var online := false
@@ -59,16 +69,31 @@ func _ready() -> void:
 	_ensure_key_action("interact", KEY_E, JOY_BUTTON_X)
 	_ensure_key_action("time_freeze", KEY_F, JOY_BUTTON_Y)
 	_ensure_key_action("shift_dimension", KEY_Q, JOY_BUTTON_LEFT_SHOULDER, MOUSE_BUTTON_RIGHT)
+	_ensure_key_action("attack", KEY_J, JOY_BUTTON_B)
+	_ensure_key_action("inventory", KEY_I, JOY_BUTTON_BACK)
+	# Rebound keys win over the defaults above.
+	_apply_key_binds()
 	current_level = int(get_tree().get_meta("level_number", 1))
 	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	get_tree().set_meta("level_number", current_level)
 	local_coop = bool(get_tree().get_meta("local_coop", false))
 	online = bool(get_tree().get_meta("online", false))
 	_build_level(current_level)
+	_aim_starting_camera()
 	coin_goal = get_tree().get_nodes_in_group("collectible_coins").size()
+	if island != null:
+		# On the island the goal is the portal requirement, not every coin: the
+		# level holds more coins than are needed, so exploring is a choice.
+		coin_goal = island.coins_required
+		island.notify_coins(0)
+		hud.show_finish_message("THE FORGOTTEN ISLAND")
+		hud.set_objective("Explore the Forgotten Island  -  %d more coins wake the portal" % coin_goal)
+	else:
+		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
+		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
 	hud.set_coin_goal(coin_goal)
 	hud.set_level_info(current_level, LEVEL_NAMES[current_level - 1])
-	hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
+	hud.bind_players([player])
 	hud.continue_pressed.connect(_on_continue_pressed)
 	player.coin_collected.connect(_on_coin_collected)
 	player.died.connect(_on_player_died.bind(player))
@@ -87,6 +112,25 @@ func _ready() -> void:
 		_setup_local_coop()
 	elif online:
 		_setup_online()
+
+
+## Start the camera behind the player, looking along the route. Otherwise the very
+## next platforms can sit between the camera and the player and hide the character
+## completely, which makes the level look broken on arrival.
+func _aim_starting_camera() -> void:
+	if route_points.size() < 2:
+		return
+	var ahead: Vector3 = route_points[1] - route_points[0]
+	ahead.y = 0.0
+	if ahead.length() < 0.01:
+		return
+	ahead = ahead.normalized()
+	# The camera sits at local (0, 0, zoom), so put that offset opposite the route.
+	var yaw := rad_to_deg(atan2(-ahead.x, -ahead.z))
+	var view: Node3D = $View
+	var current: Vector3 = view.get("camera_rotation")
+	view.set("camera_rotation", Vector3(current.x, yaw, 0.0))
+	view.rotation.y = deg_to_rad(yaw)
 
 
 func _ensure_key_action(action_name: String, key_code: Key, joy_button: JoyButton, mouse_button: MouseButton = MOUSE_BUTTON_NONE) -> void:
@@ -120,6 +164,38 @@ func _ensure_key_action(action_name: String, key_code: Key, joy_button: JoyButto
 		InputMap.action_add_event(action_name, mouse_event)
 
 
+## Swap in any keys the player rebound in OPTIONS > KEY BINDS. This runs after the
+## defaults are set up, so a rebound key replaces the default one for that action.
+func _apply_key_binds() -> void:
+	var settings := get_node_or_null("/root/Settings")
+	if settings == null:
+		return
+	var binds: Dictionary = settings.get("key_binds")
+	for action in binds.keys():
+		_add_stored_bind(str(action), int(binds[action]))
+
+
+## Put one stored bind on an action, replacing anything the game set up for it.
+## The player may have bound a key or a mouse button, so both are handled here.
+func _add_stored_bind(action_name: String, code: int) -> void:
+	if code <= 0 or not InputMap.has_action(action_name):
+		return
+	for existing_event in InputMap.action_get_events(action_name):
+		if existing_event is InputEventKey or existing_event is InputEventMouseButton:
+			InputMap.action_erase_event(action_name, existing_event)
+	var settings := get_node_or_null("/root/Settings")
+	if settings != null and bool(settings.call("is_mouse_bind", code)):
+		var mouse := InputEventMouseButton.new()
+		mouse.button_index = int(settings.call("mouse_button_of", code)) as MouseButton
+		mouse.device = -1
+		InputMap.action_add_event(action_name, mouse)
+		return
+	var key := InputEventKey.new()
+	key.physical_keycode = code as Key
+	key.device = -1
+	InputMap.action_add_event(action_name, key)
+
+
 func _ensure_key_binding(action_name: String, key_code: Key) -> void:
 	if not InputMap.has_action(action_name):
 		InputMap.add_action(action_name)
@@ -138,11 +214,16 @@ func _build_level(level_number: int) -> void:
 	gates.clear()
 	switches_pressed = 0
 	puzzle_solved = false
-	var routes := _get_level_routes()
-	var route: Array = routes[level_number - 1]
+	island = null
 	for child in world.get_children():
 		world.remove_child(child)
 		child.free()
+	if level_number == 1:
+		_build_island()
+		return
+	var routes := _get_level_routes()
+	var route: Array = routes[level_number - 1]
+	route_points = route
 	_build_specials(level_number, route.size())
 
 	for i in range(route.size()):
@@ -173,6 +254,18 @@ func _build_level(level_number: int) -> void:
 			cloud.position = point + Vector3(0, 1.2, 2.0)
 			world.add_child(cloud)
 
+		# One sentry per level, a little past the halfway point, hovering
+		# within reach of a jump - any higher and only a fall past it would
+		# ever connect.
+		if i == int(route.size() / 2.0):
+			var enemy: Node3D = ENEMY.new()
+			enemy.name = "SkySentry"
+			enemy.position = point + Vector3(0.0, 1.7, 0.0)
+			enemy.set("max_health", 2 + int(level_number / 3.0))
+			enemy.set("drift_speed", 1.5 + 0.15 * float(level_number))
+			enemy.set("chase_range", 7.0)
+			world.add_child(enemy)
+
 	var goal: Vector3 = route[route.size() - 1]
 	var flag: Node3D = FLAG.instantiate()
 	flag.position = goal + Vector3(0, 0.45, 0)
@@ -191,6 +284,31 @@ func _build_level(level_number: int) -> void:
 	_build_gimmicks(level_number, route)
 	_build_puzzle(level_number, route)
 	_apply_dimension_visibility()
+
+
+## Level 1: the hand-laid Forgotten Island. The island builds itself and reports
+## its spawn, checkpoints and portal; the level keeps running the same show -
+## coins, checkpoints, death, and a finish that leads on to level 2.
+func _build_island() -> void:
+	var node: ForgottenIsland = ISLAND.instantiate()
+	node.name = "ForgottenIsland"
+	world.add_child(node)
+	island = node
+	node.message.connect(_on_island_message)
+	node.build(self)
+	route_points = node.waypoints
+	player.position = node.spawn_point
+	player.velocity = Vector3.ZERO
+	checkpoint_position = node.spawn_point
+	active_checkpoint = 0
+	for index in node.checkpoint_points.size():
+		_add_checkpoint(node.checkpoint_points[index], index)
+	finish.position = node.portal_position
+	_apply_dimension_visibility()
+
+
+func _on_island_message(text: String) -> void:
+	hud.show_finish_message(text)
 
 
 func _get_checkpoint_indices(level_number: int, route_size: int) -> Array[int]:
@@ -931,6 +1049,8 @@ func _set_phase_active(root: Node, active: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	if _portal_locked_cooldown > 0.0:
+		_portal_locked_cooldown -= delta
 	if shift_active:
 		shift_timer -= delta
 		if shift_timer > 0:
@@ -1147,7 +1267,7 @@ func _get_level_routes() -> Array:
 	# Each level is deliberately longer than the one before it, so the difficulty
 	# and complexity climb from course to course. Gaps stay within a double jump.
 	return [
-		# 1 Cloud Hop: 15 platforms, gentle climb.
+		# 1 is the Forgotten Island - see _build_island and scripts/forgotten_island.gd.
 		_serpentine_route(3, 5, 2.35, 0.3),
 		# 2 Switchback Sprint: 20 platforms.
 		_serpentine_route(4, 5, 2.4, 0.3),
@@ -1222,6 +1342,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_coin_collected(_coins: int) -> void:
 	coins_collected += 1
 	hud._on_coin_collected(coins_collected)
+	if island != null:
+		# The island watches its own coin count: it needs 30 for the portal, and
+		# the level holds more than that on purpose.
+		island.notify_coins(coins_collected)
+		return
 	if coins_collected >= coin_goal:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
 
@@ -1229,7 +1354,13 @@ func _on_coin_collected(_coins: int) -> void:
 func _on_finish_body_entered(body: Node3D) -> void:
 	if body != player and body != player_two:
 		return
-	# Reaching the flag shows the level complete screen.
+	if island != null and not island.is_portal_ready():
+		# The portal is dormant until the coins are in.
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message("The portal is dormant - %d more coins are needed." % island.coins_needed())
+		return
+	# Reaching the flag - or stepping through an open portal - finishes the level.
 	Engine.time_scale = 1.0
 	hud.show_victory(current_level, LEVEL_NAMES.size())
 
@@ -1283,10 +1414,12 @@ const _SLOT_KEYBOARD := {
 	1: {
 		"left": KEY_A, "right": KEY_D, "forward": KEY_W, "back": KEY_S,
 		"jump": KEY_SPACE, "dash": KEY_SHIFT, "time_freeze": KEY_F,
+		"attack": KEY_J, "inventory": KEY_I,
 	},
 	2: {
 		"left": KEY_LEFT, "right": KEY_RIGHT, "forward": KEY_UP, "back": KEY_DOWN,
 		"jump": KEY_ENTER, "dash": KEY_KP_0, "time_freeze": KEY_KP_2,
+		"attack": KEY_KP_3, "inventory": KEY_KP_5,
 	},
 }
 
@@ -1366,6 +1499,9 @@ func _setup_local_coop() -> void:
 	player_two.died.connect(_on_player_died.bind(player_two))
 	player_two.add_to_group("player")
 
+	# The inventory shows both players once player 2 exists.
+	hud.bind_players([player, player_two])
+
 	# Give each player their own input device (keyboard or a specific controller).
 	_configure_local_player(player, view_a, p1_device, 1)
 	_configure_local_player(player_two, view_b, p2_device, 2)
@@ -1391,7 +1527,7 @@ func _device_label(device: String, slot: int) -> String:
 func _configure_local_player(p: CharacterBody3D, v: Node3D, device: String, slot: int) -> void:
 	var prefix := "p%d_" % slot
 	for suffix in ["left", "right", "forward", "back", "jump", "dash", "time_freeze",
-			"cam_left", "cam_right", "cam_up", "cam_down"]:
+			"attack", "inventory", "cam_left", "cam_right", "cam_up", "cam_down"]:
 		_define_action(prefix + suffix)
 
 	var is_pad := device.begins_with("pad")
@@ -1407,6 +1543,7 @@ func _configure_local_player(p: CharacterBody3D, v: Node3D, device: String, slot
 	p.set("action_jump", prefix + "jump")
 	p.set("action_dash", prefix + "dash")
 	p.set("action_time_freeze", prefix + "time_freeze")
+	p.set("action_attack", prefix + "attack")
 
 	if v != null:
 		v.set("action_cam_left", prefix + "cam_left")
@@ -1429,13 +1566,20 @@ func _define_action(action_name: String) -> void:
 
 func _bind_keyboard_actions(prefix: String, slot: int) -> void:
 	var keys: Dictionary = _SLOT_KEYBOARD[slot]
+	var settings := get_node_or_null("/root/Settings")
+	var binds: Dictionary = settings.get("key_binds") if settings != null else {}
 	for action in keys.keys():
+		# Player 1 on the keyboard uses whatever they rebound in the options;
+		# player 2 keeps the arrow-key side so the two never collide.
+		if slot == 1 and binds.has(str(action)):
+			_add_stored_bind(prefix + str(action), int(binds[str(action)]))
+			continue
 		var key := InputEventKey.new()
-		key.physical_keycode = keys[action]
+		key.physical_keycode = keys[action] as Key
 		key.device = -1
 		InputMap.action_add_event(prefix + str(action), key)
-	if slot == 1:
-		# Player 1 can also jump with the left mouse button.
+	if slot == 1 and not binds.has("jump"):
+		# Player 1 can also jump with the left mouse button, until they rebind jump.
 		var mouse_jump := InputEventMouseButton.new()
 		mouse_jump.button_index = MOUSE_BUTTON_LEFT
 		mouse_jump.device = -1
@@ -1459,6 +1603,8 @@ func _bind_pad_actions(prefix: String, pad_id: int) -> void:
 	_add_button(prefix + "dash", JOY_BUTTON_X, pad_id)
 	_add_button(prefix + "dash", JOY_BUTTON_RIGHT_SHOULDER, pad_id)
 	_add_button(prefix + "time_freeze", JOY_BUTTON_Y, pad_id)
+	_add_button(prefix + "attack", JOY_BUTTON_B, pad_id)
+	_add_button(prefix + "inventory", JOY_BUTTON_BACK, pad_id)
 
 
 func _add_motion(action_name: String, axis: JoyAxis, value: float, device: int) -> void:

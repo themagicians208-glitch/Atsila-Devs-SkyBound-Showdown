@@ -2,7 +2,10 @@ extends Control
 
 const UI_FONT = preload("res://fonts/lilita_one_regular.ttf")
 const ROSTER := preload("res://scripts/roster.gd")
-const LEVEL_NAMES := ["Cloud Hop", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+# How far the menu background extends past the screen so the parallax drift can
+# never reveal a blank edge or corner. Must be larger than the max shift (10).
+const PARALLAX_BLEED := 90.0
 
 var popup: ColorRect
 var popup_title: Label
@@ -22,6 +25,42 @@ var p2_character := ""
 var _p2_auto_assigned := false
 var _showing_input_setup := false
 
+# Actions the player can rebind, as [action, caption, default key].
+const BINDABLE := [
+	["move_forward", "Move forward", KEY_W],
+	["move_back", "Move back", KEY_S],
+	["move_left", "Move left", KEY_A],
+	["move_right", "Move right", KEY_D],
+	["jump", "Jump", KEY_SPACE],
+	["dash", "Dash", KEY_SHIFT],
+	["attack", "Slash attack", KEY_J],
+	["shift_dimension", "Shift dimension", KEY_Q],
+	["time_freeze", "Slow time", KEY_F],
+	["interact", "Interact", KEY_E],
+	["inventory", "Inventory", KEY_I],
+]
+
+# Mouse buttons the game binds by itself (main.gd and player.gd), so a rebind onto
+# one of them can be refused exactly like a keyboard clash. They apply until the
+# player rebinds that action, at which point the default goes away.
+const MOUSE_DEFAULTS := {
+	"jump": MOUSE_BUTTON_LEFT,
+	"shift_dimension": MOUSE_BUTTON_RIGHT,
+}
+
+var _awaiting_bind := ""
+var _bind_buttons: Dictionary = {}
+var _bind_defaults: Dictionary = {}
+var _bind_note: Label
+
+# Duplicate names: which player typed theirs last, and the message telling that
+# player the name is taken.
+var _last_named_player := 1
+var _name_warning: Label
+var _name_warning_for := 0
+# Banner shown when the host renames this player because their name was in use.
+var _notice: Label
+
 # What the popup's single BACK button does on the current screen. When invalid,
 # BACK closes the popup back to the main menu.
 var _back_handler: Callable = Callable()
@@ -30,12 +69,14 @@ var background: TextureRect
 var shade: ColorRect
 var margin: MarginContainer
 var brand: Label
+var parallax := Vector2.ZERO
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Audio.play_music("res://sounds/pixelland.mp3")
 	_build_home()
 	_build_popup()
+	_build_notice()
 	_run_entrance_sequence()
 	# The game can start without window focus when launched from the editor,
 	# and grab_focus() is unreliable inside _ready — so grab the window focus and
@@ -46,8 +87,40 @@ func _ready() -> void:
 	var network := get_node_or_null("/root/Network")
 	if network and not network.connection_failed.is_connected(_on_network_failed):
 		network.connection_failed.connect(_on_network_failed)
+	if network and not network.name_taken.is_connected(_on_name_taken):
+		network.name_taken.connect(_on_name_taken)
 	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.connect(_on_joy_connection_changed)
+
+## A banner along the bottom of the screen, over whatever popup is open. Used to
+## tell a player the host had to rename them.
+func _build_notice() -> void:
+	_notice = _label("", 19, Color("#ffd451"))
+	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_notice.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_notice.offset_left = -380
+	_notice.offset_right = 380
+	_notice.offset_top = -104
+	_notice.offset_bottom = -44
+	_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_notice.visible = false
+	add_child(_notice)
+
+
+func _on_name_taken(new_name: String) -> void:
+	if _notice == null:
+		return
+	var wanted := _clean_name(online_name, "Player")
+	online_name = new_name
+	_notice.text = "\"%s\" was already taken, so you are now \"%s\"." % [wanted, new_name]
+	_notice.modulate.a = 1.0
+	_notice.visible = true
+	var tween := create_tween()
+	tween.tween_interval(5.0)
+	tween.tween_property(_notice, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(func() -> void: _notice.visible = false)
+
 
 func _run_entrance_sequence() -> void:
 	background.modulate.a = 0.0
@@ -75,9 +148,19 @@ func _process(_delta: float) -> void:
 	var mouse_pos = get_viewport().get_mouse_position()
 	var screen_size = get_viewport().get_visible_rect().size
 	var target_offset = (mouse_pos / screen_size - Vector2(0.5, 0.5)) * 20.0
-	background.position = background.position.lerp(-target_offset, 0.1)
-	shade.position = shade.position.lerp(-target_offset * 0.5, 0.1)
-	margin.position = margin.position.lerp(target_offset, 0.1)
+	parallax = parallax.lerp(target_offset, 0.1)
+	# The background is PARALLAX_BLEED larger than the screen on every side, so
+	# this drift (at most 10px) never exposes a blank edge or corner.
+	_set_bleed_offsets(background, -parallax)
+	_set_bleed_offsets(shade, -parallax * 0.5)
+	margin.position = margin.position.lerp(parallax, 0.1)
+
+
+func _set_bleed_offsets(control: Control, shift: Vector2) -> void:
+	control.offset_left = -PARALLAX_BLEED + shift.x
+	control.offset_top = -PARALLAX_BLEED + shift.y
+	control.offset_right = PARALLAX_BLEED + shift.x
+	control.offset_bottom = PARALLAX_BLEED + shift.y
 
 func _exit_tree() -> void:
 	var network := get_node_or_null("/root/Network")
@@ -104,16 +187,14 @@ func _build_home() -> void:
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_SCALE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	background.offset_left = -50
-	background.offset_top = -50
-	background.offset_right = 50
-	background.offset_bottom = 50
+	_set_bleed_offsets(background, Vector2.ZERO)
 	add_child(background)
 
 	shade = ColorRect.new()
 	shade.name = "Shade"
 	shade.color = Color(0.035, 0.075, 0.17, 0.38)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_set_bleed_offsets(shade, Vector2.ZERO)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 
@@ -431,7 +512,7 @@ func _show_controls() -> void:
 	_back_handler = Callable()
 	popup_title.text = "HOW TO PLAY"
 	_clear_popup_body()
-	for line in ["WASD / LEFT STICK   Move", "MOUSE / RIGHT STICK   Look around", "LEFT CLICK / SPACE / A   Jump", "RIGHT CLICK / Q / LEFT BUMPER   Shift dimensions", "F / Y   Slow time", "E / X   Activate the nearby switch", "MOUSE WHEEL / TRIGGERS   Zoom", "CLICK / A   Select     ESC / B   Back"]:
+	for line in ["WASD / LEFT STICK   Move", "MOUSE / RIGHT STICK   Look around", "LEFT CLICK / SPACE / A   Jump", "RIGHT CLICK / Q / LEFT BUMPER   Shift dimensions", "F / Y   Slow time", "J / B   Slash - hold forward to aim up, hold back in mid-air to aim down", "I / SELECT   Open your inventory", "E / X   Activate the nearby switch", "MOUSE WHEEL / TRIGGERS   Zoom", "CLICK / A   Select     ESC / B   Back"]:
 		var row := _label(line, 19, Color.WHITE)
 		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		popup_body.add_child(row)
@@ -456,10 +537,217 @@ func _show_settings() -> void:
 		func(value: float) -> String: return "%d%%" % roundi(value * 100.0),
 		func(value: float) -> void: settings.set_master_volume(value)))
 	popup_body.add_child(_graphics_row(settings))
+	var binds := _button("KEY BINDS", Color("#27496f"), Color.WHITE)
+	binds.pressed.connect(_show_key_binds)
+	popup_body.add_child(binds)
 	popup.visible = true
 	popup.modulate.a = 0.0
 	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
 	back_button.grab_focus()
+
+
+# --- Key binds ---------------------------------------------------------------
+
+func _show_key_binds() -> void:
+	_awaiting_bind = ""
+	_back_handler = _show_settings
+	popup_title.text = "KEY BINDS"
+	_clear_popup_body()
+
+	var note := _label("Click a key, then press the key or mouse button you want to use instead.", 16, Color("#cfe9ff"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size.x = 460
+	popup_body.add_child(note)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(470, 350)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	popup_body.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.custom_minimum_size = Vector2(450, 0)
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+
+	_bind_buttons.clear()
+	_bind_defaults.clear()
+	for entry in BINDABLE:
+		_bind_defaults[str(entry[0])] = int(entry[2])
+		list.add_child(_bind_row(str(entry[0]), str(entry[1])))
+
+	_bind_note = _label("", 16, Color("#ffb0a0"))
+	_bind_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bind_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_bind_note.custom_minimum_size.x = 460
+	popup_body.add_child(_bind_note)
+
+	var reset := _button("RESET TO DEFAULTS", Color("#315784"), Color.WHITE)
+	reset.pressed.connect(_reset_key_binds)
+	popup_body.add_child(reset)
+
+	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
+	back_button.grab_focus()
+
+
+func _bind_row(action: String, caption: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var name_label := _label(caption, 18, Color.WHITE)
+	name_label.custom_minimum_size = Vector2(230, 0)
+	row.add_child(name_label)
+	var key_button := _button(_key_caption(action), Color("#27496f"), Color.WHITE)
+	key_button.custom_minimum_size = Vector2(210, 42)
+	key_button.add_theme_font_size_override("font_size", 17)
+	key_button.pressed.connect(_start_rebind.bind(action))
+	row.add_child(key_button)
+	_bind_buttons[action] = key_button
+	return row
+
+
+func _settings() -> Node:
+	return get_node_or_null("/root/Settings")
+
+
+## The bind the player chose, or 0 when they have not changed this action.
+func _custom_bind(action: String) -> int:
+	var settings := _settings()
+	return int(settings.call("get_key_bind", action)) if settings != null else 0
+
+
+## The key currently in use for an action: the player's own if they set one,
+## otherwise the game's default. 0 when the action is bound to a mouse button.
+func _bound_key(action: String) -> int:
+	var custom := _custom_bind(action)
+	if custom != 0:
+		var settings := _settings()
+		var is_mouse := settings != null and bool(settings.call("is_mouse_bind", custom))
+		return 0 if is_mouse else custom
+	return int(_bind_defaults.get(action, 0))
+
+
+## The mouse button an action uses, or 0 when it uses a key.
+func _bound_mouse(action: String) -> int:
+	var custom := _custom_bind(action)
+	if custom != 0:
+		var settings := _settings()
+		if settings != null and bool(settings.call("is_mouse_bind", custom)):
+			return int(settings.call("mouse_button_of", custom))
+		return 0
+	return int(MOUSE_DEFAULTS.get(action, 0))
+
+
+## What the row shows. Some actions ship with a key *and* a mouse button (jump is
+## Space and left click), so both are listed.
+func _bind_caption(action: String) -> String:
+	var parts: Array[String] = []
+	var key := _bound_key(action)
+	if key != 0:
+		parts.append(OS.get_keycode_string(key))
+	var mouse := _bound_mouse(action)
+	if mouse != 0:
+		parts.append(Settings.mouse_button_caption(mouse))
+	return " / ".join(parts) if not parts.is_empty() else "-"
+
+
+func _key_caption(action: String) -> String:
+	if _awaiting_bind == action:
+		return "PRESS A KEY / CLICK..."
+	return _bind_caption(action)
+
+
+## How a stored bind is written in the messages below.
+func _bind_name(code: int) -> String:
+	var settings := _settings()
+	return str(settings.call("bind_caption", code)) if settings != null else OS.get_keycode_string(code)
+
+
+func _caption_for(action: String) -> String:
+	for entry in BINDABLE:
+		if str(entry[0]) == action:
+			return str(entry[1])
+	return action
+
+
+func _start_rebind(action: String) -> void:
+	_awaiting_bind = action
+	if _bind_note != null:
+		_bind_note.text = "Press a key, or a mouse button, for \"%s\".   ESC cancels." % _caption_for(action)
+	_refresh_bind_buttons()
+
+
+func _refresh_bind_buttons() -> void:
+	for action in _bind_buttons.keys():
+		var key_button: Button = _bind_buttons[action]
+		if is_instance_valid(key_button):
+			key_button.text = _key_caption(str(action))
+
+
+## Which action already uses this key or mouse button, if any.
+func _action_using(key_code: int) -> String:
+	var settings := _settings()
+	var is_mouse := settings != null and bool(settings.call("is_mouse_bind", key_code))
+	for entry in BINDABLE:
+		var action := str(entry[0])
+		if is_mouse:
+			if _bound_mouse(action) == int(settings.call("mouse_button_of", key_code)):
+				return action
+		elif _bound_key(action) == key_code:
+			return action
+	return ""
+
+
+func _input(event: InputEvent) -> void:
+	if _awaiting_bind.is_empty():
+		return
+	# Keys and mouse buttons both rebind. Only presses count, so the click that
+	# opened the row cannot bind itself on its way back up.
+	if event is InputEventMouseButton and event.pressed:
+		var mouse := event as InputEventMouseButton
+		var settings := _settings()
+		if settings == null:
+			return
+		get_viewport().set_input_as_handled()
+		_commit_bind(_awaiting_bind, int(settings.call("mouse_bind_for", mouse.button_index)))
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key := event as InputEventKey
+	get_viewport().set_input_as_handled()
+	if key.physical_keycode == KEY_ESCAPE:
+		_awaiting_bind = ""
+		_bind_note.text = ""
+		_refresh_bind_buttons()
+		return
+	_commit_bind(_awaiting_bind, key.physical_keycode)
+
+
+func _commit_bind(action: String, key_code: int) -> void:
+	# One bind per action: a key or mouse button another action is using is
+	# refused, rather than quietly stealing it.
+	var taken_by := _action_using(key_code)
+	if taken_by != "" and taken_by != action:
+		_bind_note.text = "%s is already used by \"%s\". Pick another key." % [
+			_bind_name(key_code), _caption_for(taken_by)]
+		_awaiting_bind = ""
+		_refresh_bind_buttons()
+		return
+	var settings := _settings()
+	if settings != null:
+		settings.call("set_key_bind", action, key_code)
+	_awaiting_bind = ""
+	_bind_note.text = "\"%s\" is now %s." % [_caption_for(action), _bind_name(key_code)]
+	_refresh_bind_buttons()
+
+
+func _reset_key_binds() -> void:
+	var settings := get_node_or_null("/root/Settings")
+	if settings != null:
+		settings.call("clear_key_binds")
+	_awaiting_bind = ""
+	_bind_note.text = "Keys reset to their defaults."
+	_refresh_bind_buttons()
 
 func _slider_row(caption: String, min_value: float, max_value: float, step: float, value: float, formatter: Callable, on_change: Callable) -> VBoxContainer:
 	var row := VBoxContainer.new()
@@ -545,7 +833,9 @@ func _show_local_options() -> void:
 
 	popup_body.add_child(_label("PLAYER 1", 16, Color("#8fe0ff")))
 	var p1_name_edit := _name_field(p1_name, func(value: String) -> void:
-		p1_name = value)
+		p1_name = value
+		_last_named_player = 1
+		_refresh_name_warning())
 	popup_body.add_child(p1_name_edit)
 	var p1_option := _device_option(p1_device, func(value: String) -> void:
 		p1_device = value)
@@ -553,7 +843,9 @@ func _show_local_options() -> void:
 
 	popup_body.add_child(_label("PLAYER 2", 16, Color("#8fe0ff")))
 	var p2_name_edit := _name_field(p2_name, func(value: String) -> void:
-		p2_name = value)
+		p2_name = value
+		_last_named_player = 2
+		_refresh_name_warning())
 	popup_body.add_child(p2_name_edit)
 	var p2_option := _device_option(p2_device, func(value: String) -> void:
 		p2_device = value
@@ -565,6 +857,15 @@ func _show_local_options() -> void:
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	popup_body.add_child(status)
 
+	_name_warning = _label("", 16, Color("#ffb0a0"))
+	_name_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_name_warning.custom_minimum_size.x = 460
+	_name_warning.visible = false
+	popup_body.add_child(_name_warning)
+	if _name_warning_for != 0:
+		_show_name_warning(_name_warning_for)
+
 	var start := _button("START", Color("#ffd451"), Color("#493600"))
 	start.pressed.connect(_local_start_pressed)
 	popup_body.add_child(start)
@@ -572,6 +873,39 @@ func _show_local_options() -> void:
 	_back_handler = _show_multiplayer
 	popup.visible = true
 	start.grab_focus()
+
+
+## The player who typed a name the other one is already using - the one who did it
+## last. 0 when the names differ.
+func _duplicate_name_owner() -> int:
+	var first := _clean_name(p1_name, "Player 1").to_lower()
+	var second := _clean_name(p2_name, "Player 2").to_lower()
+	if first != second:
+		return 0
+	return _last_named_player
+
+
+## Tell the player who typed the duplicate that the name is taken.
+func _show_name_warning(player_number: int) -> void:
+	_name_warning_for = player_number
+	if _name_warning == null:
+		return
+	_name_warning.text = "PLAYER %d: \"%s\" is already taken by PLAYER %d.\nPlease choose another name." % [
+		player_number, _clean_name(p1_name, "Player 1") if player_number == 1 else _clean_name(p2_name, "Player 2"),
+		2 if player_number == 1 else 1]
+	_name_warning.visible = true
+
+
+## Once the names differ again, the warning goes away.
+func _refresh_name_warning() -> void:
+	if _name_warning == null:
+		return
+	var clash := _duplicate_name_owner()
+	if clash == 0:
+		_name_warning_for = 0
+		_name_warning.visible = false
+	elif _name_warning_for != 0:
+		_show_name_warning(clash)
 
 
 func _name_field(current: String, on_change: Callable) -> LineEdit:
@@ -613,6 +947,10 @@ func _device_option(current: String, on_change: Callable) -> OptionButton:
 
 
 func _local_start_pressed() -> void:
+	var clash := _duplicate_name_owner()
+	if clash > 0:
+		_show_name_warning(clash)
+		return
 	if p1_device == p2_device:
 		if p1_device.begins_with("pad"):
 			_show_device_error()

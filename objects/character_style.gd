@@ -33,9 +33,9 @@ var rig_leg_parents: PackedStringArray = PackedStringArray()
 var rig_arm_all := false   # every mesh carries arm masks (limbs split by material)
 var rig_leg_all := false
 var side_axis := Vector3(0.0, 0.0, 1.0)
-# A model-space point lying on the body's centre line. Models that are not built
-# around their own origin (isabelle is 2.13 units to the side of hers) need this,
-# or the limb masks and pivots land next to the character instead of on it.
+# A model-space point lying on the body s centre line. A model not built around
+# its own origin needs this, or the limb masks and pivots land next to the
+# character instead of on it.
 var side_origin := Vector3(0.0, 0.0, 0.0)
 var arm_y0 := 0.96     # arm band: fades in from y0 to y1 ...
 var arm_y1 := 1.22
@@ -44,8 +44,8 @@ var arm_y3 := 1.72
 var arm_x_in := 0.44   # |side| where the arm weight starts rising
 var arm_x_out := 0.86  # |side| where it is full
 # Optional outer edge. 0 means the arm mask has no far edge, which suits models
-# whose arms are the only thing out there. isabelle's hair hangs into the arm band
-# further out than her hands, so she sets one.
+# whose arms are the only thing out there. A model with long hair hanging into the
+# arm band further out than its hands needs one.
 var arm_x_far := 0.0
 # Some models need both arms moved the same way rather than mirrored; see the
 # shader s u_arm_flap_mirror.
@@ -67,10 +67,10 @@ var rig_tail := false
 # instance, should only sway gently rather than stride.
 var arm_amp_scale := 1.0
 var leg_amp_scale := 1.0
-# Some models have their arms running along the side axis (isabelle's are short
-# stubs out to the sides). Reaching about that axis would only twist them, so a
-# slash is played on the flap channel instead, lifting the arms in view. Such a
-# character sets its own SWING_FLAP_POSE below.
+# A model whose arms run along the side axis (short stubs out to the sides)
+# would only twist if it were reached about that axis, so its slash is played on
+# the flap channel instead, lifting the arms in view. Such a character sets its
+# own SWING_FLAP_POSE below.
 var swing_via_flap := false
 # Flap angles for a slash, keyed by direction: negative lifts the arms, positive
 # drops them.
@@ -352,9 +352,9 @@ func _apply_bone_pose(arm_swing: float, arm_reach: float, arm_flap: float) -> vo
 		var off_swing := float(entry["swing_off"])
 		var off_lift := float(entry["lift_off"]) * lead
 		if bool(entry["driven"]):
-			var swing := (arm_swing * lead - arm_reach) * arm_amp_scale + off_swing
+			var bone_swing := (arm_swing * lead - arm_reach) * arm_amp_scale + off_swing
 			var lift := arm_flap * lead * arm_amp_scale + off_lift
-			desired = Quaternion(axis_side, swing) * Quaternion(axis_front, lift)
+			desired = Quaternion(axis_side, bone_swing) * Quaternion(axis_front, lift)
 		elif not (is_zero_approx(off_swing) and is_zero_approx(off_lift)):
 			# A held bone still holds, but at its corrected rest angle: the arm above
 			# it swings without dragging the geometry skinned to this bone.
