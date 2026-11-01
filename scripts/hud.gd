@@ -55,6 +55,7 @@ var combat_level := 1
 var combat_level_name := ""
 var _players: Array = []
 var _coins := 0
+var _transition_overlay: ColorRect
 
 func _ready() -> void:
 	# The HUD keeps working while the game is paused, so the inventory key can
@@ -325,6 +326,31 @@ func show_finish_message(message: String) -> void:
 
 	var timer := get_tree().create_timer(2.5)
 	timer.timeout.connect(func(): finish_message.visible = false)
+
+func play_level_transition(title: String, callback: Callable) -> void:
+	if _transition_overlay != null:
+		_transition_overlay.queue_free()
+	_transition_overlay = ColorRect.new()
+	_transition_overlay.color = Color("#071526")
+	_transition_overlay.modulate.a = 0.0
+	_transition_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_transition_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_transition_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_transition_overlay)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_transition_overlay.add_child(center)
+	var label := Label.new()
+	label.text = title
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 42)
+	label.add_theme_color_override("font_color", Color("#dffaff"))
+	center.add_child(label)
+	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(_transition_overlay, "modulate:a", 1.0, 0.35)
+	tween.tween_interval(0.55)
+	tween.tween_callback(callback)
 
 func show_victory(level_number: int, total_levels: int) -> void:
 	victory_heading.text = "ALL 5 LEVELS COMPLETE!" if level_number == total_levels else "LEVEL %d COMPLETE!" % level_number

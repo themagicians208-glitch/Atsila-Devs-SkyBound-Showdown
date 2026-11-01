@@ -1472,7 +1472,10 @@ func _go_to_next_level() -> void:
 	if next_level > LEVEL_NAMES.size():
 		next_level = 1
 	get_tree().set_meta("level_number", next_level)
-	get_tree().reload_current_scene()
+	if next_level == 3:
+		hud.play_level_transition("LEVEL 3  •  FROZEN SKIES", func(): get_tree().reload_current_scene())
+	else:
+		get_tree().reload_current_scene()
 
 
 func _on_player_died(who: CharacterBody3D) -> void:
