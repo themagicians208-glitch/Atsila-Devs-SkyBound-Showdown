@@ -43,6 +43,7 @@ func activate() -> bool:
 	if is_activated:
 		return false
 	is_activated = true
+	Audio.play("res://sounds/coin.ogg")
 	_material.albedo_color = Color("#f2ffff")
 	_material.emission = Color("#b7f7ff")
 	_material.emission_energy_multiplier = 2.2

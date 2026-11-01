@@ -42,6 +42,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if opened or not unlocked or not body.is_in_group("player"):
 		return
 	opened = true
+	Audio.play("res://sounds/open.ogg" if ResourceLoader.exists("res://sounds/open.ogg") else "res://sounds/coin.ogg")
 	Progress.recover_third_fragment()
 	_lid.rotation.x = deg_to_rad(-65.0)
 	fragment_recovered.emit()

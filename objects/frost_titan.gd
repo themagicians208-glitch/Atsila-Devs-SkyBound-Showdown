@@ -82,6 +82,7 @@ func _physics_process(delta: float) -> void:
 func _perform_phase_attack(target: Node3D) -> void:
 	_attack_cooldown = 3.0 if phase == 1 else (2.2 if phase == 2 else 1.6)
 	_attack_flash = 0.3
+	Audio.play("res://sounds/land.ogg")
 	var distance := global_position.distance_to(target.global_position)
 	if phase == 1:
 		if distance < 7.0 and target.has_method("take_damage"):
