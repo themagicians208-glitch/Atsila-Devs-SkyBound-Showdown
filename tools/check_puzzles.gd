@@ -110,6 +110,97 @@ func _ready() -> void:
 	var closed := island.is_puzzle_solved("ancient_switch") and island.is_puzzle_solved("hidden_crystal")
 	print("both puzzles solved: %s" % closed)
 
+	# --- Puzzle 4: the three nature seals -----------------------------------
+	var seals: Array = []
+	for node in island.get_children():
+		if node is NatureSeal:
+			seals.append(node as NatureSeal)
+	var grove: NatureSeal = island.get_node_or_null("Seal_grove")
+	var terrace: NatureSeal = island.get_node_or_null("Seal_terrace")
+	var summit: NatureSeal = island.get_node_or_null("Seal_summit")
+	print("seals: %d (%s)" % [seals.size(), [grove != null, terrace != null, summit != null]])
+	if seals.size() != 3 or grove == null or terrace == null or summit == null:
+		_problems.append("the island does not have its three seals")
+	else:
+		for seal in seals:
+			if seal.awakened:
+				_problems.append("%s starts already awake" % seal.name)
+
+		# The grove seal is warded while a Shadow Slime is alive near it.
+		var guard: ShadowSlime = null
+		for node in get_tree().get_nodes_in_group("shadow_slimes"):
+			var slime := node as ShadowSlime
+			if slime.global_position.distance_to(grove.global_position) <= float(grove.get("ward_range")):
+				guard = slime
+		print("grove seal warded by %s, reason: '%s'" % [
+			guard.name if guard != null else "nothing", grove.blocking_reason()])
+		if guard == null:
+			_problems.append("no Shadow Slime is actually guarding the grove seal")
+		else:
+			player.global_position = grove.global_position + Vector3(0.0, 0.6, 1.8)
+			player.velocity = Vector3.ZERO
+			await get_tree().physics_frame
+			await get_tree().physics_frame
+			_press_interact()
+			await get_tree().physics_frame
+			if grove.awakened:
+				_problems.append("the grove seal opened while its slime was still alive")
+			# Kill the guard: the seal should accept now.
+			guard.call("take_hit", 99, guard.global_position + Vector3(0.0, 0.0, -1.0))
+			await get_tree().create_timer(1.0).timeout
+			_press_interact()
+			await get_tree().physics_frame
+			print("after the guard is destroyed: grove seal awake %s" % grove.awakened)
+			if not grove.awakened:
+				_problems.append("the grove seal still refuses with its guardian gone")
+
+		# The terrace seal waits for the switch hidden behind the waterfall.
+		player.global_position = terrace.global_position + Vector3(0.0, 0.6, 1.8)
+		player.velocity = Vector3.ZERO
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		_press_interact()
+		await get_tree().physics_frame
+		print("terrace seal before the hidden switch: awake %s, reason: '%s'" % [
+			terrace.awakened, terrace.blocking_reason()])
+		if terrace.awakened:
+			_problems.append("the terrace seal opened before its hidden switch was thrown")
+		var hidden: IslandSwitch = island.get_node_or_null("HiddenSwitch")
+		if hidden == null:
+			_problems.append("the hidden switch behind the waterfall is missing")
+		else:
+			hidden.activate()
+			await get_tree().physics_frame
+			_press_interact()
+			await get_tree().physics_frame
+			print("after the hidden switch: terrace seal awake %s" % terrace.awakened)
+			if not terrace.awakened:
+				_problems.append("the terrace seal did not open after its switch was thrown")
+
+		# The summit seal: the climb is the challenge, so it opens on arrival.
+		player.global_position = summit.global_position + Vector3(0.0, 0.6, 1.8)
+		player.velocity = Vector3.ZERO
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		_press_interact()
+		await get_tree().physics_frame
+		print("summit seal awake %s, seals lit %d" % [summit.awakened, island.seals_awakened()])
+		if not summit.awakened:
+			_problems.append("the summit seal did not open when the player reached it")
+
+		var ruins_gate: IslandGate = island.get_node_or_null("RuinsGate")
+		var ruins_shape: CollisionShape3D = null
+		if ruins_gate != null:
+			ruins_shape = ruins_gate.find_children("*", "CollisionShape3D", true, false)[0]
+		print("after all three seals: nature_seals solved %s, ruins gate open %s, collision disabled %s" % [
+			island.is_puzzle_solved("nature_seals"),
+			ruins_gate.opened if ruins_gate != null else false,
+			ruins_shape.disabled if ruins_shape != null else false])
+		if not island.is_puzzle_solved("nature_seals"):
+			_problems.append("three lit seals did not open the ruins")
+		if ruins_gate == null or not ruins_gate.opened or not ruins_shape.disabled:
+			_problems.append("the ruins gate did not open with all three seals lit")
+
 	# --- Puzzle 3: the vanishing crossing ----------------------------------
 	# Two things have to hold for the crossing to be a puzzle rather than a lottery:
 	# neighbours are never gone at the same moment, and every stone stands long

@@ -85,6 +85,9 @@ var _solved: Dictionary = {}
 var _gates: Dictionary = {}
 var _raisers: Dictionary = {}
 var _crystal: IslandCrystal = null
+var _seals: Array[NatureSeal] = []
+## The puzzle name of the switch hidden behind the waterfall.
+const feed_puzzle := "seal_feed"
 var _symbols: Array[Node3D] = []
 var _portal_disc: MeshInstance3D
 var _portal_inner: MeshInstance3D
@@ -365,17 +368,13 @@ func _build_seal_terraces() -> void:
 	_platform(3.6, -2.4, 90.6, "small")
 	_platform(3.8, -4.4, 91.4, "small")
 	_platform(4.0, -6.2, 92.4, "grass", 0.3)
-	_pedestal(Vector3(-6.2, 4.0, 92.4))
 	# East terrace.
 	_platform(3.7, 3.8, 90.0, "small")
 	_platform(3.9, 5.8, 91.0, "small")
 	_platform(4.2, 7.6, 94.0, "grass", 0.2)
-	_pedestal(Vector3(7.6, 4.2, 94.0))
-	# Upper terrace, reached by a short climb off the long path.
-	_platform(4.6, 2.0, 100.0, "small")
-	_platform(5.2, 4.0, 101.0, "small")
+	# The upper terrace. Its seal and the climb up to it are built with the
+	# nature seals, further down.
 	_platform(5.8, 5.6, 102.6, "grass", 0.1)
-	_pedestal(Vector3(5.6, 5.8, 102.6))
 	_tree(4.0, -8.4, 94.2, 3.8, LEAF)
 	_tree(4.2, 9.6, 95.6, 3.6, LEAF_DEEP)
 	for spot in [Vector3(-6.0, 4.0, 90.8), Vector3(7.4, 4.2, 91.6), Vector3(5.0, 5.8, 103.8)]:
@@ -643,8 +642,8 @@ func _spawn_slimes() -> void:
 		[2.0, 0.8, 46.0, 2],      # C - the grove, a pair watching the middle
 		[2.5, 2.8, 57.0, 2],
 		[3.5, 2.8, 83.4, 3],      # D - waiting at the far side of the crossing
-		[4.0, -6.2, 92.4, 3],     # E - one guarding each seal terrace
-		[4.2, 7.6, 94.0, 3],
+		[4.0, -5.6, 93.4, 3, 0.9], # E - one warding each seal terrace; they keep to a
+		[4.2, 7.0, 94.8, 3, 0.9],  #     short patrol there so they cannot fall off it
 		[5.6, 0.0, 122.0, 3],     # F - the ruins floor
 		[8.0, 0.0, 156.0, 3],     # G - the arena
 	]
@@ -653,6 +652,9 @@ func _spawn_slimes() -> void:
 		slime.name = "ShadowSlime_%02d" % slimes_placed
 		slime.position = Vector3(float(plan[1]), float(plan[0]) + 0.05, float(plan[2]))
 		slime.set("max_health", int(plan[3]))
+		if plan.size() > 4:
+			# The terrace guards patrol tightly: their terrace is only 2.5 across.
+			slime.set("patrol_radius", float(plan[4]))
 		add_child(slime)
 		slimes_placed += 1
 
@@ -707,6 +709,95 @@ func _build_puzzles() -> void:
 # grove and the crossing, and without it the gap is far too wide to jump.
 	for plank in [[2.7, -3.2, 63.6], [2.8, -5.2, 65.8], [2.9, -3.2, 68.0]]:
 		_build_gated_bridge("hidden_crystal", float(plank[0]), float(plank[1]), float(plank[2]), 0.9)
+
+	_build_nature_seals()
+
+
+## Puzzle 4 - the three nature seals, one at each terrace of the seal terraces.
+## Each answers a different challenge, and all three together open the way into
+## the ancient ruins:
+##   * the grove seal is warded by the Shadow Slimes patrolling that terrace,
+##   * the terrace seal is dormant until a switch hidden behind the waterfall is
+##     thrown,
+##   * the summit seal sits at the top of a climb of vanishing stones.
+func _build_nature_seals() -> void:
+	var plans: Array = [
+		["grove", "guardian", Vector3(-6.2, 4.0, 92.4)],
+		["terrace", "switch", Vector3(7.6, 4.2, 94.0)],
+		["summit", "climb", Vector3(5.6, 5.8, 102.6)],
+	]
+	for plan in plans:
+		var seal := NatureSeal.new()
+		seal.name = "Seal_%s" % plan[0]
+		seal.seal_name = "The %s seal" % plan[0]
+		seal.solution = plan[1]
+		seal.island = self
+		seal.position = plan[2]
+		add_child(seal)
+		_seals.append(seal)
+		_record_surface(plan[2], 0.9)
+
+	# The switch that feeds the terrace seal, tucked behind the waterfall on the
+	# west edge.
+	var hidden := IslandSwitch.new()
+	hidden.name = "HiddenSwitch"
+	hidden.island = self
+	hidden.solved_name = feed_puzzle
+	hidden.tutorial = "A switch hidden behind the falling water. Something up on the terraces is waiting for it."
+	hidden.success = "Somewhere above, a seal stops being dormant."
+	hidden.position = Vector3(6.6, -1.2, 31.4)
+	add_child(hidden)
+	_record_surface(Vector3(6.6, -1.2, 31.4), 0.7)
+
+	# The climb to the summit seal: vanishing stones, so reaching the top is the
+	# puzzle. Same staggered wave as the crossing.
+	var climb: Array = [
+		[4.6, 2.0, 100.0, 0.0, false],
+		[5.2, 4.0, 101.0, 1.9, true],
+		[5.5, 4.9, 102.0, 0.0, true],
+	]
+	for entry in climb:
+		var surface := float(entry[0])
+		var x := float(entry[1])
+		var z := float(entry[2])
+		if bool(entry[4]):
+			var vanish := VanishingPlatform.new()
+			vanish.name = "ClimbVanish_%d" % roundi(z)
+			vanish.position = Vector3(x, surface - 0.5, z)
+			vanish.scene = PLATFORM
+			vanish.offset = float(entry[3])
+			add_child(vanish)
+		else:
+			_platform(surface, x, z, "small")
+		_record_surface(Vector3(x, surface, z), 0.9)
+
+	# The gate those three seals open: the only way into the ruins.
+	var gate := IslandGate.new()
+	gate.name = "RuinsGate"
+	gate.solved_name = "nature_seals"
+	gate.width = 12.0
+	gate.position = Vector3(0.0, 5.6, 118.0)
+	add_child(gate)
+	_register_gate("nature_seals", gate)
+	_gate_off("nature_seals", 118.0)
+
+
+## Called by a seal when it lights up. Three of them open the ruins.
+func seal_awakened(who: NatureSeal) -> void:
+	var lit := seals_awakened()
+	if lit >= _seals.size():
+		solve_puzzle("nature_seals",
+			"All three nature seals are lit - the ancient ruins open their doors!")
+	else:
+		message.emit("%s awakens.  %d of %d seals lit." % [who.seal_name, lit, _seals.size()])
+
+
+func seals_awakened() -> int:
+	var lit := 0
+	for seal in _seals:
+		if is_instance_valid(seal) and seal.awakened:
+			lit += 1
+	return lit
 
 
 ## Mark every ledge north of a wall as lying behind that puzzle. The wall is the
