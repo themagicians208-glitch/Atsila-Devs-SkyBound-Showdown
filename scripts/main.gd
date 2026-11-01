@@ -23,6 +23,8 @@ const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
 const FROZEN_SKIES_SCRIPT := preload("res://scripts/frozen_skies.gd")
+const SHADOW_WOLF := preload("res://objects/shadow_wolf.gd")
+const SECOND_FRAGMENT_CHEST := preload("res://objects/second_fragment_chest.gd")
 
 const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Frozen Skies", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
@@ -48,6 +50,8 @@ var coins_collected := 0
 ## Level 1 is the hand-laid Forgotten Island instead of a generated course.
 var island: ForgottenIsland = null
 var frozen_skies: FrozenSkies = null
+var level2_wolf: Node = null
+var level2_chest: Node = null
 ## Stops the dormant portal from spamming its message while the player stands in it.
 var _portal_locked_cooldown := 0.0
 
@@ -299,7 +303,36 @@ func _build_level(level_number: int) -> void:
 	_build_level_identity(level_number, route)
 	_build_gimmicks(level_number, route)
 	_build_puzzle(level_number, route)
+	if level_number == 2:
+		_build_level2_progression(route)
 	_apply_dimension_visibility()
+
+func _build_level2_progression(route: Array) -> void:
+	var boss_point: Vector3 = route[route.size() - 3] + Vector3(0.0, 1.2, 0.0)
+	level2_wolf = SHADOW_WOLF.new()
+	level2_wolf.name = "ShadowWolf"
+	level2_wolf.position = boss_point
+	world.add_child(level2_wolf)
+	level2_wolf.defeated.connect(_on_level2_wolf_defeated)
+	level2_chest = SECOND_FRAGMENT_CHEST.new()
+	level2_chest.name = "SecondFragmentChest"
+	level2_chest.position = route[route.size() - 2] + Vector3(0.0, 0.0, 0.8)
+	world.add_child(level2_chest)
+	level2_chest.fragment_recovered.connect(_on_level2_fragment_recovered)
+	if Progress.second_fragment_recovered:
+		level2_chest.unlock()
+	if is_instance_valid(level2_wolf) and Progress.second_fragment_recovered:
+		level2_wolf.queue_free()
+
+func _on_level2_wolf_defeated() -> void:
+	if level2_chest != null:
+		level2_chest.unlock()
+	hud.show_finish_message("The Shadow Wolf falls. Recover the Second Fragment!")
+	hud.set_objective("Open the Second Fragment chest, then activate the portal.")
+
+func _on_level2_fragment_recovered() -> void:
+	hud.show_finish_message("You have recovered the Second Fragment of the Eternal Tree!")
+	hud.set_objective("Collect the required coins and activate the Level 3 portal.")
 
 
 ## Level 1: the hand-laid Forgotten Island. The island builds itself and reports
@@ -1527,6 +1560,21 @@ func _on_finish_body_entered(body: Node3D) -> void:
 		if _portal_locked_cooldown <= 0.0:
 			_portal_locked_cooldown = 2.5
 			hud.show_finish_message(frozen_skies.portal_blocked_reason(coins_collected))
+		return
+	if level2_wolf != null and is_instance_valid(level2_wolf):
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message("Defeat the Shadow Wolf to open the Level 3 portal.")
+		return
+	if level2_chest != null and not Progress.second_fragment_recovered:
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message("Recover the Second Fragment to open the Level 3 portal.")
+		return
+	if current_level == 2 and coins_collected < coin_goal:
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message("Collect all required coins: %d/%d." % [coins_collected, coin_goal])
 		return
 	if island != null and not island.is_portal_ready():
 		# The portal is dormant until the guardian is gone, the Fragment is
