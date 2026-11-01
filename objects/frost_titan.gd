@@ -101,7 +101,6 @@ func take_hit(amount: int, from: Vector3) -> bool:
 	health_changed.emit(maxi(health, 0), max_health, phase)
 	if health <= 0:
 		_dead = true
-		Progress.recover_third_fragment()
 		defeated.emit()
 		queue_free()
 	return true

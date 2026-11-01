@@ -347,6 +347,10 @@ func _bind_frozen_boss(boss: Node) -> void:
 	)
 
 
+func _on_frozen_fragment_recovered() -> void:
+	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
+
+
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
 ## every hit, gone when it falls.
 func _bind_island_boss() -> void:

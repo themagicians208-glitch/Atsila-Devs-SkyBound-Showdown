@@ -5,6 +5,7 @@ const PLATFORM := preload("res://objects/platform_medium.tscn")
 const COIN := preload("res://objects/coin.tscn")
 const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
+const FRAGMENT_CHEST := preload("res://objects/frozen_fragment_chest.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
 @export var coins_required := 50
@@ -14,6 +15,7 @@ var boss_defeated := false
 var fragment_recovered := false
 var _world: Node3D
 var _main: Node
+var _chest: FrozenFragmentChest
 
 func build(main: Node) -> Array:
 	_main = main
@@ -91,7 +93,15 @@ func _place_enemies() -> void:
 	titan.name = "FrostTitan"
 	titan.position = route[route.size() - 3] + Vector3(0.0, 2.2, 3.0)
 	_world.add_child(titan)
+	_chest = FRAGMENT_CHEST.new()
+	_chest.name = "ThirdFragmentChest"
+	_chest.position = route[route.size() - 3] + Vector3(2.5, 0.0, 2.5)
+	_world.add_child(_chest)
 	titan.defeated.connect(_on_boss_defeated)
+	_chest.fragment_recovered.connect(func():
+		if _main.has_method("_on_frozen_fragment_recovered"):
+			_main.call("_on_frozen_fragment_recovered")
+	)
 	if _main.has_method("_bind_frozen_boss"):
 		_main.call("_bind_frozen_boss", titan)
 
@@ -188,7 +198,8 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 
 func _on_boss_defeated() -> void:
 	boss_defeated = true
-	fragment_recovered = true
+	if _chest != null:
+		_chest.unlock()
 
 func is_portal_ready(coins: int) -> bool:
 	return boss_defeated and Progress.third_fragment_recovered and coins >= coins_required
