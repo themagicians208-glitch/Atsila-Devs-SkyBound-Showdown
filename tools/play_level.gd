@@ -48,16 +48,42 @@ func _process(delta: float) -> void:
 	var spot := _player.global_position
 	var dead := bool(_player.get("is_dead"))
 	var camera_spot := _camera.global_position if _camera != null else Vector3.ZERO
-	print("  t %.1fs  player (%.2f, %.2f, %.2f)  speed %.1f  cam %.1f away  dead %s  checkpoint %s" % [
+	if _view != null and _camera != null:
+		camera_spot = _view.global_transform * _camera.position
+	print("  t %.1fs  player (%.2f, %.2f, %.2f)  speed %.1f  cam %.1f away  dead %s  checkpoint %s  view: %s" % [
 		Time.get_ticks_msec() / 1000.0, spot.x, spot.y, spot.z,
 		Vector2(_player.velocity.x, _player.velocity.z).length(),
-		camera_spot.distance_to(spot), dead, _main.get("active_checkpoint")])
+		camera_spot.distance_to(spot), dead, _main.get("active_checkpoint"), _view_clear()])
 	_report_gate()
 	if Vector2(_player.velocity.x, _player.velocity.z).length() < 0.1:
 		_report_blocker()
 	if dead and not _was_dead:
 		print("  -> DIED at (%.2f, %.2f, %.2f)" % [spot.x, spot.y, spot.z])
 	_was_dead = dead
+
+
+## Is anything between the camera and the player right now? That is the property the
+## camera's occlusion handling exists to keep true, so a live run reports it instead
+## of leaving it to be judged from a screenshot.
+func _view_clear() -> String:
+	if _camera == null or _view == null or _player == null:
+		return "?"
+	var space := get_viewport().world_3d.direct_space_state
+	if space == null:
+		return "?"
+	var eye := _view.global_transform * _camera.position
+	var head := _player.global_position + Vector3(0.0, 1.1, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(eye, head)
+	query.collide_with_areas = false
+	query.collision_mask = 1
+	var who := _player as CollisionObject3D
+	if who != null:
+		query.exclude = [who.get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return "clear"
+	var what := hit["collider"] as Node3D
+	return "BLOCKED by %s" % (String(what.name) if what != null else "?")
 
 
 ## What the level's gates are doing right now.
