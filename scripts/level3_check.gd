@@ -92,6 +92,8 @@ func _run() -> void:
 	assert(player.is_dashing, "Frost Dash must activate")
 	titan.take_hit(10, player.global_position)
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
+	titan._perform_phase_attack(player)
+	assert(get_nodes_in_group("frost_hazards").size() > 0, "Titan phase 2 must create ice hazards")
 	titan.take_hit(12, player.global_position)
 	assert(titan.phase == 3, "Frost Titan must enter phase 3")
 	titan.take_hit(8, player.global_position)

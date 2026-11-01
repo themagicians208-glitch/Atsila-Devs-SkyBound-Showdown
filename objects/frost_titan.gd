@@ -108,11 +108,12 @@ func _perform_phase_attack(target: Node3D) -> void:
 		if distance < 7.0 and target.has_method("take_damage"):
 			target.call("take_damage", 10.0, global_position, "frost_titan_shockwave")
 	elif phase == 2:
+		_spawn_ice_hazard(target.global_position)
 		var projectile: IceProjectile = ICE_PROJECTILE.new()
 		projectile.damage = 6.0
 		projectile.speed = 7.0
-		projectile.global_position = global_position + Vector3(0.0, 1.0, 0.0)
 		get_parent().add_child(projectile)
+		projectile.global_position = global_position + Vector3(0.0, 1.0, 0.0)
 		projectile.launch(target)
 		if distance < 11.0 and target.has_method("take_damage"):
 			target.call("take_damage", 7.0, global_position, "frost_titan_crystal_storm")
@@ -122,6 +123,7 @@ func _perform_phase_attack(target: Node3D) -> void:
 		if distance < 13.0 and target.has_method("take_damage"):
 			target.call("take_damage", 12.0, global_position, "frost_titan_disappearance")
 	else:
+		_spawn_ice_hazard(target.global_position + Vector3(1.5, 0.0, 0.0))
 		if distance < 15.0 and target.has_method("take_damage"):
 			target.call("take_damage", 14.0, global_position, "frost_titan_absolute_frost")
 
@@ -162,6 +164,36 @@ func _burst_crystals() -> void:
 	particles.position = global_position + Vector3(0.0, 1.0, 0.0)
 	get_parent().add_child(particles)
 	particles.emitting = true
+
+func _spawn_ice_hazard(at: Vector3) -> void:
+	var hazard := Area3D.new()
+	hazard.name = "FrostTitanIceHazard"
+	hazard.add_to_group("frost_hazards")
+	hazard.collision_layer = 0
+	hazard.collision_mask = 1
+	var shape := CollisionShape3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = 0.8
+	shape.shape = sphere
+	hazard.add_child(shape)
+	var visual := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.0
+	mesh.bottom_radius = 0.55
+	mesh.height = 1.3
+	visual.mesh = mesh
+	visual.material_override = _crystal_material()
+	hazard.add_child(visual)
+	hazard.body_entered.connect(func(body: Node3D):
+		if body.has_method("take_damage"):
+			body.call("take_damage", 5.0, hazard.global_position, "frost_hazard")
+	)
+	get_parent().add_child(hazard)
+	hazard.global_position = at + Vector3(0.0, 0.65, 0.0)
+	get_tree().create_timer(4.0).timeout.connect(func():
+		if is_instance_valid(hazard):
+			hazard.queue_free()
+	)
 
 func unlock() -> void:
 	locked = false
