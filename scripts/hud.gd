@@ -333,6 +333,10 @@ func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_
 		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
 	frozen_progress_hint.visible = true
 
+func set_woods_status(_rescued: int, _total_rescued: int, _seals: int, _total_seals: int, _has_frag: bool) -> void:
+	# Whispering Woods status tracker hook.
+	pass
+
 func _on_coin_collected(coins):
 	_update_coin_counter(coins)
 

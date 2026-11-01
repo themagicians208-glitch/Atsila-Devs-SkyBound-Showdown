@@ -2,7 +2,7 @@ extends Control
 
 const UI_FONT = preload("res://fonts/lilita_one_regular.ttf")
 const ROSTER := preload("res://scripts/roster.gd")
-const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Moonflip Maze", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 # How far the menu background extends past the screen so the parallax drift can
 # never reveal a blank edge or corner. Must be larger than the max shift (10).
 const PARALLAX_BLEED := 90.0

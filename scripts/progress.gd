@@ -25,6 +25,8 @@ var frost_titan_defeated := false
 var crystal_light_solved := false
 var frozen_generators_activated := 0
 var frozen_checkpoint_index := 0
+var rescued_creatures: Dictionary = {}
+var woods_coins_best := 0
 
 
 func _ready() -> void:
@@ -36,7 +38,13 @@ func load_progress() -> void:
 	if config.load(config_path) != OK:
 		return
 	fragment_recovered = bool(config.get_value("island", "fragment_recovered", false))
-	second_fragment_recovered = bool(config.get_value("progression", "second_fragment_recovered", false))
+	second_fragment_recovered = bool(config.get_value("woods", "second_fragment_recovered", config.get_value("progression", "second_fragment_recovered", false)))
+	var saved_creatures: Variant = config.get_value("woods", "rescued_creatures", {})
+	if saved_creatures is Dictionary:
+		rescued_creatures = (saved_creatures as Dictionary).duplicate()
+	else:
+		rescued_creatures = {}
+	woods_coins_best = int(config.get_value("woods", "coins_best", 0))
 	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
 	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
 	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
@@ -55,6 +63,9 @@ func save_progress() -> void:
 	var config := ConfigFile.new()
 	config.set_value("island", "fragment_recovered", fragment_recovered)
 	config.set_value("progression", "second_fragment_recovered", second_fragment_recovered)
+	config.set_value("woods", "second_fragment_recovered", second_fragment_recovered)
+	config.set_value("woods", "rescued_creatures", rescued_creatures)
+	config.set_value("woods", "coins_best", woods_coins_best)
 	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
 	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
 	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
@@ -80,6 +91,23 @@ func recover_second_fragment() -> void:
 		return
 	second_fragment_recovered = true
 	save_progress()
+
+func record_creature_rescued(creature_id: String) -> void:
+	if creature_id.is_empty():
+		return
+	rescued_creatures[creature_id] = true
+	save_progress()
+
+func is_creature_rescued(creature_id: String) -> bool:
+	return bool(rescued_creatures.get(creature_id, false))
+
+func rescued_count() -> int:
+	return rescued_creatures.size()
+
+func record_woods_coins(amount: int) -> void:
+	if amount > woods_coins_best:
+		woods_coins_best = amount
+		save_progress()
 
 func recover_third_fragment() -> void:
 	if third_fragment_recovered:
@@ -146,5 +174,7 @@ func clear() -> void:
 	crystal_light_solved = false
 	frozen_generators_activated = 0
 	frozen_checkpoint_index = 0
+	rescued_creatures.clear()
+	woods_coins_best = 0
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))

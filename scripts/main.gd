@@ -22,11 +22,12 @@ const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")
 const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
+const WOODS := preload("res://scenes/whispering_woods.tscn")
 const FROZEN_SKIES_SCRIPT := preload("res://scripts/frozen_skies.gd")
 const SHADOW_WOLF := preload("res://objects/shadow_wolf.gd")
 const SECOND_FRAGMENT_CHEST := preload("res://objects/second_fragment_chest.gd")
 
-const LEVEL_NAMES := ["Forgotten Island", "Switchback Sprint", "Frozen Skies", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
@@ -49,6 +50,7 @@ var player_two: CharacterBody3D
 var coins_collected := 0
 ## Level 1 is the hand-laid Forgotten Island instead of a generated course.
 var island: ForgottenIsland = null
+var woods: WhisperingWoods = null
 var frozen_skies: FrozenSkies = null
 var level2_wolf: Node = null
 var level2_chest: Node = null
@@ -97,6 +99,11 @@ func _ready() -> void:
 		island.notify_coins(0)
 		hud.show_finish_message("THE FORGOTTEN ISLAND")
 		hud.set_objective("Explore the Forgotten Island  -  %d more coins wake the portal" % coin_goal)
+	elif woods != null:
+		coin_goal = woods.coins_required
+		woods.notify_coins(0)
+		hud.show_finish_message("THE WHISPERING WOODS")
+		woods.main_objective()
 	elif frozen_skies != null:
 		coin_goal = frozen_skies.coins_required
 		coins_collected = Progress.frozen_coins_collected()
@@ -231,12 +238,16 @@ func _build_level(level_number: int) -> void:
 	switches_pressed = 0
 	puzzle_solved = false
 	island = null
+	woods = null
 	frozen_skies = null
 	for child in world.get_children():
 		world.remove_child(child)
 		child.free()
 	if level_number == 1:
 		_build_island()
+		return
+	if level_number == 2:
+		_build_woods()
 		return
 	if level_number == 3:
 		_build_frozen_skies()
@@ -303,9 +314,37 @@ func _build_level(level_number: int) -> void:
 	_build_level_identity(level_number, route)
 	_build_gimmicks(level_number, route)
 	_build_puzzle(level_number, route)
-	if level_number == 2:
-		_build_level2_progression(route)
 	_apply_dimension_visibility()
+
+
+func _build_woods() -> void:
+	var node: WhisperingWoods = WOODS.instantiate()
+	node.name = "WhisperingWoods"
+	world.add_child(node)
+	woods = node
+	node.message.connect(_on_island_message)
+	node.build(self)
+	route_points = node.waypoints
+	player.position = node.spawn_point
+	player.velocity = Vector3.ZERO
+	checkpoint_position = node.spawn_point
+	active_checkpoint = 0
+	for index in node.checkpoint_points.size():
+		_add_checkpoint(node.checkpoint_points[index], index)
+	finish.position = node.portal_position
+	_apply_dimension_visibility()
+	_bind_woods_boss()
+
+
+func _bind_woods_boss() -> void:
+	var boss := get_tree().get_first_node_in_group("woods_boss") as ShadowWolfBoss
+	if boss == null:
+		return
+	boss.woke.connect(func(): hud.show_boss("THE SHADOW WOLF - GUARDIAN OF THE WOODS"))
+	boss.health_changed.connect(func(health: int, max_health: int, phase: int):
+		hud.update_boss(health, max_health, phase)
+	)
+	boss.defeated.connect(hud.hide_boss)
 
 func _build_level2_progression(route: Array) -> void:
 	var boss_point: Vector3 = route[route.size() - 3] + Vector3(0.0, 1.2, 0.0)
@@ -1546,6 +1585,9 @@ func _on_coin_collected(_coins: int) -> void:
 		# the level holds more than that on purpose.
 		island.notify_coins(coins_collected)
 		return
+	if woods != null:
+		woods.notify_coins(coins_collected)
+		return
 	if coins_collected >= coin_goal:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
 	if frozen_skies != null and coins_collected >= coin_goal \
@@ -1555,6 +1597,11 @@ func _on_coin_collected(_coins: int) -> void:
 
 func _on_finish_body_entered(body: Node3D) -> void:
 	if body != player and body != player_two:
+		return
+	if woods != null and not woods.is_portal_ready():
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message("Rescue the forest creatures, defeat the Shadow Wolf, and recover the Second Fragment.")
 		return
 	if frozen_skies != null and not frozen_skies.is_portal_ready(coins_collected):
 		if _portal_locked_cooldown <= 0.0:

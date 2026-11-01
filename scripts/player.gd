@@ -36,8 +36,9 @@ signal fly_mode_changed(enabled: bool)
 
 @export_subgroup("Dash Skill")
 @export var dash_speed_multiplier := 2.0
-@export var dash_duration := 1.0
-@export var dash_cooldown := 10.0
+@export var dash_duration := 0.35
+@export var dash_cooldown := 0.08
+@export var dash_min_stamina_pct := 0.25
 
 # --- Fighting, in the spirit of Hollow Knight ---------------------------------
 # Slash an enemy for the fun of it; a down-slash on one bounces the player back
@@ -267,7 +268,7 @@ func _physics_process(delta):
 	if Input.is_action_just_pressed(action_time_freeze) and freeze_cooldown <= 0.0:
 		_activate_time_freeze()
 
-	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0 and not is_dashing:
+	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0:
 		_start_dash()
 	if get_tree().get_meta("level_number", 1) == 3:
 		if Input.is_action_just_pressed(action_ice_shield):
@@ -534,10 +535,13 @@ func set_wind(lift: float) -> void:
 # Dash skill
 
 func _start_dash() -> void:
-	if stamina < 5.0:
+	# Dashing is blocked when stamina is below 25% of max stamina
+	var min_stamina := max_stamina * dash_min_stamina_pct
+	if stamina < min_stamina:
 		return
 	is_dashing = true
 	dash_time_left = dash_duration
+	dash_cooldown_left = 0.0
 	dash_bob = 0.0
 	stamina = maxf(0.0, stamina - dash_stamina_cost)
 	stamina_changed.emit(stamina, max_stamina)
@@ -841,13 +845,13 @@ func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: St
 		away = -Vector3(sin(rotation.y), 0.0, cos(rotation.y))
 	knockback = away.normalized() * hurt_knockback
 	model.scale = Vector3(1.35, 0.7, 1.35)
-	if source == "slime":
-		var slime_dmg: float = max_health * 0.04 if amount <= 0.0 else amount
-		health = maxf(0.0, health - slime_dmg)
+	if source in ["slime", "wolf", "phantom", "wolf_boss"]:
+		var pct_dmg: float = amount if amount > 0.0 else max_health * 0.04
+		health = maxf(0.0, health - pct_dmg)
 		health_changed.emit(health, max_health)
 		if health <= 0.0:
 			knockback = Vector3.ZERO
-			die("slime")
+			die(source)
 		return
 	var fatal_or_amount: float = max_health if amount <= 1.0 else amount
 	health = maxf(0.0, health - fatal_or_amount)
