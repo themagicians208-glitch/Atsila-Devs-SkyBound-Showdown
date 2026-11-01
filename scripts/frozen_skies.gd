@@ -20,6 +20,8 @@ var _chest: FrozenFragmentChest
 var _titan: FrostTitan
 var mechanisms: Array[FrozenMechanism] = []
 var frozen_seals_complete := false
+var _moving_platforms: Array[Node3D] = []
+var _time := 0.0
 
 func build(main: Node) -> Array:
 	_main = main
@@ -31,7 +33,31 @@ func build(main: Node) -> Array:
 	_build_snowfall()
 	_place_coins()
 	_place_enemies()
+	_build_moving_ice_platforms()
 	return route
+
+func _process(delta: float) -> void:
+	_time += delta
+	for index in _moving_platforms.size():
+		var platform := _moving_platforms[index]
+		if not is_instance_valid(platform):
+			continue
+		var origin: Vector3 = platform.get_meta("origin")
+		var phase: float = platform.get_meta("phase")
+		platform.position = origin + Vector3(sin(_time * 1.1 + phase) * 1.8, sin(_time * 1.7 + phase) * 0.35, 0.0)
+
+func _build_moving_ice_platforms() -> void:
+	for entry in [[14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
+		var platform: Node3D = PLATFORM.instantiate()
+		platform.name = "MovingIcePlatform_%02d" % int(entry[0])
+		var origin: Vector3 = route[int(entry[0])] + Vector3(float(entry[1]), 1.0, 1.4)
+		platform.position = origin
+		platform.scale = Vector3(0.72, 0.42, 0.72)
+		platform.set_meta("origin", origin)
+		platform.set_meta("phase", float(entry[0]) * 0.6)
+		_world.add_child(platform)
+		_moving_platforms.append(platform)
+		_add_ice_cap(origin)
 
 func _build_frozen_mechanics() -> void:
 	# Reuse the main level's switch/gate implementation for the first frozen seal.
