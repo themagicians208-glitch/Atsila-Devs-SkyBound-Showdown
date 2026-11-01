@@ -6,7 +6,6 @@ extends RefCounted
 const CHARACTERS: Array = [
 	{"id": "Jamal", "scene": "res://objects/character.tscn"},
 	{"id": "Nattie", "scene": "res://objects/characters/nattie.tscn"},
-	{"id": "isabelle", "scene": "res://objects/characters/isabelle.tscn"},
 ]
 
 

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/preview_before_after.gd" id="1_ba"]
+
+[node name="PreviewBeforeAfter" type="Node3D"]
+script = ExtResource("1_ba")
