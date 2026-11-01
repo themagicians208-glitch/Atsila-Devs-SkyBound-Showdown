@@ -38,6 +38,8 @@ var _snowfall: GPUParticles3D
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
 var environment_thawed := false
 var _crystal_gate: StaticBody3D
+var _boss_gate: StaticBody3D
+var boss_arena_locked := false
 
 func build(main: Node) -> Array:
 	_main = main
@@ -185,6 +187,7 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 		frozen_seals_complete = true
 		if _titan != null:
 			_titan.unlock()
+		_lock_boss_arena()
 	if _main.has_method("_on_frozen_mechanism_progress"):
 		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
@@ -259,6 +262,8 @@ func _place_enemies() -> void:
 		boss_defeated = true
 	if frozen_seals_complete or boss_defeated:
 		_titan.unlock()
+	if frozen_seals_complete and not boss_defeated:
+		_lock_boss_arena()
 	if boss_defeated:
 		_titan.set_process(false)
 		_titan.set_physics_process(false)
@@ -401,6 +406,37 @@ func _build_boss_arena() -> void:
 	sigil.position = centre + Vector3(0.0, 0.08, 0.0)
 	sigil.material_override = _material(Color("#8cddff"), 1.0)
 	_world.add_child(sigil)
+	_boss_gate = StaticBody3D.new()
+	_boss_gate.name = "FrostTitanArenaGate"
+	_boss_gate.position = route[route.size() - 4] + Vector3(0.0, 1.3, 1.4)
+	var gate_shape := CollisionShape3D.new()
+	var gate_box := BoxShape3D.new()
+	gate_box.size = Vector3(3.8, 2.5, 0.3)
+	gate_shape.shape = gate_box
+	_boss_gate.add_child(gate_shape)
+	var gate_visual := MeshInstance3D.new()
+	var gate_mesh := BoxMesh.new()
+	gate_mesh.size = gate_box.size
+	gate_visual.mesh = gate_mesh
+	gate_visual.material_override = _material(Color("#89eaff"), 1.0)
+	_boss_gate.add_child(gate_visual)
+	_world.add_child(_boss_gate)
+
+func _lock_boss_arena() -> void:
+	if boss_arena_locked or _boss_gate == null:
+		return
+	boss_arena_locked = true
+	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
+		(shape as CollisionShape3D).set_deferred("disabled", false)
+
+func _unlock_boss_arena() -> void:
+	if _boss_gate == null:
+		return
+	boss_arena_locked = false
+	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
+		(shape as CollisionShape3D).set_deferred("disabled", true)
+	var tween := _boss_gate.create_tween()
+	tween.tween_property(_boss_gate, "position:y", _boss_gate.position.y - 2.5, 0.7)
 
 func _material(color: Color, emission: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -414,6 +450,7 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 func _on_boss_defeated() -> void:
 	boss_defeated = true
 	Progress.mark_frost_titan_defeated()
+	_unlock_boss_arena()
 	if _chest != null:
 		_chest.unlock()
 

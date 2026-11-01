@@ -58,6 +58,7 @@ func _run() -> void:
 	player.global_position = seal_list[2].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
+	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan arena must lock during the fight")
 	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
 	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")
@@ -84,7 +85,8 @@ func _run() -> void:
 	frozen.thaw_environment()
 	assert(frozen.environment_thawed, "fragment recovery must thaw Frozen Skies")
 	assert(not frozen.is_portal_ready(52), "Level 4 portal must stay locked before boss and fragment")
-	frozen.boss_defeated = true
+	frozen._on_boss_defeated()
+	assert(not frozen.boss_arena_locked, "Frost Titan arena must reopen after victory")
 	assert(not frozen.is_portal_ready(49), "Level 4 portal must require 50 coins")
 	assert(frozen.is_portal_ready(50), "Level 4 portal must open at 50 coins after boss and fragment")
 	get_root().get_node("Progress").clear()
