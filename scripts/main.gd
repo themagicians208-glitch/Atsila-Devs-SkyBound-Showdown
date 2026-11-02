@@ -101,9 +101,9 @@ func _ready() -> void:
 		coin_goal = frozen_skies.coins_required
 		coins_collected = Progress.frozen_coins_collected()
 		hud.show_finish_message("LEVEL 3 – FROZEN SKIES")
-		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 		_update_frozen_ability_hud()
 		_update_frozen_progress_hud()
+		_update_frozen_portal_objective()
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
@@ -401,6 +401,7 @@ func _bind_frozen_boss(boss: Node) -> void:
 		hud.hide_boss()
 		hud.show_finish_message("The Frost Titan falls. Open the ancient chest!")
 		hud.set_objective("Open the ancient chest and recover the Third Fragment.")
+		_update_frozen_portal_objective()
 	)
 
 
@@ -408,7 +409,7 @@ func _on_frozen_fragment_recovered() -> void:
 	if frozen_skies != null:
 		frozen_skies.thaw_environment()
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
-	hud.set_objective("Find 50 coins to unlock the Level 4 portal.")
+	_update_frozen_portal_objective()
 	_update_frozen_progress_hud()
 
 
@@ -469,6 +470,16 @@ func _update_frozen_progress_hud() -> void:
 		Progress.third_fragment_recovered,
 		active_checkpoint,
 		Progress.frozen_generators_activated)
+
+func _update_frozen_portal_objective() -> void:
+	if frozen_skies == null:
+		return
+	if frozen_skies.boss_defeated and Progress.third_fragment_recovered and coins_collected >= coin_goal:
+		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
+	elif Progress.third_fragment_recovered:
+		hud.set_objective("Find %d coins to unlock the Level 4 portal." % coin_goal)
+	else:
+		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and recover the Third Fragment.")
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1566,7 +1577,7 @@ func _on_coin_collected(_coins: int) -> void:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
 	if frozen_skies != null and coins_collected >= coin_goal \
 			and frozen_skies.boss_defeated and Progress.third_fragment_recovered:
-		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
+		_update_frozen_portal_objective()
 
 
 func _on_finish_body_entered(body: Node3D) -> void:

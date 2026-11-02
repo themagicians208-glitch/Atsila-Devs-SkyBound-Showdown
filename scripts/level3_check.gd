@@ -191,6 +191,9 @@ func _run() -> void:
 	assert(frozen.is_portal_ready(50), "Level 4 portal must open at 50 coins after boss and fragment")
 	assert(frozen.boss_defeated, "Frozen Skies must retain the defeated Titan state")
 	assert(frozen.fragment_recovered, "Frozen Skies must retain the recovered fragment state")
+	instance.set("coins_collected", 50)
+	instance._update_frozen_portal_objective()
+	assert(instance.get_node("HUD").objective_hint.text.contains("path to the fourth island has opened"), "ready portal must update the objective")
 	var saved_checkpoint: int = get_root().get_node("Progress").frozen_checkpoint_index
 	instance.queue_free()
 	await process_frame
