@@ -6,7 +6,7 @@ func _init() -> void:
 func _run() -> void:
 	# Smoke tests must start from a known progression state, not a developer save.
 	get_root().get_node("Progress").config_path = "user://level3_smoke_%d.cfg" % OS.get_process_id()
-	create_timer(20.0, true, false, true).timeout.connect(func():
+	create_timer(45.0, true, false, true).timeout.connect(func():
 		push_error("LEVEL3 smoke timed out")
 		quit(1))
 	get_root().get_node("Progress").clear()
@@ -31,7 +31,7 @@ func _run() -> void:
 	var world: Node = instance.get_node("World")
 	assert(world.get_node_or_null("FrostTitan") != null, "Frost Titan must spawn")
 	assert(world.get_node_or_null("ThirdFragmentChest") != null, "Third Fragment chest must spawn")
-	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen mechanisms must spawn")
+	assert(instance.get("frozen_skies").mechanisms.size() == 3, "three frozen seals must spawn")
 	assert(instance.get("frozen_skies").region_names.size() == 6, "Frozen Skies needs six named regions")
 	assert(instance.get("frozen_skies").region_name_for_checkpoint(38) == "Frost Titan's Sanctuary", "boss region must be named")
 	assert(instance.get("mirror_dimension") == false, "Frozen Skies must preserve the material dimension on arrival")
@@ -44,7 +44,14 @@ func _run() -> void:
 	assert(not crystal_gate.opened, "crystal gate starts closed")
 	assert(world.find_children("FrostSlime", "Node3D", true, false).size() > 0, "Frost Slimes must spawn")
 	assert(world.find_children("FrostWolf", "Node3D", true, false).size() > 0, "Frost Wolves must spawn")
-	assert(world.find_children("CrystalPhantom", "Node3D", true, false).size() > 0, "Crystal Phantoms must spawn")
+	# Ground enemies only - no flying monsters - and every wolf carries its face.
+	assert(world.find_children("CrystalPhantom*", "Node3D", true, false).is_empty(), "Frozen Skies must not spawn flying Crystal Phantoms")
+	for frozen_enemy in world.get_tree().get_nodes_in_group("enemies"):
+		if frozen_enemy is FrozenEnemy:
+			assert(frozen_enemy.variant != "Crystal Phantom", "no Frozen Skies enemy may fly")
+			if frozen_enemy.variant == "Frost Wolf":
+				assert(frozen_enemy.get("_wolf_head") != null, "Frost Wolf must have a head with a face")
+				assert((frozen_enemy.get("_wolf_head") as Node3D).position.z > 0.0, "Frost Wolf must face forward (+Z)")
 	for frozen_enemy in world.get_tree().get_nodes_in_group("enemies"):
 		if frozen_enemy is FrozenEnemy:
 			assert(frozen_enemy.get_node_or_null("FrostParticles") != null, "Frozen enemies need frost particles")
@@ -77,6 +84,17 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").glowing_flower_count >= 8, "Frozen Skies needs glowing blue flowers")
 	assert(instance.get("frozen_skies").frozen_ruin_count >= 3, "Frozen Skies needs ancient frozen ruins")
 	assert(instance.get("frozen_skies")._crystal_generators.size() == 3, "Crystal Cave needs three generators")
+	assert(get_nodes_in_group("collectible_coins").size() >= 60, "Frozen Skies must offer more coins than the portal asks for")
+	var rules: Dictionary = instance.get("frozen_skies").rule_puzzles
+	assert(rules.size() == 8, "Frozen Skies needs its eight rule-changing puzzles")
+	for rule_id in ["frozen_switch", "ice_wind_valley", "three_crystals", "frozen_lake", "fortress_shift",
+			"mirror_crossing", "seal_one", "seal_three"]:
+		assert(rules.has(rule_id), "rule puzzle %s must be registered" % rule_id)
+		var shift: Node = (rules[rule_id] as Node).get("rule_shift")
+		assert(shift != null, "%s must run on the shared RuleShift engine" % rule_id)
+		assert(str(shift.call("state_name")) == "INITIAL_STATE", "%s must start on its first rules" % rule_id)
+		assert(not str(shift.get("initial_objective")).is_empty(), "%s must explain its rules to the player" % rule_id)
+	assert(instance.get_node("HUD").frozen_progress_hint.text.contains("PUZZLES 0/8"), "Frozen HUD must show puzzle progress")
 	var slippery_zone: Node = load("res://scripts/slippery_zone.gd").new()
 	slippery_zone._on_body_entered(player)
 	assert(player.slippery, "Frozen ice zones must enable slippery movement")
@@ -84,11 +102,47 @@ func _run() -> void:
 	assert(not player.slippery, "Leaving Frozen ice zones must restore movement control")
 	slippery_zone.free()
 	var crystals: Array = crystal_puzzle.get("_crystals")
-	for index in crystals.size():
-		player.global_position = crystals[index].global_position
-		for turn in range(index + 1):
-			assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
-	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
+	# Puzzle 3 the long way round: two crystals align, the cave re-routes its
+	# energy with a warning, the third crystal is sealed until the conduit is
+	# powered, and all three have to be turned again for the new direction.
+	player.global_position = crystals[0].global_position
+	assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
+	player.global_position = crystals[1].global_position
+	assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
+	assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
+	var crystal_shift: Node = crystal_puzzle.rule_shift
+	assert(crystal_shift != null, "the crystal puzzle must run on a RuleShift")
+	assert(str(crystal_shift.call("state_name")) == "RULE_CHANGE_WARNING", "the crystal puzzle must warn before its rules change")
+	assert(not bool(crystal_shift.get("shifted")), "the crystal puzzle must not change its rules during the warning")
+	player.global_position = crystals[2].global_position
+	assert(crystal_puzzle.try_interact(player), "sealed crystal interaction must be handled")
+	assert(crystal_puzzle.get("_rotations")[2] == 0, "the sealed third crystal must not turn yet")
+	await create_timer(3.4).timeout
+	assert(bool(crystal_shift.get("shifted")), "the crystal puzzle must apply its new energy direction")
+	assert(crystal_puzzle.get("_targets") == [2, 0, 3], "the crystal puzzle must re-route all three crystals")
+	assert(crystal_puzzle.is_spinning(), "one crystal must start turning on its own")
+	player.global_position = crystals[2].global_position
+	assert(crystal_puzzle.try_interact(player), "the frozen far crystal must refuse hand turns")
+	assert(crystal_puzzle.get("_rotations")[2] == 0, "the far crystal must not turn by hand")
+	var conduit: Node3D = crystal_puzzle.get("_conduit")
+	player.global_position = conduit.global_position
+	assert(crystal_puzzle.try_interact(player), "the energy conduit must be usable")
+	assert(crystal_puzzle.get("_mirror_live"), "the conduit must wake the reflection surface")
+	# Lock the spinning crystal on the quarter it needs...
+	crystals[1].rotation.y = 0.0
+	player.global_position = crystals[1].global_position
+	assert(crystal_puzzle.try_interact(player), "the spinning crystal must be lockable")
+	assert(not crystal_puzzle.is_spinning(), "locking must stop the crystal turning")
+	assert(crystal_puzzle.get("_rotations")[1] == 0, "the locked crystal must hold the quarter it was stopped on")
+	# ...turn the first by hand...
+	player.global_position = crystals[0].global_position
+	assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable after the change")
+	# ...and send the far crystal's beam with the reflection surface.
+	for _turn in 3:
+		player.global_position = crystal_puzzle.mirror_position()
+		assert(crystal_puzzle.try_interact(player), "the reflection surface must redirect the far beam")
+	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve under its new rules")
+	assert(bool(crystal_shift.get("finished")), "solving the crystal puzzle must complete its RuleShift")
 	assert(crystal_gate.opened, "crystal light puzzle must open its gate")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "solving crystal light must unlock Crystal Activation before the cave")
 	assert(instance.get("frozen_skies")._crystal_blocks.size() == 3, "Crystal Cave needs three movable crystal blocks")
@@ -107,15 +161,6 @@ func _run() -> void:
 	original_slime.free()
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]
 	assert(is_equal_approx(slime._movement_speed(player), player.get_normal_movement_speed() * 0.50), "Frost Slime must be 50% of actual player speed")
-	var phantom: Node = world.find_children("CrystalPhantom", "Node3D", true, false)[0]
-	player.global_position = Vector3(0.0, 0.0, -20.0)
-	var phantom_before: Vector3 = phantom.global_position
-	phantom._physics_process(0.5)
-	assert(not phantom.global_position.is_equal_approx(phantom_before), "Crystal Phantom must patrol when not chasing")
-	player.global_position = phantom.global_position + Vector3(0.0, 0.0, 4.0)
-	phantom._projectile_cooldown = 0.0
-	phantom._physics_process(0.016)
-	assert(phantom._attack_warning.visible, "Crystal Phantom must telegraph ice projectiles")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
 	assert(titan.get("_arms").size() == 2, "Frost Titan needs articulated arms")
@@ -136,17 +181,53 @@ func _run() -> void:
 	player.global_position = seal_list[1].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "blocked seal interaction must be handled")
 	player.global_position = seal_list[0].global_position
-	assert(instance.get("frozen_skies").try_activate_nearby(player), "first seal must activate")
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "the first seal must refuse to open before its moving ice")
+	assert(not seal_list[0].is_activated, "the first seal must wait for its challenge")
+	# Seal I's challenge: stand on the middle platform, let the rules change, cross.
+	var seal_one: Node = instance.get("frozen_skies").seal_one
+	var seal_one_shift: Node = seal_one.get("rule_shift")
+	player.global_position = (seal_one.get("platforms") as Array)[1].global_position
+	await create_timer(0.2).timeout
+	assert(str(seal_one_shift.call("state_name")) == "RULE_CHANGE_WARNING", "Seal I must warn before its platforms reverse")
+	await create_timer(3.0).timeout
+	assert(bool(seal_one_shift.get("shifted")), "Seal I's platforms must reverse")
+	player.global_position = seal_one.far_side_position()
+	await create_timer(0.2).timeout
+	assert(seal_one.is_solved(), "Seal I's moving-ice challenge must complete")
+	player.global_position = seal_list[0].global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "first seal must activate once its challenge is crossed")
 	assert(not first_bridge_shape.disabled, "Frozen Switch must open the ice bridge")
 	player.global_position = seal_list[1].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "crystal-generator seal must activate after its challenge")
+	# Seal III's challenge: walk into the arena, then let the first guardian fall.
+	var seal_three: Node = instance.get("frozen_skies").seal_three
+	var seal_three_shift: Node = seal_three.get("rule_shift")
+	player.global_position = seal_list[2].global_position
+	await create_timer(0.25).timeout
+	var guardian: Node = null
+	for enemy in get_nodes_in_group("enemies"):
+		if enemy is FrozenEnemy:
+			guardian = enemy
+			break
+	assert(guardian != null, "the frozen guardians must be there to fight")
+	guardian.take_hit(999, player.global_position)
+	await create_timer(0.25).timeout
+	assert(str(seal_three_shift.call("state_name")) == "RULE_CHANGE_WARNING", "Seal III must warn when the arena ground starts shifting")
+	assert(not bool(seal_three_shift.get("shifted")), "Seal III must not change its rules until the warning ends")
+	await create_timer(3.2).timeout
+	assert(bool(seal_three_shift.get("shifted")), "Seal III's safe platforms must start shifting mid-fight")
+	await create_timer(1.6).timeout
+	assert((seal_three.get("_timers") as Array).size() > 0, "Seal III must run platform timers once its rules change")
 	for enemy in get_nodes_in_group("enemies"):
 		if enemy is FrozenEnemy:
 			enemy.take_hit(999, player.global_position)
-	await process_frame
+	await create_timer(0.3).timeout
+	assert(seal_three.is_solved(), "Seal III's challenge must complete when the guardians are beaten")
 	player.global_position = seal_list[2].global_position
-	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
-	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "third seal must activate after the previous seal")
+	assert(not titan.locked, "Frost Titan must unlock after all three frozen seals")
+	var crossing_shift: Node = instance.get("frozen_skies").mirror_crossing.rule_shift
+	assert(str(crossing_shift.call("state_name")) == "RULE_CHANGE_WARNING", "the third seal must set the Mirror Crossing changing")
 	assert(not instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must open after all frozen seals")
 	await create_timer(0.8).timeout
 	assert(boss_gate.position.y < boss_gate_home_y - 1.0, "Frost Titan entrance must visibly open")

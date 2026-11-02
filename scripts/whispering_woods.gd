@@ -33,7 +33,6 @@ const GRASS_TUFT_SMALL := preload("res://models/grass-small.glb")
 
 const SLIME_SCRIPT := preload("res://objects/shadow_slime.gd")
 const WOLF_SCRIPT := preload("res://objects/shadow_wolf.gd")
-const PHANTOM_SCRIPT := preload("res://objects/sky_phantom.gd")
 const CREATURE_SCRIPT := preload("res://objects/forest_creature.gd")
 const PUZZLES := preload("res://objects/woods_puzzles.gd")
 
@@ -66,7 +65,6 @@ var coins_placed := 0
 var coins_collected := 0
 var slimes_placed := 0
 var wolves_placed := 0
-var phantoms_placed := 0
 var creatures_rescued_count := 0
 
 var _main: Node = null
@@ -105,9 +103,9 @@ func build(main: Node) -> void:
 	_spawn_all_enemies()
 	_place_coins()
 	_setup_environment()
-	print("[WhisperingWoods] built: %d coins placed (%d required), %d checkpoints, %d slimes, %d wolves, %d phantoms, %d creatures" % [
+	print("[WhisperingWoods] built: %d coins placed (%d required), %d checkpoints, %d slimes, %d wolves, %d creatures" % [
 		coins_placed, coins_required, checkpoint_points.size(),
-		slimes_placed, wolves_placed, phantoms_placed, _creatures.size()
+		slimes_placed, wolves_placed, _creatures.size()
 	])
 
 
@@ -729,19 +727,6 @@ func _spawn_all_enemies() -> void:
 		wolf.position = spot
 		add_child(wolf)
 		wolves_placed += 1
-
-	# New Sky Phantoms (flying across gaps in the Root Maze & Seal Terraces)
-	var phantom_spots := [
-		Vector3(0.0, 7.2, 154.0),
-		Vector3(-5.0, 8.2, 180.0),
-		Vector3(4.5, 9.0, 192.5),
-	]
-	for spot in phantom_spots:
-		var phantom: SkyPhantom = PHANTOM_SCRIPT.new()
-		phantom.name = "SkyPhantom_%02d" % phantoms_placed
-		phantom.position = spot
-		add_child(phantom)
-		phantoms_placed += 1
 
 
 # --- 52 Hidden & Path Coins (40 required for the Level 3 Portal) -------------

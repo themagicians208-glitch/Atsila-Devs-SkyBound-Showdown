@@ -61,6 +61,11 @@ func _ready():
 
 func _physics_process(delta):
 	
+	# A view built in code (the battle arena's duel camera) may be added a frame
+	# before its target is wired up; nothing to follow until then.
+	if target == null:
+		return
+	
 	# Set position and rotation to targets
 	
 	self.position = self.position.lerp(target.position, delta * 4)

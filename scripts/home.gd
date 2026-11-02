@@ -24,6 +24,9 @@ var p1_character := ""
 var p2_character := ""
 var _p2_auto_assigned := false
 var _showing_input_setup := false
+# True while the local split-screen branch is heading for the 1v1 duel instead of
+# the story co-op. The device/name screen and its warnings are shared by both.
+var _local_duel := false
 
 # Actions the player can rebind, as [action, caption, default key].
 const BINDABLE := [
@@ -79,6 +82,11 @@ func _ready() -> void:
 	_build_popup()
 	_build_notice()
 	_run_entrance_sequence()
+	# Coming back from the battle arena (or a finished duel), reopen the
+	# multiplayer screen instead of dropping the player at the title.
+	if bool(get_tree().get_meta("open_multiplayer_menu", false)):
+		get_tree().set_meta("open_multiplayer_menu", false)
+		call_deferred("_show_multiplayer")
 	# The game can start without window focus when launched from the editor,
 	# and grab_focus() is unreliable inside _ready — so grab the window focus and
 	# set the button focus deferred.
@@ -794,24 +802,236 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- Multiplayer lobby -------------------------------------------------------
 
+## The multiplayer screen: the device question comes first - local split screen,
+## or an online room - and the mode (story co-op or the 1v1 duel) comes after.
 func _show_multiplayer() -> void:
 	_showing_input_setup = false
+	_local_duel = false
 	_back_handler = Callable()
-	popup_title.text = "MULTIPLAYER LOBBY"
+	popup_title.text = "MULTIPLAYER"
 	_clear_popup_body()
-	var local := _button("LOCAL   •   SPLIT SCREEN", Color("#27496f"), Color.WHITE)
-	local.pressed.connect(_show_local_options)
-	popup_body.add_child(local)
-	var online := _button("ONLINE   •   JOIN OR CREATE A ROOM", Color("#27496f"), Color.WHITE)
-	online.pressed.connect(_show_online)
-	popup_body.add_child(online)
+	popup_body.add_child(_multiplayer_option(
+		"LOCAL",
+		"Two players on this machine: split screen, sharing the keyboard or using two controllers.",
+		"PLAY LOCAL", Color("#8fe0ff"), Color("#062a3d"), _show_local_modes))
+	popup_body.add_child(_multiplayer_option(
+		"ONLINE",
+		"Create a room and share your address, or join a friend on the same network.",
+		"PLAY ONLINE", Color("#ffd451"), Color("#493600"), _show_online_modes))
 	popup.visible = true
-	local.grab_focus()
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
+	var first_button := _first_button_in(popup_body)
+	if first_button != null:
+		first_button.grab_focus()
+
+
+## Local split screen: which mode the two players want.
+func _show_local_modes() -> void:
+	_showing_input_setup = false
+	_local_duel = false
+	_back_handler = _show_multiplayer
+	popup_title.text = "LOCAL  •  SPLIT SCREEN"
+	_clear_popup_body()
+	popup_body.add_child(_multiplayer_option(
+		"STORY MODE CO-OP",
+		"Explore Aetheria together, complete missions, solve puzzles and fight enemies.",
+		"PLAY STORY CO-OP", Color("#8fe0ff"), Color("#062a3d"), _show_local_options))
+	popup_body.add_child(_multiplayer_option(
+		"1V1 BATTLE ARENA",
+		"Two duelists on one screen: best of three rounds in the floating arena.",
+		"START A LOCAL DUEL", Color("#ffd451"), Color("#493600"), _local_duel_options))
+	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
+	var first_button := _first_button_in(popup_body)
+	if first_button != null:
+		first_button.grab_focus()
+
+
+## Local duel: the same device/name screen the co-op uses, then the arena.
+func _local_duel_options() -> void:
+	_local_duel = true
+	_show_local_options()
+
+
+## Online: which mode the room is for. Sessions themselves are created or joined
+## on the screens behind these doors.
+func _show_online_modes() -> void:
+	_showing_input_setup = false
+	_local_duel = false
+	_back_handler = _show_multiplayer
+	popup_title.text = "ONLINE  •  CREATE OR JOIN A ROOM"
+	_clear_popup_body()
+	popup_body.add_child(_multiplayer_option(
+		"STORY MODE CO-OP",
+		"Explore Aetheria together, complete missions, solve puzzles and fight enemies.",
+		"PLAY STORY CO-OP", Color("#8fe0ff"), Color("#062a3d"), _show_online))
+	popup_body.add_child(_multiplayer_option(
+		"1V1 BATTLE ARENA",
+		"Enter a battle arena, challenge another player and compete to win two rounds.",
+		"PLAY 1V1 ONLINE", Color("#ffd451"), Color("#493600"), _show_battle_menu))
+	popup.visible = true
+	popup.modulate.a = 0.0
+	create_tween().tween_property(popup, "modulate:a", 1.0, 0.2)
+	var first_button := _first_button_in(popup_body)
+	if first_button != null:
+		first_button.grab_focus()
+
+
+## One option card: title, description, and the button that opens it.
+func _multiplayer_option(title: String, description: String, button_text: String,
+		button_color: Color, text_color: Color, on_pressed: Callable) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _panel_style(Color(0.03, 0.09, 0.19, 0.9), Color("#6fe7ef")))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	card.add_child(box)
+	var heading := _label(title, 26, Color("#ffe078"))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(heading)
+	var body := _label(description, 16, Color("#e6f3ff"))
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size.x = 440
+	box.add_child(body)
+	var button := _button(button_text, button_color, text_color)
+	button.pressed.connect(on_pressed)
+	box.add_child(button)
+	return card
+
+
+func _first_button_in(root: Node) -> Control:
+	var found := root.find_children("*", "Button", true, false)
+	return found[0] as Control if not found.is_empty() else null
+
+
+## 1v1 battle arena: host or join a duel, then the arena scene does the rest.
+func _show_battle_menu() -> void:
+	_showing_input_setup = false
+	_back_handler = _show_online_modes
+	popup_title.text = "1V1 BATTLE ARENA"
+	_clear_popup_body()
+	var info := _label("Exactly two duelists. You spawn in sealed cages, an 8-second\ncountdown runs, then the doors open. First to win two\nrounds takes the match.", 16, Color("#cfe9ff"))
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size.x = 460
+	popup_body.add_child(info)
+
+	var name_label := _label("YOUR NAME", 16, Color("#cfe9ff"))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(name_label)
+	var name_edit := _name_field(online_name, func(value: String) -> void:
+		online_name = value)
+	popup_body.add_child(name_edit)
+
+	var create := _button("CREATE ARENA", Color("#27496f"), Color.WHITE)
+	create.pressed.connect(_battle_create)
+	popup_body.add_child(create)
+
+	var code_label := _label("HOST ADDRESS", 16, Color("#cfe9ff"))
+	code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(code_label)
+	var code_edit := LineEdit.new()
+	code_edit.placeholder_text = "e.g. 192.168.0.12"
+	code_edit.max_length = 32
+	code_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code_edit.custom_minimum_size = Vector2(320, 40)
+	code_edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	code_edit.add_theme_font_override("font", UI_FONT)
+	code_edit.add_theme_font_size_override("font_size", 20)
+	popup_body.add_child(code_edit)
+
+	var join := _button("JOIN ARENA", Color("#27496f"), Color.WHITE)
+	join.pressed.connect(func() -> void: _battle_join(code_edit.text))
+	popup_body.add_child(join)
+
+	var note := _label("Create the arena and share your address, or join a friend\non the same network. (LAN works best.)", 15, Color("#9fc4e8"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(note)
+	popup.visible = true
+	create.grab_focus()
+
+
+func _battle_create() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		_online_message("CREATE ARENA", "Networking is unavailable.")
+		return
+	network.local_name = _clean_name(online_name)
+	# One opponent only: the arena room always seats exactly two duelists.
+	if not network.host(Network.DEFAULT_PORT, 1):
+		_online_message("CREATE ARENA", "Could not create the arena.\nThe port may already be in use.")
+		return
+	_showing_input_setup = false
+	popup_title.text = "ARENA CREATED"
+	_clear_popup_body()
+	popup_body.add_child(_label("Share this address with your opponent:", 16, Color("#cfe9ff")))
+	var address := _label(network.get_local_address(), 30, Color("#8fe0ff"))
+	address.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(address)
+	var note := _label("They pick ENTER BATTLE ARENA, then JOIN ARENA and type it in.\nThe duel starts the moment they are in their cage.", 15, Color("#9fc4e8"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_body.add_child(note)
+	var start := _button("ENTER THE ARENA", Color("#ffd451"), Color("#493600"))
+	start.pressed.connect(func(): _show_character_select(1, _battle_character_confirmed, _battle_leave))
+	popup_body.add_child(start)
+	var cancel := _button("CLOSE ARENA", Color("#315784"), Color.WHITE)
+	cancel.pressed.connect(_battle_leave)
+	popup_body.add_child(cancel)
+	_back_handler = _battle_leave
+	popup.visible = true
+	start.grab_focus()
+
+
+func _battle_leave() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.close()
+	_show_battle_menu()
+
+
+## The duelist's character is confirmed: publish it, then the host opens the
+## arena (clients are dropped into their cage by the host's RPC).
+func _battle_character_confirmed() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.local_character = p1_character
+		network.announce_profile()
+	if network != null and network.is_host:
+		network.start_battle()
+		get_tree().set_meta("online", true)
+		get_tree().set_meta("local_coop", false)
+		get_tree().set_meta("arena_local_duel", false)
+		get_tree().set_meta("level_number", 1)
+		get_tree().paused = false
+		Engine.time_scale = 1.0
+		get_tree().change_scene_to_file("res://scenes/battle_arena.tscn")
+	else:
+		_online_message("WAITING IN THE ARENA LOBBY",
+			"You picked %s.\nThe host will open the arena - you drop straight into your cage." % p1_character)
+
+
+func _battle_join(code: String) -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		_online_message("JOIN ARENA", "Networking is unavailable.")
+		return
+	var address := code.strip_edges()
+	if address.is_empty():
+		_online_message("JOIN ARENA", "Enter the host's address first.")
+		return
+	network.local_name = _clean_name(online_name)
+	if not network.join(address):
+		_online_message("JOIN ARENA", "Could not start the connection to \"%s\"." % address)
+		return
+	# Pick a character while the connection is being made.
+	_show_character_select(1, _battle_character_confirmed, _battle_leave)
 
 
 func _show_local_options() -> void:
 	_showing_input_setup = true
-	popup_title.text = "LOCAL CO-OP — CONTROLS"
+	popup_title.text = "LOCAL DUEL — CONTROLS" if _local_duel else "LOCAL CO-OP — CONTROLS"
 	_clear_popup_body()
 
 	var pads := Input.get_connected_joypads()
@@ -871,7 +1091,7 @@ func _show_local_options() -> void:
 	start.pressed.connect(_local_start_pressed)
 	popup_body.add_child(start)
 
-	_back_handler = _show_multiplayer
+	_back_handler = _show_local_modes
 	popup.visible = true
 	start.grab_focus()
 
@@ -958,7 +1178,34 @@ func _local_start_pressed() -> void:
 		else:
 			_ask_keyboard_share()
 		return
-	_show_character_select(2, _show_local_levels, _show_local_options)
+	_show_character_select(2, _local_continue_after_characters, _show_local_options)
+
+
+## Where the local branch goes once both players have picked: the story campaign
+## in split screen, or the 1v1 duel on the same screen.
+func _local_continue_after_characters() -> void:
+	if _local_duel:
+		_start_local_duel()
+	else:
+		_show_local_levels()
+
+
+## Local 1v1: one screen, two duelists, no network at all. The arena reads the
+## devices, names and characters from these metas.
+func _start_local_duel() -> void:
+	get_tree().set_meta("local_coop", false)
+	get_tree().set_meta("online", false)
+	get_tree().set_meta("arena_local_duel", true)
+	get_tree().set_meta("local_p1_device", p1_device)
+	get_tree().set_meta("local_p2_device", p2_device)
+	get_tree().set_meta("local_p1_name", _clean_name(p1_name, "Player 1"))
+	get_tree().set_meta("local_p2_name", _clean_name(p2_name, "Player 2"))
+	get_tree().set_meta("p1_character", p1_character)
+	get_tree().set_meta("p2_character", p2_character)
+	get_tree().set_meta("level_number", 1)
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file("res://scenes/battle_arena.tscn")
 
 
 func _ask_keyboard_share() -> void:
@@ -971,7 +1218,7 @@ func _ask_keyboard_share() -> void:
 	info.custom_minimum_size.x = 460
 	popup_body.add_child(info)
 	var yes := _button("YES, PLAY ON ONE KEYBOARD", Color("#ffd451"), Color("#493600"))
-	yes.pressed.connect(func(): _show_character_select(2, _show_local_levels, _show_local_options))
+	yes.pressed.connect(func(): _show_character_select(2, _local_continue_after_characters, _show_local_options))
 	popup_body.add_child(yes)
 	_back_handler = _show_local_options
 	popup.visible = true
@@ -1019,7 +1266,7 @@ func _local_device_name(device: String) -> String:
 
 
 func _show_online() -> void:
-	_back_handler = _show_multiplayer
+	_back_handler = _show_online_modes
 	popup_title.text = "ONLINE"
 	_clear_popup_body()
 
@@ -1066,7 +1313,7 @@ func _online_message(title: String, body: String) -> void:
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	line.custom_minimum_size.x = 460
 	popup_body.add_child(line)
-	_back_handler = _show_multiplayer
+	_back_handler = _show_online_modes
 	popup.visible = true
 	back_button.grab_focus()
 
@@ -1172,6 +1419,7 @@ func _start_level(level_number: int) -> void:
 func _begin_level(level_number: int) -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
+	get_tree().set_meta("arena_local_duel", false)
 	get_tree().set_meta("level_number", level_number)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 

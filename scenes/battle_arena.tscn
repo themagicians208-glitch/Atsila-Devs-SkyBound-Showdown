@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/battle_arena.gd" id="1_arena"]
+[ext_resource type="Environment" path="res://scenes/main-environment.tres" id="2_env"]
+
+[node name="BattleArena" type="Node3D"]
+script = ExtResource("1_arena")
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.94902, 0.839216, 1)
+light_energy = 1.15

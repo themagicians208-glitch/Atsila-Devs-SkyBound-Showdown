@@ -59,11 +59,19 @@ var _players: Array = []
 var _coins := 0
 var _transition_overlay: ColorRect
 
+## Rule-change announcements ("REALITY SHIFT DETECTED!"), one at a time so a
+## puzzle never buries the player in text.
+var frozen_notice: Label
+var _notice_queue: Array[Dictionary] = []
+var _notice_time_left := 0.0
+var _notice_text := ""
+
 func _ready() -> void:
 	# The HUD keeps working while the game is paused, so the inventory key can
 	# close the inventory it opened.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_game_hud()
+	_build_frozen_notice()
 	_build_status_bars()
 	_build_victory_overlay()
 	_build_death_overlay()
@@ -75,6 +83,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_tick_frozen_notice(_delta)
 	if _players.is_empty():
 		return
 	var primary: Node = _players[0] as Node
@@ -325,16 +334,19 @@ func set_objective(text: String, persistent := true) -> void:
 	objective_hint.modulate.a = 1.0
 	objective_persistent = persistent
 
-func set_frozen_abilities(unlocked: Array[String]) -> void:
+func set_frozen_abilities(unlocked: Array[String], shield_active := false, shield_cd := 0.0, dash_cd := 0.0) -> void:
 	if not is_instance_valid(frozen_ability_hint):
 		return
 	if unlocked.is_empty():
 		frozen_ability_hint.visible = false
 		return
-	frozen_ability_hint.text = "ICE ABILITIES  •  " + "  |  ".join(unlocked)
+	var status := "ACTIVE" if shield_active else ("READY" if shield_cd <= 0.01 else ("CD %.1fs" % shield_cd))
+	var dash_status := "READY" if dash_cd <= 0.01 else ("CD %.1fs" % dash_cd)
+	frozen_ability_hint.text = "ICE ABILITIES  •  " + "  |  ".join(unlocked) \
+			+ "  (SHIELD %s  •  DASH %s)" % [status, dash_status]
 	frozen_ability_hint.visible = true
 
-func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int, generators: int = 0, blocks_aligned: bool = false) -> void:
+func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int, generators: int = 0, blocks_aligned: bool = false, rules_line := "") -> void:
 	if not is_instance_valid(frozen_progress_hint):
 		return
 	# Frozen Skies has two extra status rows; keep its transient message and
@@ -343,10 +355,75 @@ func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_
 	finish_message.offset_bottom = 204
 	boss_panel.offset_top = 214
 	boss_panel.offset_bottom = 294
-	frozen_progress_hint.text = "SEALS %d/%d  •  GENERATORS %d/3  •  BLOCKS %s  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d" % [
+	frozen_progress_hint.text = "SEALS %d/%d  •  GENERATORS %d/3  •  BLOCKS %s  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d%s" % [
 		seals, total, generators, "ALIGNED" if blocks_aligned else "PENDING", "ALIGNED" if crystal_solved else "PENDING",
-		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
+		"RECOVERED" if fragment_recovered else "PENDING", checkpoint,
+		("  •  " + rules_line) if not rules_line.is_empty() else ""]
 	frozen_progress_hint.visible = true
+
+## "REALITY SHIFT DETECTED!" and friends: queued, tinted by tone, auto-hiding.
+func show_frozen_notice(text: String, tone := "objective") -> void:
+	if text.is_empty():
+		return
+	if text == _notice_text and _notice_time_left > 0.0:
+		return
+	for queued in _notice_queue:
+		if str(queued.get("text", "")) == text:
+			return
+	if _notice_queue.size() >= 3:
+		_notice_queue.pop_front()
+	_notice_queue.append({"text": text, "tone": tone})
+
+func _build_frozen_notice() -> void:
+	frozen_notice = Label.new()
+	frozen_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frozen_notice.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	frozen_notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	frozen_notice.offset_left = -700
+	frozen_notice.offset_top = -170
+	frozen_notice.offset_right = 700
+	frozen_notice.offset_bottom = -110
+	frozen_notice.add_theme_font_override("font", UI_FONT)
+	frozen_notice.add_theme_font_size_override("font_size", 30)
+	frozen_notice.add_theme_color_override("font_color", Color("#dff4ff"))
+	frozen_notice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
+	frozen_notice.add_theme_constant_override("shadow_offset_x", 2)
+	frozen_notice.add_theme_constant_override("shadow_offset_y", 3)
+	frozen_notice.visible = false
+	add_child(frozen_notice)
+
+func _tick_frozen_notice(delta: float) -> void:
+	if not is_instance_valid(frozen_notice):
+		return
+	if _notice_time_left > 0.0:
+		_notice_time_left = maxf(0.0, _notice_time_left - delta)
+		if _notice_time_left <= 0.0:
+			frozen_notice.visible = false
+			_notice_text = ""
+	if _notice_time_left > 0.0 or _notice_queue.is_empty():
+		return
+	var entry: Dictionary = _notice_queue.pop_front()
+	_notice_text = str(entry.get("text", ""))
+	frozen_notice.text = _notice_text
+	frozen_notice.add_theme_color_override("font_color", _notice_color(str(entry.get("tone", "objective"))))
+	frozen_notice.visible = true
+	frozen_notice.scale = Vector2(0.72, 0.72)
+	_notice_time_left = 2.6
+	var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(frozen_notice, "scale", Vector2.ONE, 0.28)
+
+func _notice_color(tone: String) -> Color:
+	match tone:
+		"warning":
+			return Color("#ffd166")
+		"changed":
+			return Color("#8ff6ff")
+		"complete":
+			return Color("#9ff5b0")
+		"fail":
+			return Color("#ff9a7a")
+		_:
+			return Color("#dff4ff")
 
 func set_ember_abilities(unlocked: Array[String], shield_active: bool = false, shield_cd: float = 0.0) -> void:
 	if not is_instance_valid(frozen_ability_hint):

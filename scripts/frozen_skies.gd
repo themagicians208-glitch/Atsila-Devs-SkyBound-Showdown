@@ -15,6 +15,19 @@ const CRYSTAL_BLOCK := preload("res://objects/frozen_crystal_block.gd")
 const FROZEN_AUDIO := preload("res://objects/frozen_audio.gd")
 const PUZZLE_GATE := preload("res://objects/puzzle_gate.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
+const SWITCH_PUZZLE := preload("res://objects/frozen_switch_puzzle.gd")
+const WIND_VALLEY := preload("res://objects/ice_wind_valley.gd")
+const LAKE_CYCLE := preload("res://objects/frozen_lake_cycle.gd")
+const FORTRESS_SHIFT := preload("res://objects/fortress_shift.gd")
+const SEAL_APPROACH := preload("res://objects/seal_approach.gd")
+const SEAL_CHALLENGE := preload("res://objects/seal_challenge.gd")
+
+## Every rule-changing puzzle in Frozen Skies, by id. Six of them, one per region
+## feature, all running on the same RuleShift engine.
+const RULE_PUZZLE_TOTAL := 6
+## Four frozen seals: the timed switch, the crystal energy re-route, the frozen
+## guardians and - new - the moving-platform cross through the Mirror Dimension.
+const SEAL_TOTAL := 3
 
 @export var coins_required := 50
 var route: Array = []
@@ -70,6 +83,56 @@ var cave_cluster_count := 0
 var glowing_flower_count := 0
 var frozen_ruin_count := 0
 var boss_music_active := false
+## The rule-changing puzzles, keyed by their RuleShift id.
+var rule_puzzles: Dictionary = {}
+## The three seals' mid-challenge changes, plus the optional mirror crossing.
+var seal_one: SealChallenge
+var seal_three: SealChallenge
+var mirror_crossing: SealApproach
+var _arena_platforms: Array[Node3D] = []
+var _arena_shifted := false
+var _arena_reposition_pending := false
+## Frozen Skies' rotating fortress bridge turns one way, then the other, once the
+## fortress puzzle changes its rules.
+var _bridge_rate := 1.0
+
+
+## Absolute Frost: the Titan drags the arena slabs a quarter-turn round the sigil.
+## A slab the player is standing on or beside holds the whole turn back, so the
+## floor can never vanish out from under them - and, because the four slabs swap
+## slots as they turn, they must move together: letting one stay behind would land
+## its neighbour on top of it.
+func _shift_arena_platforms() -> void:
+	if _arena_turn_blocked():
+		_arena_reposition_pending = true
+		return
+	for slab in _arena_platforms:
+		if is_instance_valid(slab):
+			_reposition_slab(slab)
+
+
+## True while the player is close enough to any slab that moving it would drop
+## them - checked for all four before any of them turns.
+func _arena_turn_blocked() -> bool:
+	var player: Node3D = _main.get("player") as Node3D if _main != null else null
+	if player == null:
+		return false
+	for slab in _arena_platforms:
+		if is_instance_valid(slab) and slab.global_position.distance_to(player.global_position) < 2.6:
+			return true
+	return false
+
+
+func _reposition_slab(slab: Node3D) -> void:
+	if not is_instance_valid(slab):
+		return
+	var centre: Vector3 = slab.get_meta("centre", slab.global_position)
+	var angle: float = float(slab.get_meta("angle", 0.0)) + PI * 0.5
+	slab.set_meta("angle", angle)
+	slab.global_position = centre + Vector3(cos(angle) * 3.5, -0.12, sin(angle) * 3.5)
+	var visual := slab.find_child("*", true, false) as MeshInstance3D
+	if visual != null and visual.material_override is StandardMaterial3D:
+		(visual.material_override as StandardMaterial3D).emission_energy_multiplier = 1.6
 
 func build(main: Node) -> Array:
 	_main = main
@@ -91,9 +154,150 @@ func build(main: Node) -> Array:
 	_build_crystal_generators()
 	_build_crystal_gate()
 	_build_cave_gate()
+	_build_rule_puzzles()
 	if Progress.third_fragment_recovered:
 		thaw_environment()
 	return route
+
+
+## --- The rule-changing puzzles -----------------------------------------------
+##
+## Six sites, each one running on a shared RuleShift: The Frozen Switch (I),
+## Slippery Ice Valley's wind (II), the Three Crystal Puzzle (III, built above),
+## the Frozen Lake (IV), the Shattered Ice Fortress (V) and the approach to the
+## Fourth Frozen Seal (VI). Every site reports through _on_rule_notice so the HUD
+## says what changed, and every site can be retried.
+func _build_rule_puzzles() -> void:
+	# I - The Frozen Switch, on the way out of Crystal Snowfields.
+	var switch_frame := _site_frame(8, 3.4)
+	var switch_puzzle: FrozenSwitchPuzzle = SWITCH_PUZZLE.new()
+	switch_puzzle.name = "FrozenSwitchPuzzle"
+	switch_puzzle.position = switch_frame["anchor"]
+	_world.add_child(switch_puzzle)
+	switch_puzzle.configure(switch_frame["anchor"], switch_frame["lane"], switch_frame["across"])
+	_register_rule_puzzle("frozen_switch", switch_puzzle, switch_puzzle.rule_shift,
+			[switch_puzzle.island_positions()[0], switch_puzzle.island_positions()[1]])
+
+	# II - Slippery Ice Valley's turning wind.
+	var valley_frame := _site_frame(16, 3.6)
+	var valley: IceWindValley = WIND_VALLEY.new()
+	valley.name = "IceWindValley"
+	valley.position = valley_frame["anchor"]
+	_world.add_child(valley)
+	valley.configure(valley_frame["anchor"], valley_frame["lane"], valley_frame["across"])
+	_register_rule_puzzle("ice_wind_valley", valley, valley.rule_shift, [valley.island_position()])
+
+	# III - the Three Crystal Puzzle already exists; just put it on the books.
+	if _crystal_light != null and _crystal_light.get("rule_shift") != null:
+		_register_rule_puzzle("three_crystals", _crystal_light, _crystal_light.get("rule_shift") as RuleShift, [])
+
+	# IV - the Frozen Lake.
+	var lake_frame := _site_frame(27, 3.8)
+	var lake: FrozenLakeCycle = LAKE_CYCLE.new()
+	lake.name = "FrozenLakeCycle"
+	lake.position = lake_frame["anchor"]
+	_world.add_child(lake)
+	lake.configure(lake_frame["anchor"], lake_frame["lane"], lake_frame["across"])
+	_register_rule_puzzle("frozen_lake", lake, lake.rule_shift, [lake.far_shore_position()])
+
+	# V - the Shattered Ice Fortress.
+	var fortress_frame := _site_frame(32, 4.0)
+	var fortress: FortressShift = FORTRESS_SHIFT.new()
+	fortress.name = "FortressShift"
+	fortress.position = fortress_frame["anchor"]
+	_world.add_child(fortress)
+	fortress.configure(fortress_frame["anchor"], fortress_frame["lane"], fortress_frame["across"], _main)
+	_register_rule_puzzle("fortress_shift", fortress, fortress.rule_shift, fortress.mirror_route_positions())
+
+	# VI - Malakar's last trick: the optional Mirror Crossing up by the Sanctuary.
+	# Its path splits between dimensions once all three seals are lit.
+	var seal_frame := _site_frame(37, 4.5)
+	mirror_crossing = SEAL_APPROACH.new()
+	mirror_crossing.name = "MirrorCrossing"
+	mirror_crossing.position = seal_frame["anchor"]
+	_world.add_child(mirror_crossing)
+	mirror_crossing.configure(seal_frame["anchor"], seal_frame["lane"], seal_frame["across"], _main)
+	_register_rule_puzzle("mirror_crossing", mirror_crossing, mirror_crossing.rule_shift,
+			[mirror_crossing.pedestal_position()])
+
+	# Seal I's challenge: the moving ice in front of the first seal reverses
+	# halfway across. Seal III's: the guardians' safe platforms start fading once
+	# the first guardian falls.
+	var seal_one_frame := _site_frame(3, 2.6)
+	seal_one = SEAL_CHALLENGE.new()
+	seal_one.name = "SealOneChallenge"
+	seal_one.position = seal_one_frame["anchor"]
+	_world.add_child(seal_one)
+	seal_one.configure(seal_one_frame["anchor"], seal_one_frame["lane"], seal_one_frame["across"], "moving")
+	_register_rule_puzzle("seal_one", seal_one, seal_one.rule_shift, [seal_one.far_side_position()])
+
+	var seal_three_frame := _site_frame(31, 3.0)
+	seal_three = SEAL_CHALLENGE.new()
+	seal_three.name = "SealThreeChallenge"
+	seal_three.position = seal_three_frame["anchor"]
+	_world.add_child(seal_three)
+	seal_three.configure(seal_three_frame["anchor"], seal_three_frame["lane"], seal_three_frame["across"], "arena")
+	_register_rule_puzzle("seal_three", seal_three, seal_three.rule_shift, [])
+
+
+func _register_rule_puzzle(id: String, site: Node, shift: RuleShift, reward_points: Array) -> void:
+	rule_puzzles[id] = site
+	shift.notice.connect(_on_rule_notice)
+	shift.rules_changed.connect(_on_rules_changed)
+	# Reward coins live at the far end of each site, so the puzzle is worth doing.
+	for index in reward_points.size():
+		var point: Vector3 = reward_points[index]
+		_add_coin(point + Vector3(0.0, 1.4, 0.6), "frozen_rule_%s_%d" % [id, index])
+		coins_placed += 1
+
+
+func _on_rule_notice(text: String, tone: String) -> void:
+	if _main != null and _main.has_method("_on_frozen_rule_notice"):
+		_main.call("_on_frozen_rule_notice", text, tone)
+
+
+func _on_rules_changed(shifted: bool, puzzle_name: String) -> void:
+	if not shifted:
+		return
+	# The corruption's rule changes are the level's, too: refreeze the HUD and
+	# let the site's own physics settle.
+	if _main != null and _main.has_method("_update_frozen_progress_hud"):
+		_main.call("_update_frozen_progress_hud")
+	if puzzle_name.is_empty():
+		return
+	FrozenAudio.cue(_world, "shift", 1.6, -10.0)
+
+
+## "PUZZLES 3/6 • THE FROZEN LAKE RULE_CHANGED" for the HUD's progress row.
+func rule_line() -> String:
+	var done := 0
+	var active := ""
+	for id in rule_puzzles.keys():
+		var site: Node = rule_puzzles[id]
+		var shift := site.get("rule_shift") as RuleShift
+		if shift == null:
+			continue
+		if shift.finished:
+			done += 1
+		elif shift.shifted and active.is_empty():
+			active = "%s %s" % [shift.puzzle_name, shift.state_name()]
+	var line := "PUZZLES %d/%d" % [done, rule_puzzles.size()]
+	if not active.is_empty():
+		line += "  •  " + active
+	return line
+
+
+## A point beside the route plus the frame (lane forward, across sideways) a
+## puzzle site is built in.
+func _site_frame(index: int, lateral: float) -> Dictionary:
+	var point: Vector3 = route[index]
+	var forward: Vector3 = route[mini(index + 1, route.size() - 1)] - route[maxi(index - 1, 0)]
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+	var side := Vector3(-forward.z, 0.0, forward.x)
+	return {"anchor": point + side * lateral, "lane": forward, "across": side}
 
 func _build_audio() -> void:
 	_ambient_audio = FROZEN_AUDIO.new()
@@ -109,8 +313,12 @@ func _build_audio() -> void:
 func _build_crystal_light_puzzle() -> void:
 	_crystal_light = CRYSTAL_LIGHT.new()
 	_crystal_light.name = "CrystalLightPuzzle"
+	# Frozen Skies is the level where this puzzle re-routes its own energy
+	# halfway through; other levels can still build it as a plain rotation puzzle.
+	_crystal_light.set("rule_shift_enabled", true)
 	_crystal_light.position = route[18] + Vector3(0.0, 0.65, 1.8)
 	_world.add_child(_crystal_light)
+	_crystal_light.connect("notice", _on_rule_notice)
 	_crystal_light.solved.connect(func():
 		Progress.unlock_crystal_activation()
 		if _crystal_gate != null:
@@ -256,6 +464,16 @@ func _process(delta: float) -> void:
 		Audio.play_music("res://sounds/itty_bitty.mp3")
 		if _boss_audio != null:
 			_boss_audio.start()
+	if _titan != null and not boss_defeated and _titan.phase >= 4 and not _arena_shifted:
+		_arena_shifted = true
+		_shift_arena_platforms()
+		_on_rule_notice("ABSOLUTE FROST - THE ARENA ITSELF MOVES!", "changed")
+		FrozenAudio.cue(_world, "shift", 1.8, -8.0)
+	if _arena_reposition_pending:
+		_arena_reposition_pending = false
+		for slab in _arena_platforms:
+			if is_instance_valid(slab):
+				_reposition_slab(slab)
 	for index in _moving_platforms.size():
 		var platform := _moving_platforms[index]
 		if not is_instance_valid(platform):
@@ -265,11 +483,15 @@ func _process(delta: float) -> void:
 		platform.position = origin + Vector3(sin(_time * 1.1 + phase) * 1.8, sin(_time * 1.7 + phase) * 0.35, 0.0)
 	for bridge in _rotating_bridges:
 		if is_instance_valid(bridge):
-			bridge.rotation = Vector3(0.0, sin(_time * 0.75 + float(bridge.get_meta("phase"))) * 0.72, 0.0)
+			bridge.rotation = Vector3(0.0, sin(_time * 0.75 * _bridge_rate + float(bridge.get_meta("phase"))) * 0.72, 0.0)
 	if _timed_seal_time > 0.0:
 		_timed_seal_time = maxf(0.0, _timed_seal_time - delta)
 		if _timed_seal_time == 0.0 and _timed_seal_switch != null:
 			_timed_seal_switch.reset()
+	# Once the moving-ice challenge in front of the first seal is crossed, the
+	# timed switch holds: the player should not have to run all the way back for it.
+	if seal_one != null and seal_one.is_solved() and _timed_seal_time < 3.0:
+		_timed_seal_time = 6.0
 
 func _build_moving_ice_platforms() -> void:
 	for entry in [[4, -1.2], [14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
@@ -341,7 +563,7 @@ func _build_frozen_mechanics() -> void:
 	_timed_seal_switch.activated.connect(func(): _timed_seal_time = 6.0)
 	for index in range(mini(Progress.frozen_seals_activated, mechanisms.size())):
 		mechanisms[index].activate()
-	frozen_seals_complete = Progress.frozen_seals_activated >= mechanisms.size()
+	frozen_seals_complete = Progress.frozen_seals_activated >= SEAL_TOTAL
 
 func try_activate_nearby(player: Node3D) -> bool:
 	if _crystal_light != null and _crystal_light.try_interact(player):
@@ -353,6 +575,12 @@ func try_activate_nearby(player: Node3D) -> bool:
 		for generator in _crystal_generators:
 			if not generator.get("is_activated") and generator.global_position.distance_to(player.global_position) <= 2.4:
 				return generator.activate()
+	# The rule-changing puzzle sites own their own interactions (switches, the
+	# revealed crystal, the lake's cycle switch, the fortress mechanisms).
+	for id in ["frozen_switch", "frozen_lake", "fortress_shift"]:
+		var site: Node = rule_puzzles.get(id)
+		if site != null and site.has_method("try_activate") and bool(site.call("try_activate", player)):
+			return true
 	if _timed_seal_switch != null and not _timed_seal_switch.is_activated and _timed_seal_switch.global_position.distance_to(player.global_position) <= 2.4:
 		return _timed_seal_switch.activate()
 	for index in mechanisms.size():
@@ -374,8 +602,18 @@ func try_activate_nearby(player: Node3D) -> bool:
 				if _main.has_method("_on_frozen_mechanism_blocked"):
 					_main.call("_on_frozen_mechanism_blocked", "Defeat the frozen guardians before activating the final seal.")
 				return true
+			if index == 0 and seal_one != null and not seal_one.is_solved():
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Cross the moving ice to the first seal.")
+				return true
 			return mechanism.activate()
 	return false
+
+## The fortress puzzle calls this when its structure changes: the level's own
+## rotating ice bridge then turns the other way.
+func reverse_frozen_bridges() -> void:
+	_bridge_rate = -_bridge_rate
+
 
 func _frozen_enemy_encounter_cleared() -> bool:
 	for enemy in get_tree().get_nodes_in_group("enemies"):
@@ -397,6 +635,12 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 		Progress.unlock_frost_dash()
 	if activated_count == 3:
 		Progress.unlock_crystal_activation()
+		# Malakar's last trick: the moment the third seal is lit, the optional
+		# Mirror Crossing up by the Sanctuary starts switching dimensions.
+		if mirror_crossing != null and mirror_crossing.rule_shift != null \
+				and not mirror_crossing.rule_shift.shifted and not mirror_crossing.rule_shift.finished:
+			mirror_crossing.rule_shift.request_rule_change()
+	if activated_count >= mechanisms.size():
 		frozen_seals_complete = true
 		if _titan != null:
 			_titan.unlock()
@@ -569,6 +813,14 @@ func _place_coins() -> void:
 	for hidden_index in [3, 5, 8, 12, 14, 19, 21, 27, 28, 34, 35, 39]:
 		_add_coin(route[hidden_index] + Vector3(2.3, 1.6, 0.8), "frozen_hidden_%02d" % hidden_index)
 		coins_placed += 1
+	# Behind the frozen waterfalls and inside the crystal caves. The portal only
+	# asks for 50, so the level deliberately offers more than that.
+	for index in [4, 11, 18, 25, 32, 39]:
+		_add_coin(route[index] + Vector3(-2.7, 1.5, 1.5), "frozen_waterfall_%02d" % index)
+		coins_placed += 1
+	for index in [21, 23, 25, 27]:
+		_add_coin(route[index] + Vector3(2.1, 1.25, 1.3), "frozen_cave_%02d" % index)
+		coins_placed += 1
 
 func _add_coin(where: Vector3, persistent_id: String) -> void:
 	var coin: Area3D = COIN.instantiate()
@@ -577,12 +829,11 @@ func _add_coin(where: Vector3, persistent_id: String) -> void:
 	_world.add_child(coin)
 
 func _place_enemies() -> void:
+	# Ground enemies only: the Crystal Phantoms' flying patrols were removed.
 	for index in [6, 15, 24, 31]:
 		_spawn_enemy("Frost Slime", route[index] + Vector3(0.0, 1.0, 0.0))
 	for index in [11, 22, 30]:
 		_spawn_enemy("Frost Wolf", route[index] + Vector3(0.0, 1.0, 0.0))
-	for index in [18, 28, 36]:
-		_spawn_enemy("Crystal Phantom", route[index] + Vector3(0.0, 3.0, 0.0))
 	_titan = FROST_TITAN.new()
 	_titan.name = "FrostTitan"
 	_titan.position = route[route.size() - 3] + Vector3(0.0, 2.2, 3.0)
@@ -766,6 +1017,29 @@ func _build_boss_arena() -> void:
 	sigil.position = centre + Vector3(0.0, 0.08, 0.0)
 	sigil.material_override = _material(Color("#8cddff"), 1.0)
 	_world.add_child(sigil)
+	# Four slabs ringing the arena. They are the Titan's last-phase gimmick: when
+	# it enters Absolute Frost it drags them to new positions, so the footing the
+	# player learned in phases 1-3 is not the footing they finish on.
+	for index in 4:
+		var angle := TAU * (float(index) / 4.0) + PI * 0.25
+		var slab := StaticBody3D.new()
+		slab.name = "FrostArenaSlab_%d" % index
+		slab.position = centre + Vector3(cos(angle) * 3.5, -0.12, sin(angle) * 3.5)
+		slab.set_meta("angle", angle)
+		slab.set_meta("centre", centre)
+		var slab_visual := MeshInstance3D.new()
+		var slab_mesh := BoxMesh.new()
+		slab_mesh.size = Vector3(2.4, 0.6, 2.4)
+		slab_visual.mesh = slab_mesh
+		slab_visual.material_override = _material(Color("#a8d8ff"), 0.45)
+		slab.add_child(slab_visual)
+		var slab_shape := CollisionShape3D.new()
+		var slab_box := BoxShape3D.new()
+		slab_box.size = Vector3(2.4, 0.6, 2.4)
+		slab_shape.shape = slab_box
+		slab.add_child(slab_shape)
+		_world.add_child(slab)
+		_arena_platforms.append(slab)
 	_boss_gate = StaticBody3D.new()
 	_boss_gate.name = "FrostTitanArenaGate"
 	_boss_gate.position = route[route.size() - 4] + Vector3(0.0, 1.3, 1.4)
@@ -829,7 +1103,7 @@ func _on_boss_arena_entered(body: Node3D) -> void:
 
 func reset_boss_encounter() -> void:
 	boss_fight_started = false
-	if not boss_defeated and Progress.frozen_seals_activated >= 3:
+	if not boss_defeated and Progress.frozen_seals_activated >= mechanisms.size():
 		_unlock_boss_arena()
 
 func _material(color: Color, emission: float) -> StandardMaterial3D:

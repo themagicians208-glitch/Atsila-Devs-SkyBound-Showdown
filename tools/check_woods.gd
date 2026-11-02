@@ -10,7 +10,7 @@ extends Node
 ##     - Shadow Slimes present and functional
 ##     - Shadow Wolf speed = 125% player speed (7.5 vs 6.0)
 ##     - Shadow Wolf damage strictly < Level 1 Shadow Slime damage (3.0 < 4.0)
-##     - Sky Phantoms present with warning rings & projectiles
+##     - Ground enemies only: slimes and wolves, no flying monsters
 ##  5. Puzzles 1 to 6 interactive and solveable
 ##  6. Rescued creatures persistence in Progress
 ##  7. 4-Phase Shadow Wolf Boss mechanics (damage, health bar, phases, arena lock)
@@ -73,11 +73,11 @@ func _ready() -> void:
 	# Enemies
 	var slimes := get_tree().get_nodes_in_group("shadow_slimes")
 	var wolves := get_tree().get_nodes_in_group("shadow_wolves")
-	var phantoms := get_tree().get_nodes_in_group("sky_phantoms")
+	var flying := get_tree().get_nodes_in_group("sky_phantoms")
 	var boss: ShadowWolfBoss = get_tree().get_first_node_in_group("woods_boss") as ShadowWolfBoss
 
-	print("ENEMIES: %d slimes, %d wolves, %d phantoms, boss=%s" % [
-		slimes.size(), wolves.size(), phantoms.size(), "found" if boss != null else "MISSING"
+	print("ENEMIES: %d slimes, %d wolves, %d flying (must be 0), boss=%s" % [
+		slimes.size(), wolves.size(), flying.size(), "found" if boss != null else "MISSING"
 	])
 
 	if slimes.is_empty():
@@ -98,8 +98,8 @@ func _ready() -> void:
 		else:
 			print("WOLF DAMAGE OK: %f (strictly < slime 4.0)" % wolf.contact_damage)
 
-	if phantoms.is_empty():
-		problems.append("No Sky Phantoms found in Level 2")
+	if not flying.is_empty():
+		problems.append("Flying Sky Phantoms are still spawned in Level 2 (%d)" % flying.size())
 	if boss == null:
 		problems.append("Shadow Wolf Boss not found")
 	else:

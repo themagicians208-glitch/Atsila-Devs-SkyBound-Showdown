@@ -825,9 +825,7 @@ func _place_enemies() -> void:
 	# Magma Wolves (110% speed, articulated rig, damage < Shadow Slime) - spawned directly on the platform surface
 	for index in [11, 22, 24, 33, 40]:
 		_spawn_enemy("Magma Wolf", route[index] + Vector3(0.0, 0.50, 0.0))
-	# Lava Phantoms (flying aerial movement, warning ring, fire projectiles)
-	for index in [16, 26, 35, 40]:
-		_spawn_enemy("Lava Phantom", route[index] + Vector3(0.0, 2.8, 0.0))
+	# Flying enemies (Lava Phantoms) are no longer placed.
 
 	# Final Boss: The Ember Dragon
 	_dragon = EMBER_DRAGON.new()
