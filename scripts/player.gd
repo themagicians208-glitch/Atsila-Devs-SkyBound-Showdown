@@ -679,6 +679,7 @@ func collect_coin():
 
 func reset_vitals() -> void:
 	_reset_ice_abilities()
+	knockback = Vector3.ZERO
 	health = max_health
 	stamina = max_stamina
 	last_death_cause = "fall"

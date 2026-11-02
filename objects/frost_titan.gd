@@ -18,11 +18,13 @@ var _material: StandardMaterial3D
 var _attack_cooldown := 2.0
 var _attack_flash := 0.0
 var _warning: MeshInstance3D
+var _home := Vector3.ZERO
 
 func _ready() -> void:
 	add_to_group("enemies")
 	health = max_health
 	_build()
+	_home = global_position
 	health_changed.emit(health, max_health, phase)
 
 func _build() -> void:
@@ -208,5 +210,16 @@ func _spawn_ice_hazard(at: Vector3) -> void:
 
 func unlock() -> void:
 	locked = false
+	health_changed.emit(health, max_health, phase)
+
+func reset_to_home() -> void:
+	if _dead:
+		return
+	health = max_health
+	phase = 1
+	locked = Progress.frozen_seals_activated < 3
+	global_position = _home
+	_attack_cooldown = 2.0
+	_warning.visible = false
 	health_changed.emit(health, max_health, phase)
 

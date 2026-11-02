@@ -1199,6 +1199,10 @@ func _reset_enemies() -> void:
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if node.has_method("reset_to_home"):
 			node.call("reset_to_home")
+	for node in get_tree().get_nodes_in_group("frost_hazards"):
+		node.queue_free()
+	for node in get_tree().get_nodes_in_group("frozen_projectiles"):
+		node.queue_free()
 	hud.hide_boss()
 
 
@@ -1543,10 +1547,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not get_tree().paused:
 		hud.toggle_pause()
 		return
-	if event.is_action_pressed("interact") and not puzzle_solved:
+	if event.is_action_pressed("interact"):
 		if frozen_skies != null and frozen_skies.try_activate_nearby(player):
 			return
-		_try_press_switch()
+		if not puzzle_solved:
+			_try_press_switch()
 
 
 func _on_coin_collected(_coins: int) -> void:
@@ -1620,6 +1625,11 @@ func _on_player_died(who: CharacterBody3D) -> void:
 	if local_coop:
 		# In co-op, drop the fallen player back in rather than stopping the game.
 		respawn_player(who)
+	elif frozen_skies != null:
+		hud.show_finish_message("The frost claims you. Returning to the latest checkpoint...")
+		await get_tree().create_timer(0.45).timeout
+		if is_instance_valid(who) and bool(who.get("is_dead")):
+			respawn_player(who)
 	else:
 		Engine.time_scale = 1.0
 		var cause := str(who.get("last_death_cause")) if who != null and who.get("last_death_cause") != null else "fall"

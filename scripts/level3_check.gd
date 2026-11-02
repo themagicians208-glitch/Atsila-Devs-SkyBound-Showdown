@@ -86,6 +86,13 @@ func _run() -> void:
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
 	var seal_list: Array = instance.get("frozen_skies").mechanisms
+	instance.set("active_checkpoint", 9)
+	instance.set("checkpoint_position", instance.get("frozen_skies").route[9] + Vector3(0.0, 0.55, 0.0))
+	get_root().get_node("Progress").set_frozen_checkpoint(9)
+	player.die("checkpoint_test")
+	await create_timer(0.7).timeout
+	assert(not player.is_dead, "Frozen Skies defeat must respawn the player")
+	assert(player.global_position.distance_to(instance.get("checkpoint_position")) < 0.6, "Frozen Skies defeat must use the latest checkpoint")
 	player.global_position = instance.get("frozen_skies")._timed_seal_switch.global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "timed seal switch must start the first seal challenge")
 	player.global_position = seal_list[1].global_position

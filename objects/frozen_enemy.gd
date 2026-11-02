@@ -238,3 +238,14 @@ func take_hit(amount: int, from: Vector3) -> bool:
 		queue_free()
 	return true
 
+func reset_to_home() -> void:
+	if _dead:
+		return
+	health = max_health
+	global_position = _home
+	_lunge_time = 0.0
+	_lunge_cooldown = 0.0
+	_projectile_cooldown = 1.8
+	_touch_cooldown = 0.0
+	_visual.scale = Vector3.ONE
+
