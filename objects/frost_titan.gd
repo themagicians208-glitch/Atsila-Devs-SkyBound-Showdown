@@ -19,6 +19,7 @@ var _attack_cooldown := 2.0
 var _attack_flash := 0.0
 var _warning: MeshInstance3D
 var _home := Vector3.ZERO
+var _arms: Array[MeshInstance3D] = []
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -29,6 +30,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	_visual = Node3D.new()
+	_visual.name = "FrostTitanVisual"
 	add_child(_visual)
 	_material = StandardMaterial3D.new()
 	_material.albedo_color = Color("#bdeeff")
@@ -50,6 +52,32 @@ func _build() -> void:
 		arm.material_override = _material
 		arm.position = Vector3(side * 1.75, 0.0, 0.0)
 		_visual.add_child(arm)
+		_arms.append(arm)
+	var eye_material := StandardMaterial3D.new()
+	eye_material.albedo_color = Color("#174d88")
+	eye_material.emission_enabled = true
+	eye_material.emission = Color("#54eaff")
+	eye_material.emission_energy_multiplier = 2.2
+	for side in [-1.0, 1.0]:
+		var eye := MeshInstance3D.new()
+		eye.name = "CyanEye"
+		var eye_mesh := SphereMesh.new()
+		eye_mesh.radius = 0.24
+		eye_mesh.height = 0.36
+		eye.mesh = eye_mesh
+		eye.material_override = eye_material
+		eye.position = Vector3(side * 0.48, 1.0, 1.25)
+		_visual.add_child(eye)
+	var chest_symbol := MeshInstance3D.new()
+	chest_symbol.name = "ChestSigil"
+	var sigil_mesh := TorusMesh.new()
+	sigil_mesh.inner_radius = 0.42
+	sigil_mesh.outer_radius = 0.56
+	chest_symbol.mesh = sigil_mesh
+	chest_symbol.rotation.x = PI / 2.0
+	chest_symbol.position = Vector3(0.0, 0.35, 1.43)
+	chest_symbol.material_override = _crystal_material()
+	_visual.add_child(chest_symbol)
 	for i in 6:
 		var crystal := MeshInstance3D.new()
 		var cone := CylinderMesh.new()
@@ -111,7 +139,18 @@ func _perform_phase_attack(target: Node3D) -> void:
 	Audio.play("res://sounds/land.ogg")
 	var distance := global_position.distance_to(target.global_position)
 	if phase == 1:
-		if distance < 7.0 and target.has_method("take_damage"):
+		var sweep_tween := create_tween()
+		for index in _arms.size():
+			var side := -1.0 if index == 0 else 1.0
+			sweep_tween.parallel().tween_property(_arms[index], "rotation:z", side * 0.85, 0.24)
+			sweep_tween.parallel().tween_property(_arms[index], "position:x", side * 2.05, 0.24)
+		sweep_tween.tween_interval(0.18)
+		for arm in _arms:
+			sweep_tween.parallel().tween_property(arm, "rotation:z", 0.0, 0.32)
+			sweep_tween.parallel().tween_property(arm, "position:x", signf(arm.position.x) * 1.75, 0.32)
+		if distance < 5.8 and target.has_method("take_damage"):
+			target.call("take_damage", 6.0, global_position, "frost_titan_sweep")
+		elif distance < 7.0 and target.has_method("take_damage"):
 			target.call("take_damage", 10.0, global_position, "frost_titan_shockwave")
 	elif phase == 2:
 		_spawn_ice_hazard(target.global_position)
@@ -229,5 +268,8 @@ func reset_to_home() -> void:
 	global_position = _home
 	_attack_cooldown = 2.0
 	_warning.visible = false
+	for arm in _arms:
+		arm.rotation.z = 0.0
+		arm.position.x = -1.75 if arm == _arms[0] else 1.75
 	health_changed.emit(health, max_health, phase)
 

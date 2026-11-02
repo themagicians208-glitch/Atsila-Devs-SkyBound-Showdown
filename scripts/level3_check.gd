@@ -115,6 +115,8 @@ func _run() -> void:
 	assert(phantom._attack_warning.visible, "Crystal Phantom must telegraph ice projectiles")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
+	assert(titan.get("_arms").size() == 2, "Frost Titan needs articulated arms")
+	assert(titan.get_node_or_null("FrostTitanVisual/ChestSigil") != null, "Frost Titan needs a glowing chest sigil")
 	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must start closed")
 	var boss_gate: Node3D = world.get_node("FrostTitanArenaGate")
 	var boss_gate_home_y := boss_gate.position.y

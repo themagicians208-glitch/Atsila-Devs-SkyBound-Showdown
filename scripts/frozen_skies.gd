@@ -728,6 +728,7 @@ func _build_snowfall() -> void:
 
 func _build_boss_arena() -> void:
 	var centre: Vector3 = route[route.size() - 3] + Vector3(0.0, 0.0, 3.0)
+	_add_frozen_tree(centre + Vector3(0.0, 0.0, 4.0))
 	for i in 8:
 		var angle := TAU * float(i) / 8.0
 		var pillar := MeshInstance3D.new()
