@@ -86,8 +86,31 @@ func _ready() -> void:
 	player.died.connect(func(): died[0] = true)
 	player.call("take_damage", 1, player.global_position + Vector3(0, 0, 1.5))
 	await get_tree().physics_frame
-	print("   player dead: %s   death overlay up: %s" % [
-		died[0], hud.get("death_overlay").visible])
+	print("   player dead: %s   death overlay up: %s   death anim: %s (hud=%s)" % [
+		died[0], hud.get("death_overlay").visible,
+		player.get("death_animation_type"), hud.get("death_anim_mode")])
+	assert(str(player.get("death_animation_type")) == "mob", "mob kill must trigger the mob death animation")
+	assert(str(character2.call("death_animation_type")) == "mob", "character rig must run the mob death animation")
+	assert(str(hud.get("death_anim_mode")) == "mob", "HUD death overlay must use mob death animation mode")
+	var stars_node: Node3D = character2.get_node_or_null("MobDeathStars")
+	assert(stars_node != null and stars_node.visible, "mob death animation must show knockout stars")
+	character2.call("_update_death_pose", 0.65)
+	var anim_node: Node3D = character2.get_node("anim")
+	var mob_pitch := anim_node.rotation.x
+	assert(mob_pitch < -1.0, "mob death animation must collapse the character onto their back")
+
+	# Respawn clears the death pose, and falling uses a separate death animation
+	main2.call("_on_retry_pressed")
+	await get_tree().physics_frame
+	assert(str(player.get("death_animation_type")) == "", "respawn must clear death_animation_type")
+	assert(absf(anim_node.rotation.x) < 0.08, "respawn must restore upright character rotation")
+	player.call("die", "fall")
+	await get_tree().physics_frame
+	assert(str(player.get("death_animation_type")) == "fall", "falling death must use the separate fall animation")
+	assert(str(hud.get("death_anim_mode")) == "fall", "HUD must use fall animation mode on void death")
+	assert(not stars_node.visible, "falling death must not show mob knockout stars")
+	character2.call("_update_death_pose", 0.45)
+	assert(anim_node.rotation.x > 0.0, "falling death must pitch forward into a tumble, distinct from mob collapse")
 
 	# --- Inventory ----------------------------------------------------------
 	hud.call("toggle_inventory")

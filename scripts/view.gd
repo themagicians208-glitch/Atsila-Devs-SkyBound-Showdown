@@ -45,10 +45,24 @@ extends Node3D
 @export var close_lift := 2.4
 @export var close_tip := 16.0
 
+@export_group("Obstacle Fading")
+## Smoothly fades obstacles (walls, pillars, trees, canopies, gates, arches) that
+## sit in front of the camera angle of the main player so the player stays visible.
+@export var fade_obstacles: bool = true
+## Target GeometryInstance3D.transparency when an obstacle blocks the view (0 = opaque, 1 = invisible).
+@export var fade_transparency: float = 0.78
+## How quickly obstacles fade out when blocking the view and fade back in when clear.
+@export var fade_speed: float = 10.0
+## Radius around the camera-to-player sightline within which obstacles fade.
+@export var fade_corridor_radius: float = 0.85
+
 var camera_rotation:Vector3
 var zoom = 10
 var settings: Node
 var _avoid_sphere := SphereShape3D.new()
+var _faded_meshes: Dictionary = {}
+var _env_meshes_cache: Array[int] = []
+var _env_cache_clock: float = 0.0
 
 @onready var camera = $Camera
 
@@ -102,6 +116,199 @@ func settle_camera(delta: float) -> void:
 	camera.rotation.x = -deg_to_rad(tip)
 	if hide_target_when_close > 0.0 and target is Node3D:
 		(target as Node3D).visible = current > hide_target_when_close
+	_update_obstacle_fading(delta)
+
+
+## Number of meshes currently faded because they sit in front of the camera angle.
+func faded_obstacle_count() -> int:
+	return _faded_meshes.size()
+
+
+## True if `mesh` is currently faded by the camera's obstacle fader.
+func is_mesh_faded(mesh: MeshInstance3D) -> bool:
+	if mesh == null:
+		return false
+	return _faded_meshes.has(mesh.get_instance_id())
+
+
+func _update_obstacle_fading(delta: float) -> void:
+	if not fade_obstacles or target == null or not is_instance_valid(target) or not (target is Node3D):
+		_clear_all_faded_meshes()
+		return
+	var target_node := target as Node3D
+	var target_pos := target_node.global_position
+	var head := target_pos + Vector3(0.0, avoid_head_height, 0.0)
+	var chest := target_pos + Vector3(0.0, 0.65, 0.0)
+	var eye: Vector3 = global_transform * (camera.position as Vector3)
+	var wanted_eye := global_position + global_transform.basis.z * float(zoom)
+	var blocking_meshes: Dictionary = {}
+
+	var space := get_world_3d().direct_space_state if get_world_3d() != null else null
+	if space != null:
+		var right := global_transform.basis.x * 0.35
+		_collect_ray_blockers(space, eye, head, target_pos, blocking_meshes)
+		_collect_ray_blockers(space, eye, chest, target_pos, blocking_meshes)
+		_collect_ray_blockers(space, head, wanted_eye, target_pos, blocking_meshes)
+		_collect_ray_blockers(space, eye + right, head, target_pos, blocking_meshes)
+		_collect_ray_blockers(space, eye - right, head, target_pos, blocking_meshes)
+
+	_env_cache_clock -= delta
+	if _env_cache_clock <= 0.0 or _env_meshes_cache.is_empty():
+		_env_cache_clock = 0.45
+		_refresh_env_meshes_cache()
+
+	for mesh_id in _env_meshes_cache:
+		if not is_instance_id_valid(mesh_id):
+			continue
+		var obj: Object = instance_from_id(mesh_id)
+		if not (obj is MeshInstance3D):
+			continue
+		var mesh_inst: MeshInstance3D = obj as MeshInstance3D
+		if not mesh_inst.is_inside_tree() or not mesh_inst.is_visible_in_tree() or mesh_inst.mesh == null:
+			continue
+		var world_box: AABB = mesh_inst.global_transform * mesh_inst.get_aabb()
+		if _is_ground_or_backdrop_box(world_box, target_pos):
+			continue
+		var grown := world_box.grow(fade_corridor_radius)
+		if grown.intersects_segment(eye, chest) or grown.intersects_segment(eye, head) \
+				or world_box.grow(fade_corridor_radius * 0.65).intersects_segment(wanted_eye, head):
+			blocking_meshes[mesh_id] = true
+
+	for id in blocking_meshes.keys():
+		if not _faded_meshes.has(id) and is_instance_id_valid(id):
+			var obj: Object = instance_from_id(id)
+			if obj is MeshInstance3D:
+				var m: MeshInstance3D = obj as MeshInstance3D
+				_faded_meshes[id] = {
+					"base": m.transparency,
+					"current": m.transparency,
+				}
+
+	var step := maxf(delta, 0.016) * fade_speed
+	for id in _faded_meshes.keys():
+		if not is_instance_id_valid(id):
+			_faded_meshes.erase(id)
+			continue
+		var obj: Object = instance_from_id(id)
+		if not (obj is MeshInstance3D):
+			_faded_meshes.erase(id)
+			continue
+		var m: MeshInstance3D = obj as MeshInstance3D
+		if not m.is_inside_tree():
+			_faded_meshes.erase(id)
+			continue
+		var entry: Dictionary = _faded_meshes[id]
+		var base_t := float(entry["base"])
+		var is_blocking := blocking_meshes.has(id)
+		var goal := maxf(base_t, fade_transparency) if is_blocking else base_t
+		var cur := move_toward(float(entry["current"]), goal, step)
+		entry["current"] = cur
+		m.transparency = cur
+		if not is_blocking and is_equal_approx(cur, base_t):
+			m.transparency = base_t
+			_faded_meshes.erase(id)
+
+
+func _clear_all_faded_meshes() -> void:
+	if _faded_meshes.is_empty():
+		return
+	for id in _faded_meshes.keys():
+		if not is_instance_id_valid(id):
+			continue
+		var obj: Object = instance_from_id(id)
+		if obj is MeshInstance3D:
+			var entry: Dictionary = _faded_meshes[id]
+			(obj as MeshInstance3D).transparency = float(entry["base"])
+	_faded_meshes.clear()
+
+
+func _collect_ray_blockers(
+	space: PhysicsDirectSpaceState3D,
+	from: Vector3,
+	to: Vector3,
+	target_pos: Vector3,
+	out_meshes: Dictionary
+) -> void:
+	var excluded := _avoid_exclusions()
+	for _pass in 5:
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		query.collision_mask = avoid_mask
+		query.collide_with_areas = false
+		query.exclude = excluded
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			break
+		var rid: RID = hit["rid"]
+		excluded.append(rid)
+		var collider_obj: Variant = hit.get("collider")
+		if collider_obj == null or not is_instance_valid(collider_obj) or not (collider_obj is Node3D):
+			continue
+		var collider := collider_obj as Node3D
+		if not _is_fading_candidate_node(collider):
+			continue
+		_gather_obstacle_meshes(collider, target_pos, out_meshes)
+
+
+func _gather_obstacle_meshes(root_node: Node3D, target_pos: Vector3, out_meshes: Dictionary) -> void:
+	var candidates: Array = []
+	if root_node is MeshInstance3D:
+		candidates.append(root_node)
+	for child in root_node.find_children("*", "MeshInstance3D", true, false):
+		candidates.append(child)
+	for item in candidates:
+		if not is_instance_valid(item) or not (item is MeshInstance3D):
+			continue
+		var mesh_inst := item as MeshInstance3D
+		if not mesh_inst.is_inside_tree() or not mesh_inst.is_visible_in_tree() or mesh_inst.mesh == null:
+			continue
+		var world_box: AABB = mesh_inst.global_transform * mesh_inst.get_aabb()
+		if _is_ground_or_backdrop_box(world_box, target_pos):
+			continue
+		out_meshes[mesh_inst.get_instance_id()] = true
+
+
+func _is_ground_or_backdrop_box(world_box: AABB, target_pos: Vector3) -> bool:
+	# Never fade floor slabs or ground beneath the player's knees.
+	if world_box.end.y <= target_pos.y + 0.48:
+		return true
+	var span := maxf(world_box.size.x, world_box.size.z)
+	# Never fade huge island ground slabs or water/sky planes.
+	if span > 15.0 and world_box.size.y < 2.0:
+		return true
+	return false
+
+
+func _is_fading_candidate_node(node: Node) -> bool:
+	var walk: Node = node
+	while walk != null and is_instance_valid(walk):
+		if walk == target:
+			return false
+		if walk.is_in_group("player") or walk.is_in_group("enemies") or walk.is_in_group("collectible_coins"):
+			return false
+		var nm := String(walk.name)
+		if nm.begins_with("Player") or nm.begins_with("Coin"):
+			return false
+		walk = walk.get_parent()
+	return true
+
+
+func _refresh_env_meshes_cache() -> void:
+	_env_meshes_cache.clear()
+	var tree := get_tree()
+	if tree == null:
+		return
+	var root_node: Node = tree.current_scene if tree.current_scene != null else tree.root
+	if root_node == null:
+		return
+	for child in root_node.find_children("*", "MeshInstance3D", true, false):
+		if not is_instance_valid(child) or not (child is MeshInstance3D):
+			continue
+		var mesh_inst := child as MeshInstance3D
+		if mesh_inst.mesh == null:
+			continue
+		if not _is_fading_candidate_node(mesh_inst):
+			continue
+		_env_meshes_cache.append(mesh_inst.get_instance_id())
 
 
 ## Would a camera lifted this far above the player be clear of the world?

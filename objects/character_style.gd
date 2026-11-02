@@ -148,9 +148,16 @@ var swing := 0.0
 var swing_dir := 0
 var _leg_swing := 0.0
 var _arm_swing := 0.0
+var _arm_reach := 0.0
 var _crouch := 0.0
 var _arm_flap := 0.0
 var _leg_splay := 0.0
+
+# Separate death animations: "mob" (stagger, spin and collapse flat with knockout
+# stars) vs "fall" (frantic mid-air flailing tumble). Empty while alive.
+var _death_type := ""
+var _death_time := 0.0
+var _death_stars: Node3D
 
 # The tail is a separate mesh, so it can simply be rotated - and it is the most
 # visible part of the character from the game camera.
@@ -162,6 +169,7 @@ const TINT_GAIN := 1.6
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_anim_node = get_node_or_null("anim") as Node3D
 	_body = get_parent() as CharacterBody3D
 	_loop_cycle_clips()
@@ -539,7 +547,7 @@ func set_swing(amount: float, direction: int) -> void:
 
 func _apply_pose() -> void:
 	var arm_swing := _arm_swing
-	var arm_reach := 0.0
+	var arm_reach := _arm_reach
 	var arm_flap := _arm_flap
 	if swing > 0.001:
 		# A slash takes the arms off the walk cycle entirely.
@@ -561,8 +569,175 @@ func _apply_pose() -> void:
 		_tail_pivot.rotation.y = _tail_sway
 
 
+## Start the character's death animation:
+##   * "mob"  - staggered recoil from the monster's blow, half-spin and collapse
+##              flat onto the ground with orbiting knockout stars.
+##   * "fall" - frantic mid-air flailing tumble as the sky swallows the player.
+func play_death_animation(kind: String, _cause: String = "") -> void:
+	_death_type = kind if kind != "" else "fall"
+	_death_time = 0.0
+	swing = 0.0
+	if _death_type == "mob":
+		_ensure_death_stars()
+		if _death_stars != null:
+			_death_stars.visible = true
+	elif _death_stars != null:
+		_death_stars.visible = false
+	_update_death_pose(0.0)
+
+
+## Restore the upright rest pose and palette after respawning.
+func reset_death_animation() -> void:
+	var was_dead := _death_type != ""
+	_death_type = ""
+	_death_time = 0.0
+	_arm_reach = 0.0
+	if _death_stars != null:
+		_death_stars.visible = false
+	if _anim_node != null:
+		_anim_node.position = Vector3.ZERO
+		_anim_node.rotation = Vector3.ZERO
+		_anim_node.scale = Vector3.ONE
+	if was_dead:
+		apply_player_color(player_index)
+	set_pose(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+func death_animation_type() -> String:
+	return _death_type
+
+
+func _ensure_death_stars() -> void:
+	if _death_stars != null:
+		return
+	_death_stars = Node3D.new()
+	_death_stars.name = "MobDeathStars"
+	_death_stars.position = Vector3(0.0, 0.72, -0.18)
+	add_child(_death_stars)
+	var star_mat := StandardMaterial3D.new()
+	star_mat.albedo_color = Color("#ffe45e")
+	star_mat.emission_enabled = true
+	star_mat.emission = Color("#ff8a3d")
+	star_mat.emission_energy_multiplier = 2.4
+	var ruby_mat := StandardMaterial3D.new()
+	ruby_mat.albedo_color = Color("#ff5b72")
+	ruby_mat.emission_enabled = true
+	ruby_mat.emission = Color("#ff2e55")
+	ruby_mat.emission_energy_multiplier = 2.2
+	for i in 5:
+		var angle := TAU * float(i) / 5.0
+		var orb := MeshInstance3D.new()
+		var prism := PrismMesh.new()
+		prism.size = Vector3(0.16, 0.16, 0.06)
+		orb.mesh = prism
+		orb.position = Vector3(cos(angle) * 0.48, (i % 2) * 0.07, sin(angle) * 0.48)
+		orb.rotation = Vector3(0.45, angle, 0.35)
+		orb.material_override = star_mat if i % 2 == 0 else ruby_mat
+		_death_stars.add_child(orb)
+
+
+func _apply_hit_flash(amount: float) -> void:
+	var weight := clampf(amount, 0.0, 1.0)
+	var plain := player_index == 1
+	var tint: Color = PALETTES[player_index % PALETTES.size()]
+	var flash := Color(1.0, 0.32, 0.38)
+	for i in _materials.size():
+		var base_col := _base_colors[i] if plain else _tinted(_base_colors[i], tint)
+		_materials[i].albedo_color = base_col.lerp(flash, weight)
+	for i in _limb_materials.size():
+		var base_col := _limb_bases[i] if plain else _tinted(_limb_bases[i], tint)
+		_limb_materials[i].set_shader_parameter("albedo_color", base_col.lerp(flash, weight))
+
+
+func _update_death_pose(delta: float) -> void:
+	_death_time += delta
+	if _anim_node == null:
+		return
+	if _death_type == "mob":
+		# Distinct mob-kill sequence:
+		#   1. Impact stagger & upward jolt (0.00 - 0.20s)
+		#   2. Spin & collapse flat onto back with ground bounce (0.20 - 0.58s)
+		#   3. Knocked-out sprawl with orbiting knockout stars (> 0.58s)
+		if _death_time < 0.20:
+			var p := clampf(_death_time / 0.20, 0.0, 1.0)
+			_anim_node.position = Vector3(0.0, sin(p * PI) * 0.40, -p * 0.22)
+			_anim_node.rotation = Vector3(
+				lerpf(-0.32, -0.78, p),
+				p * 1.45,
+				sin(p * PI * 2.0) * 0.30
+			)
+			_anim_node.scale = Vector3(1.22 - 0.22 * p, 0.78 + 0.22 * p, 1.22 - 0.22 * p)
+			_arm_reach = -1.65
+			_arm_flap = -0.92
+			_arm_swing = 0.0
+			_leg_swing = -0.50
+			_leg_splay = 0.46
+			_crouch = 0.26
+			_tail_sway = 0.60
+			_apply_hit_flash(0.85 * (1.0 - p * 0.35))
+		elif _death_time < 0.58:
+			var q := clampf((_death_time - 0.20) / 0.38, 0.0, 1.0)
+			var ease_q := 1.0 - pow(1.0 - q, 3.0)
+			var bounce := absf(sin(q * PI * 2.0)) * (1.0 - q) * 0.16
+			_anim_node.position = Vector3(0.0, 0.14 + bounce, -0.22 - ease_q * 0.16)
+			_anim_node.rotation = Vector3(
+				lerpf(-0.78, -PI * 0.46, ease_q),
+				lerpf(1.45, 2.05, ease_q),
+				lerpf(0.0, 0.24, ease_q)
+			)
+			_anim_node.scale = Vector3.ONE
+			_arm_reach = lerpf(-1.65, -0.35, ease_q)
+			_arm_flap = lerpf(-0.92, -1.05, ease_q)
+			_arm_swing = 0.0
+			_leg_swing = lerpf(-0.50, 0.22, ease_q)
+			_leg_splay = lerpf(0.46, 0.58, ease_q)
+			_crouch = lerpf(0.26, 0.0, ease_q)
+			_tail_sway = lerpf(0.60, 0.0, ease_q)
+			_apply_hit_flash(maxf(0.0, 0.55 * (1.0 - q * 1.4)))
+		else:
+			_anim_node.position = Vector3(0.0, 0.14, -0.38)
+			_anim_node.rotation = Vector3(-PI * 0.46, 2.05, 0.24)
+			_anim_node.scale = Vector3.ONE
+			_arm_reach = -0.35
+			_arm_flap = -1.05 + sin(_death_time * 4.5) * 0.05
+			_arm_swing = 0.0
+			_leg_swing = 0.22
+			_leg_splay = 0.58 + cos(_death_time * 4.5) * 0.03
+			_crouch = 0.0
+			_tail_sway = 0.0
+			_apply_hit_flash(0.0)
+		if _death_stars != null:
+			_death_stars.visible = true
+			_death_stars.rotation.y = _death_time * 4.4
+			_death_stars.position.y = 0.68 + sin(_death_time * 5.0) * 0.05
+	else:
+		# Fall / environmental death: frantic mid-air flailing & spinning tumble.
+		if _death_stars != null:
+			_death_stars.visible = false
+		_anim_node.position = Vector3(0.0, -minf(_death_time * 0.55, 0.45), 0.0)
+		_anim_node.rotation = Vector3(
+			0.42 + sin(_death_time * 8.0) * 0.48,
+			_death_time * 9.5,
+			cos(_death_time * 7.0) * 0.35
+		)
+		_anim_node.scale = Vector3.ONE * maxf(0.38, 1.0 - _death_time * 0.55)
+		_arm_reach = -0.95
+		_arm_flap = -0.80 + sin(_death_time * 24.0) * 0.50
+		_arm_swing = cos(_death_time * 22.0) * 0.75
+		_leg_swing = sin(_death_time * 26.0) * 1.05
+		_leg_splay = 0.36
+		_crouch = 0.22
+		_tail_sway = sin(_death_time * 18.0) * 0.55
+	_apply_pose()
+
+
 func _process(delta: float) -> void:
 	if not animate_motion or _anim_node == null or _body == null:
+		return
+	if _death_type != "":
+		_update_death_pose(delta)
+		return
+	if get_tree() != null and get_tree().paused:
 		return
 	var speed := Vector2(_body.velocity.x, _body.velocity.z).length()
 	var grounded := _body.is_on_floor()

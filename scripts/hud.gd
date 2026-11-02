@@ -24,10 +24,14 @@ signal continue_pressed
 signal retry_pressed
 signal menu_pressed
 var death_overlay: ColorRect
+var death_panel: PanelContainer
+var death_emblem: Control
 var death_heading: Label
 var death_subtitle: Label
 var retry_button: Button
 var menu_button: Button
+var death_anim_mode: String = "fall"
+var _death_anim_time: float = 0.0
 
 var pause_overlay: ColorRect
 var pause_heading: Label
@@ -84,6 +88,16 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_tick_frozen_notice(_delta)
+	if death_overlay != null and death_overlay.visible:
+		_death_anim_time += _delta
+		if death_emblem != null:
+			death_emblem.queue_redraw()
+		if death_panel != null:
+			if death_anim_mode == "mob" and _death_anim_time < 0.35:
+				var decay := 1.0 - (_death_anim_time / 0.35)
+				death_panel.rotation = sin(_death_anim_time * 58.0) * 0.045 * decay
+			else:
+				death_panel.rotation = 0.0
 	if _players.is_empty():
 		return
 	var primary: Node = _players[0] as Node
@@ -500,9 +514,22 @@ func show_victory(level_number: int, total_levels: int) -> void:
 	get_tree().paused = true
 
 func show_death(cause: String = "fall") -> void:
+	var mob_kill := cause in [
+		"slime", "wolf", "phantom", "wolf_boss", "warden", "enemy",
+		"frozen_enemy", "crystal_phantom", "frost_titan", "frost_titan_sweep", "frost_titan_shockwave",
+		"magma_slime", "magma_wolf", "lava_phantom", "ember_dragon", "pvp",
+	] or cause.begins_with("frost_titan")
+	death_anim_mode = "mob" if mob_kill else "fall"
+	_death_anim_time = 0.0
 	if cause == "slime":
 		death_heading.text = "SLIMED!"
 		death_subtitle.text = "A Shadow Slime drained the last of your health. Try again?"
+	elif cause in ["wolf", "wolf_boss"]:
+		death_heading.text = "MAULED BY WOLVES!"
+		death_subtitle.text = "The Shadow Wolves ran you down in the woods. Try again?"
+	elif cause == "frozen_enemy" or cause.begins_with("frost_titan"):
+		death_heading.text = "SHATTERED BY FROST!"
+		death_subtitle.text = "The creatures of the Frozen Skies struck you down. Try again?"
 	elif cause == "magma_slime":
 		death_heading.text = "MELTED BY MAGMA!"
 		death_subtitle.text = "A Magma Slime seared away the last of your health. Try again?"
@@ -527,6 +554,18 @@ func show_death(cause: String = "fall") -> void:
 
 	death_overlay.visible = true
 	death_overlay.modulate.a = 1.0
+	if death_panel != null:
+		death_panel.pivot_offset = death_panel.custom_minimum_size * 0.5
+		if death_anim_mode == "mob":
+			death_panel.scale = Vector2(1.16, 0.86)
+			var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+			tween.tween_property(death_panel, "scale", Vector2.ONE, 0.42)
+		else:
+			death_panel.scale = Vector2(0.88, 1.12)
+			var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween.tween_property(death_panel, "scale", Vector2.ONE, 0.36)
+	if death_emblem != null:
+		death_emblem.queue_redraw()
 
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	retry_button.grab_focus()
@@ -971,7 +1010,8 @@ func _build_victory_overlay() -> void:
 
 func _build_death_overlay() -> void:
 	death_overlay = ColorRect.new()
-	death_overlay.color = Color(0.09, 0.02, 0.03, 0.82)
+	# Translucent enough that the character's 3D death animation remains visible behind the card.
+	death_overlay.color = Color(0.09, 0.02, 0.03, 0.52)
 	death_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	death_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	death_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -983,14 +1023,23 @@ func _build_death_overlay() -> void:
 	death_overlay.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(520, 260)
-	panel.add_theme_stylebox_override("panel", _hud_panel_style(Color("#3a1620"), Color("#ff5b72")))
+	death_panel = panel
+	panel.custom_minimum_size = Vector2(540, 320)
+	panel.pivot_offset = Vector2(270, 160)
+	panel.add_theme_stylebox_override("panel", _hud_panel_style(Color(0.23, 0.08, 0.12, 0.90), Color("#ff5b72")))
 	center.add_child(panel)
 
 	var layout := VBoxContainer.new()
 	layout.alignment = BoxContainer.ALIGNMENT_CENTER
-	layout.add_theme_constant_override("separation", 16)
+	layout.add_theme_constant_override("separation", 12)
 	panel.add_child(layout)
+
+	death_emblem = Control.new()
+	death_emblem.name = "DeathEmblem"
+	death_emblem.custom_minimum_size = Vector2(180, 74)
+	death_emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	death_emblem.draw.connect(_draw_death_emblem)
+	layout.add_child(death_emblem)
 
 	death_heading = Label.new()
 	death_heading.text = "YOU FELL"
@@ -1020,6 +1069,45 @@ func _build_death_overlay() -> void:
 	menu_button = _hud_button("MAIN MENU", Color("#315784"), Color.WHITE)
 	menu_button.pressed.connect(func(): menu_pressed.emit())
 	button_row.add_child(menu_button)
+
+
+func _draw_death_emblem() -> void:
+	if death_emblem == null:
+		return
+	var c := death_emblem.size * 0.5
+	var t := _death_anim_time
+	if death_anim_mode == "mob":
+		# Animated mob-kill emblem: pulsing crimson shield with 3 monster claw slashes
+		# raking across it and orbiting knockout stars.
+		var pulse := 1.0 + sin(t * 7.0) * 0.08
+		death_emblem.draw_circle(c, 28.0 * pulse, Color(0.95, 0.20, 0.32, 0.26))
+		death_emblem.draw_arc(c, 28.0 * pulse, 0.0, TAU, 36, Color("#ff5b72"), 3.0)
+		for i in 3:
+			var delay := float(i) * 0.07
+			var prog := clampf((t - delay) / 0.22, 0.0, 1.0)
+			if prog <= 0.0:
+				continue
+			var x_off := float(i - 1) * 14.0
+			var p0 := c + Vector2(x_off - 18.0, -22.0)
+			var p1 := p0.lerp(c + Vector2(x_off + 18.0, 22.0), prog)
+			death_emblem.draw_line(p0, p1, Color("#fff2f5"), 4.2)
+			death_emblem.draw_line(p0, p1, Color("#ff2e55"), 2.2)
+		for i in 4:
+			var ang := t * 4.5 + float(i) * (TAU / 4.0)
+			var star_pos := c + Vector2(cos(ang) * 44.0, sin(ang) * 18.0)
+			death_emblem.draw_circle(star_pos, 4.5, Color("#ffe45e"))
+			death_emblem.draw_circle(star_pos, 2.2, Color.WHITE)
+	else:
+		# Fall / void death emblem: rushing upward wind streaks and a falling silhouette.
+		death_emblem.draw_circle(c, 26.0, Color(0.25, 0.62, 0.95, 0.20))
+		death_emblem.draw_arc(c, 26.0, 0.0, TAU, 36, Color("#7fd8ff"), 2.5)
+		for i in 4:
+			var wx := c.x + float(i - 1.5) * 14.0
+			var wy := fmod(t * 90.0 + float(i) * 19.0, 48.0) - 24.0
+			death_emblem.draw_line(Vector2(wx, c.y - wy), Vector2(wx, c.y - wy + 12.0), Color(0.82, 0.95, 1.0, 0.75), 2.2)
+		var drop_y := sin(t * 5.0) * 6.0
+		death_emblem.draw_circle(c + Vector2(0.0, drop_y), 7.5, Color("#ff8a9c"))
+
 
 func _build_pause_menu() -> void:
 	pause_overlay = ColorRect.new()

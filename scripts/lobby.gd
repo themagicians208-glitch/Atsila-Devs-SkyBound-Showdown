@@ -474,7 +474,7 @@ func show_levels() -> void:
 
 
 func _level_color(i: int) -> Color:
-	return [MINT, PEACH, SKY, LAVENDER, PINK, BUTTER][i % 6]
+	return [MINT, PEACH, SKY, LAVENDER, PINK][i % 5]
 
 
 # ---------------------------------------------------------------- local ------
