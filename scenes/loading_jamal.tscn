@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://loadingjamal01"]
+[gd_scene format=3 uid="uid://brkhnsl24128k"]
 
 [ext_resource type="Script" path="res://scripts/loading_jamal.gd" id="1_jamal"]
 [ext_resource type="PackedScene" uid="uid://xy8rvnjp22n5" path="res://models/character.glb" id="2_model"]
@@ -12,7 +12,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_jamal")
-next_scene = "res://scenes/home.tscn"
+next_scene = "res://scenes/lobby.tscn"
 jamal_model = ExtResource("2_model")
 title_font = ExtResource("3_font")
 simulate_seconds = 15.0

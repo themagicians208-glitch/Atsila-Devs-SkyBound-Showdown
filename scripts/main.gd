@@ -102,7 +102,9 @@ func _ready() -> void:
 		gsm.name = "GameStateManager"
 		game_state_manager = gsm
 
-	current_level = int(game_state_manager.state["current_level"])
+	current_level = int(get_tree().get_meta("level_number", 1))
+	if game_state_manager != null:
+		game_state_manager.state["current_level"] = current_level
 	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	if current_level == 5:
 		dimension_shifts_left = 4
@@ -3027,7 +3029,7 @@ func _go_to_menu() -> void:
 		network.close()
 	get_tree().set_meta("online", false)
 	get_tree().set_meta("local_coop", false)
-	get_tree().change_scene_to_file("res://scenes/home.tscn")
+	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
 
 
 # --- Local split-screen co-op ------------------------------------------------

@@ -201,7 +201,7 @@ func _build_runner() -> void:
 	_runner = TextureRect.new()
 	var tex := runner_texture
 	if tex == null:
-		tex = load(runner_path) as Texture2D
+		tex = _load_texture(runner_path)
 	_runner.texture = tex
 	_runner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_runner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -212,6 +212,16 @@ func _build_runner() -> void:
 	add_child(_runner)
 	if tex == null:
 		push_warning("Jamal sprite not found at " + runner_path)
+
+
+## Load a texture even when the editor has not imported the PNG yet.
+func _load_texture(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var res := load(path)
+		if res is Texture2D:
+			return res
+	var img := Image.load_from_file(path)
+	return ImageTexture.create_from_image(img) if img != null else null
 
 
 # ---------------------------------------------------------------- loop

@@ -16,8 +16,7 @@ const WATERFALL_SHADER := preload("res://shaders/lobby_waterfall.gdshader")
 
 const LEVEL_NAMES := [
 	"Forgotten Island", "The Whispering Woods", "Frozen Skies",
-	"Rising Ruins", "Malakar's Fortress", "Gimmick Gauntlet",
-]
+	"Ember Heights", "Malakar's Fortress", "Gimmick Gauntlet",]
 
 # Palette (all outlines and text use ink navy).
 const INK := Color("#2b1d5c")
