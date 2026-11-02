@@ -138,6 +138,7 @@ func _ready() -> void:
 
 	# --- No yellow tile may sit below or intersect a rock, island or other tile ---
 	var pieces: Array = []
+	var slabs: Array = []
 	for child in island.get_children():
 		if not (child is Node3D):
 			continue
@@ -159,8 +160,10 @@ func _ready() -> void:
 			var shape_node := n.get_node_or_null("CollisionShape3D") as CollisionShape3D
 			if shape_node != null and shape_node.shape is CylinderShape3D:
 				var cyl := shape_node.shape as CylinderShape3D
-				if cyl.radius < 8.0:
-					pieces.append({"node": n, "kind": "island", "r": cyl.radius * 0.95})
+				# Every floor counts, the arenas included: since they grew, no two
+				# round floors may merge, however big either of them is.
+				pieces.append({"node": n, "kind": "island", "r": cyl.radius * 0.95})
+				slabs.append({"node": n, "r": cyl.radius * 0.95})
 	var tile_overlaps := 0
 	for i in pieces.size():
 		for j in range(i + 1, pieces.size()):
@@ -177,6 +180,24 @@ func _ready() -> void:
 				problems.append("%s at %s overlaps %s at %s (xz %.2f < %.2f)" % [
 					na.name, na.position.round(), nb.name, nb.position.round(), xz, min_dist])
 	print("tile/rock/island overlaps: %d" % tile_overlaps)
+
+	# --- No two round floors may merge either ---------------------------------
+	# The boss arena and its neighbours have to read as separate islands with a
+	# jump between them, exactly like every other ledge on the route.
+	var slab_merges := 0
+	for i in slabs.size():
+		for j in range(i + 1, slabs.size()):
+			var sa: Dictionary = slabs[i]
+			var sb: Dictionary = slabs[j]
+			var na: Node3D = sa["node"]
+			var nb: Node3D = sb["node"]
+			var xz := Vector2(na.position.x - nb.position.x, na.position.z - nb.position.z).length()
+			var min_dist := float(sa["r"]) + float(sb["r"])
+			if xz < min_dist - 0.05:
+				slab_merges += 1
+				problems.append("floor %s at %s merges into floor %s at %s (xz %.2f < %.2f)" % [
+					na.name, na.position.round(), nb.name, nb.position.round(), xz, min_dist])
+	print("merged floors: %d" % slab_merges)
 
 	# --- The coin gate: coins are one of three keys -------------------------
 	# The portal also wants the Warden gone and the First Fragment recovered, so

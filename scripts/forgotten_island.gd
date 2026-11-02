@@ -13,8 +13,8 @@ extends Node3D
 ##   D Vanishing Crossing  z  63 - 84   stepping stones over the chasm     5 coins
 ##   E Seal Terraces       z  88 - 115  three side terraces, the long path 5 coins
 ##   F Ruins Approach      z 116 - 145  stone floor, broken pillars        3 coins
-##   G Warden's Arena      z 145 - 167  circular arena floor               1 coin
-##   H Portal Terrace      z 162 - 174  the coin-gated portal to level 2   1 coin
+##   G Warden's Arena      z 156.5 - 187.5  circular arena floor            1 coin
+##   H Portal Terrace      z 188.3 - 200.7  the coin-gated portal to level 2  1 coin
 ##
 ## 40 coins in total, [member coins_required] of them needed for the portal.
 ##
@@ -67,7 +67,7 @@ const PORTAL_VIOLET := Color("#b06bff")
 
 # --- State -------------------------------------------------------------------
 var spawn_point := Vector3(0.0, 0.55, -4.0)
-var portal_position := Vector3(0.0, 8.55, 168.5)
+var portal_position := Vector3(0.0, 8.55, 195.0)
 ## Points the starting camera is aimed along, in walking order.
 var waypoints: Array = []
 ## Where the four checkpoints go, in the order the player meets them.
@@ -403,17 +403,20 @@ func _build_ruins_approach() -> void:
 # --- G: the arena -------------------------------------------------------------
 
 func _build_arena() -> void:
-	_stone_slab(8.0, 0.0, 156.0, 11.0, 3.2)
+	# A big round arena that reads as its own island: its rim stops 1.0 short of
+	# the ruins floor at z 147 and 1.3 short of the portal terrace at z 194.5,
+	# so each floor is a separate ledge with a jump between them.
+	_stone_slab(8.0, 0.0, 172.0, 15.5, 3.2)
 	# Broken pillars and violet braziers around the circle: the Shadow King's
 	# corruption has reached this far.
-	for i in 8:
-		var angle := TAU * float(i) / 8.0
-		var spot := Vector3(cos(angle) * 8.6, 8.0, 156.0 + sin(angle) * 8.6)
-		_pillar(spot, 4.0, 0.28, i % 3 == 0)
-	for i in 4:
-		var angle := TAU * float(i) / 4.0 + 0.4
-		_brazier(Vector3(cos(angle) * 4.4, 8.0, 156.0 + sin(angle) * 4.4))
-	_motes(8.0, 0.0, 156.0, 40, MAGIC, 7.0)
+	for i in 12:
+		var angle := TAU * float(i) / 12.0
+		var spot := Vector3(cos(angle) * 12.8, 8.0, 172.0 + sin(angle) * 12.8)
+		_pillar(spot, 4.2, 0.32, i % 3 == 0)
+	for i in 6:
+		var angle := TAU * float(i) / 6.0 + 0.3
+		_brazier(Vector3(cos(angle) * 7.5, 8.0, 172.0 + sin(angle) * 7.5))
+	_motes(8.0, 0.0, 172.0, 50, MAGIC, 10.0)
 
 
 # --- G2: the guardian's chamber ----------------------------------------------
@@ -424,20 +427,20 @@ func _build_arena() -> void:
 func _build_chamber() -> void:
 	var warden := IslandWarden.new()
 	warden.name = "IslandWarden"
-	warden.home = Vector3(0.0, 8.0, 160.5)
-	warden.arena_radius = 7.5
+	warden.home = Vector3(0.0, 8.0, 176.5)
+	warden.arena_radius = 12.5
 	warden.set_island(self)
 	add_child(warden)
 	warden.global_position = warden.home
 	warden.rotation.y = PI
 	_warden = warden
-	_record_surface(Vector3(0.0, 8.0, 163.4), 1.1)
+	_record_surface(Vector3(0.0, 8.0, 179.4), 1.1)
 
 	# The chest the Warden guards, at the back of the chamber.
 	var chest := IslandChest.new()
 	chest.name = "FragmentChest"
 	chest.island = self
-	chest.position = Vector3(0.0, 8.0, 163.4)
+	chest.position = Vector3(0.0, 8.0, 179.4)
 	chest.rotation.y = PI
 	add_child(chest)
 	_chest = chest
@@ -482,14 +485,15 @@ func portal_blocked_reason() -> String:
 # --- H: the portal terrace ----------------------------------------------------
 
 func _build_portal_terrace() -> void:
-	_stone_slab(8.0, 0.0, 168.0, 6.2, 3.0)
-	portal_position = Vector3(0.0, 8.55, 168.5)
+	# A small terrace standing clear of the arena rim at z 187.5.
+	_stone_slab(8.0, 0.0, 194.5, 6.2, 3.0)
+	portal_position = Vector3(0.0, 8.55, 195.0)
 	_build_portal(portal_position)
-	_pillar(Vector3(-4.4, 8.0, 166.0), 3.6, 0.2, true)
-	_pillar(Vector3(4.4, 8.0, 166.0), 3.6, 0.24, true)
-	_post(8.0, 0.0, 163.0, 1.4)
-	_flower(Vector3(-2.6, 8.0, 165.0), 1.9, PETAL_GOLD)
-	_flower(Vector3(2.6, 8.0, 165.0), 1.9, PETAL_BLUE)
+	_pillar(Vector3(-4.4, 8.0, 192.5), 3.6, 0.2, true)
+	_pillar(Vector3(4.4, 8.0, 192.5), 3.6, 0.24, true)
+	_post(8.0, 0.0, 189.5, 1.4)
+	_flower(Vector3(-2.6, 8.0, 191.5), 1.9, PETAL_GOLD)
+	_flower(Vector3(2.6, 8.0, 191.5), 1.9, PETAL_BLUE)
 
 
 func _build_portal(where: Vector3) -> void:
@@ -606,9 +610,9 @@ func _place_coins() -> void:
 		[6.4, -5.6, 129.4, 0.8],        # on the side rock island
 		[6.2, -1.6, 131.2, 0.8],        # on the first climb stone
 		# G. arena
-		[8.0, 6.0, 158.0, 0.8],
+		[8.0, 6.0, 174.0, 0.8],
 		# H. portal terrace
-		[8.0, -3.6, 166.5, 0.8],
+		[8.0, -3.6, 193.0, 0.8],
 	]
 	for spot in spots:
 		_coin(float(spot[0]), float(spot[1]), float(spot[2]), float(spot[3]))
@@ -655,7 +659,7 @@ func _build_flanks() -> void:
 		[4.4, -14.0, 92.0, 5.0],
 		[5.6, 14.5, 108.0, 5.0],
 		[8.0, -16.5, 152.0, 4.0],
-		[8.0, 13.0, 165.0, 3.5],
+		[8.0, 18.0, 163.0, 3.5],
 	]
 	for entry in flanks:
 		var surface := float(entry[0])
@@ -700,7 +704,7 @@ func _spawn_slimes() -> void:
 		[5.6, 0.0, 122.0, 3],      # F - the ruins floor, and a pair on it: the ruin
 		[5.6, -3.4, 124.0, 3],     #     asks for company while the symbols are turned
 		[5.6, 3.4, 124.8, 3],
-		[8.0, 8.0, 156.0, 3],      # G - the arena, on the arena floor itself
+		[8.0, 8.0, 172.0, 3],      # G - the arena, on the arena floor itself
 	]
 	var slime_death_lines: Array[String] = [
 		"A Shadow Slime dissolves into purple mist!",

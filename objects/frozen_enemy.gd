@@ -194,7 +194,7 @@ func _physics_process(delta: float) -> void:
 	var distance := offset.length()
 	if variant == "Frost Wolf" and _lunge_time > 0.0:
 		_lunge_time -= delta
-		global_position += _lunge_direction * 2.2 * delta
+		_try_ground_move(_lunge_direction * 2.2 * delta)
 		if _lunge_time <= 0.0:
 			_lunge_cooldown = 1.1
 		return
@@ -204,6 +204,8 @@ func _physics_process(delta: float) -> void:
 			if _attack_warning != null:
 				_attack_warning.visible = false
 			_patrol_phantom()
+		else:
+			_snap_to_ground()
 		return
 	if variant == "Crystal Phantom":
 		if _projectile_warning_time > 0.0 and _projectile_target != null and is_instance_valid(_projectile_target):
@@ -231,12 +233,47 @@ func _physics_process(delta: float) -> void:
 		global_position.y += sin(_time * 2.0) * delta * 0.4
 	else:
 		var flat := Vector3(offset.x, 0.0, offset.z)
+		var world_spd := (speed / 250.0) * 6.0 if speed > 20.0 else speed
 		if flat.length() > 0.5:
-			global_position += flat.normalized() * speed * delta
+			_try_ground_move(flat.normalized() * world_spd * delta)
+		else:
+			_snap_to_ground()
 		rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), delta * 5.0)
 	if distance < 1.0 and _touch_cooldown <= 0.0 and target.has_method("take_damage"):
 		target.call("take_damage", attack_damage, global_position, "frozen_enemy")
 		_touch_cooldown = 1.0
+
+func _try_ground_move(step: Vector3) -> void:
+	var candidate := global_position + Vector3(step.x, 0.0, step.z)
+	var dir := Vector3(step.x, 0.0, step.z).normalized()
+	var lead := candidate + dir * 0.42
+	var floor_y := _probe_ground_y(lead)
+	if is_nan(floor_y):
+		# No ground ahead: refuse horizontal step so wolf/slime never walks onto air
+		_snap_to_ground()
+		return
+	var cur_floor_y := _probe_ground_y(candidate)
+	if not is_nan(cur_floor_y):
+		candidate.y = cur_floor_y + 0.42
+	global_position = candidate
+
+func _snap_to_ground() -> void:
+	var floor_y := _probe_ground_y(global_position)
+	if not is_nan(floor_y):
+		global_position.y = floor_y + 0.42
+
+func _probe_ground_y(pos: Vector3) -> float:
+	if not is_inside_tree() or get_world_3d() == null:
+		return NAN
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		pos + Vector3(0.0, 1.6, 0.0),
+		pos + Vector3(0.0, -2.0, 0.0)
+	)
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return NAN
+	return float((hit["position"] as Vector3).y)
 
 func _patrol_phantom() -> void:
 	global_position = _home + Vector3(

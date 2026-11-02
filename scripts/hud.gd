@@ -84,6 +84,15 @@ func _process(_delta: float) -> void:
 		update_health(float(primary.get("health")), float(primary.get("max_health")))
 	if primary.get("stamina") != null and primary.get("max_stamina") != null:
 		update_stamina(float(primary.get("stamina")), float(primary.get("max_stamina")))
+	if combat_level == 4:
+		var prog := get_node_or_null("/root/Progress")
+		if prog != null and bool(prog.get("magical_shield_unlocked")):
+			var active := bool(primary.get("magical_shield_active"))
+			var cd := float(primary.get("magical_shield_cooldown_left")) if primary.get("magical_shield_cooldown_left") != null else 0.0
+			var status := "ACTIVE" if active else ("READY" if cd <= 0.01 else ("CD %.1fs" % cd))
+			if is_instance_valid(frozen_ability_hint):
+				frozen_ability_hint.text = "VOLCANIC ABILITIES  •  H / K Magical Shield (%s)" % status
+				frozen_ability_hint.visible = true
 
 
 func _build_status_bars() -> void:
@@ -339,6 +348,26 @@ func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_
 		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
 	frozen_progress_hint.visible = true
 
+func set_ember_abilities(unlocked: Array[String], shield_active: bool = false, shield_cd: float = 0.0) -> void:
+	if not is_instance_valid(frozen_ability_hint):
+		return
+	if unlocked.is_empty():
+		frozen_ability_hint.visible = false
+		return
+	var status := "ACTIVE" if shield_active else ("READY" if shield_cd <= 0.01 else ("CD %.1fs" % shield_cd))
+	frozen_ability_hint.text = "VOLCANIC ABILITIES  •  " + "  |  ".join(unlocked) + (" (%s)" % status)
+	frozen_ability_hint.visible = true
+
+func set_ember_progress(seals: int, total_seals: int, crystals: int, machines: int, fragment_recovered: bool, checkpoint: int, fortress_discovered: bool = false) -> void:
+	if not is_instance_valid(frozen_progress_hint):
+		return
+	frozen_progress_hint.text = "SEALS %d/%d  •  CRYSTALS %d/3  •  MACHINES %d/3  •  FRAGMENT %s  •  FORTRESS %s  •  CHECKPOINT %d" % [
+		seals, total_seals, crystals, machines,
+		"RECOVERED" if fragment_recovered else "PENDING",
+		"DISCOVERED" if fortress_discovered else "HIDDEN",
+		checkpoint]
+	frozen_progress_hint.visible = true
+
 func set_woods_status(_rescued: int, _total_rescued: int, _seals: int, _total_seals: int, _has_frag: bool) -> void:
 	# Whispering Woods status tracker hook.
 	pass
@@ -397,6 +426,21 @@ func show_death(cause: String = "fall") -> void:
 	if cause == "slime":
 		death_heading.text = "SLIMED!"
 		death_subtitle.text = "A Shadow Slime drained the last of your health. Try again?"
+	elif cause == "magma_slime":
+		death_heading.text = "MELTED BY MAGMA!"
+		death_subtitle.text = "A Magma Slime seared away the last of your health. Try again?"
+	elif cause == "magma_wolf":
+		death_heading.text = "HUNTED IN THE ASH!"
+		death_subtitle.text = "A Magma Wolf pounced through the embers. Try again?"
+	elif cause == "lava_phantom":
+		death_heading.text = "SCORCHED FROM ABOVE!"
+		death_subtitle.text = "A Lava Phantom's fire bolt struck you down. Try again?"
+	elif cause == "ember_dragon":
+		death_heading.text = "CONSUMED BY DRAGONFIRE!"
+		death_subtitle.text = "The Ember Dragon overwhelmed your defenses. Try again?"
+	elif cause in ["lava_hazard", "falling_rock"]:
+		death_heading.text = "CLAIMED BY THE VOLCANO!"
+		death_subtitle.text = "Use your Magical Shield (H / K) to survive volcanic hazards!"
 	elif cause == "enemy" or cause == "warden":
 		death_heading.text = "STRUCK DOWN"
 		death_subtitle.text = "You were overwhelmed in battle. Try again?"
@@ -597,6 +641,21 @@ func _fill_inventory() -> void:
 		"%d / %d" % [_coins, coin_goal], Color("#ffd451")))
 	inventory_rows.add_child(_inventory_row("Level",
 		"%d  •  %s" % [combat_level, combat_level_name.to_upper()], Color.WHITE))
+	var prog := get_node_or_null("/root/Progress")
+	if prog != null:
+		var frags: Array[String] = []
+		if bool(prog.get("fragment_recovered")):
+			frags.append("1st")
+		if bool(prog.get("second_fragment_recovered")):
+			frags.append("2nd")
+		if bool(prog.get("third_fragment_recovered")):
+			frags.append("3rd")
+		if bool(prog.get("fourth_fragment_recovered")):
+			frags.append("4th")
+		inventory_rows.add_child(_inventory_row("Tree Fragments",
+			"None" if frags.is_empty() else ", ".join(frags), Color("#ffe86b")))
+		if bool(prog.get("magical_shield_unlocked")):
+			inventory_rows.add_child(_inventory_row("Magical Shield", "Unlocked (H / K)", Color("#ff941f")))
 
 
 func toggle_inventory() -> void:

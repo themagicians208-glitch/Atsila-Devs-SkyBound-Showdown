@@ -59,7 +59,7 @@ const MAGIC_VIOLET := Color("#b06bff")
 
 var spawn_point := Vector3(0.0, 0.55, -2.0)
 var arrival_portal_position := Vector3(0.0, 0.55, -6.2)
-var portal_position := Vector3(0.0, 8.55, 233.5)
+var portal_position := Vector3(0.0, 8.55, 235.6)
 var waypoints: Array = []
 var checkpoint_points: Array = []
 var coins_placed := 0
@@ -222,7 +222,7 @@ func _build_region_1_entrance() -> void:
 		Vector3(0.0, 2.6, 82.0),
 		Vector3(0.0, 3.4, 98.0),
 		Vector3(0.0, 6.4, 170.0),
-		Vector3(0.0, 8.0, 206.5),
+		Vector3(0.0, 7.7, 201.2),
 	]
 	# Arrival portal behind the player (opens on arrival and links back to Level 1)
 	_build_arrival_portal(arrival_portal_position)
@@ -356,29 +356,29 @@ func _build_region_5_corrupted_maze() -> void:
 # --- Region 6: The Ancient Guardian's Grove & Portal to Level 3 --------------
 
 func _build_region_6_guardian_grove() -> void:
-	# Approach platform with Checkpoint 5 (spaced cleanly between tile at 201.2 and arena at 213.5)
-	_stone_slab(8.0, 0.0, 206.5, 2.8, 2.8)
-	# Large circular Boss Arena (radius 8.4, edge at 209.6 to 226.4)
-	_grass_slab(8.0, 0.0, 218.0, 8.4, 3.4, true, GRASS)
+	# Checkpoint 5 stands on the last Root Maze platform at z 201.2; the grove
+	# rim begins at 204.5, a single clean jump away.
+	# Large circular Boss Arena (radius 13.5, expanded for intense boss mobility)
+	_grass_slab(8.0, 0.0, 218.0, 13.5, 3.4, true, GRASS)
 	# Perimeter trees framing only the sides and back of the arena (leaving the entire front/approach completely open)
 	for i in [0, 1, 2, 3, 4]:
 		var angle := TAU * float(i) / 8.0
-		var spot := Vector3(cos(angle) * 7.5, 8.0, 218.0 + sin(angle) * 7.5)
-		_rounded_tree(8.0, spot.x, spot.z, 4.8, LEAF_CORRUPT if i % 2 == 0 else LEAF_BRIGHT)
+		var spot := Vector3(cos(angle) * 12.2, 8.0, 218.0 + sin(angle) * 12.2)
+		_rounded_tree(8.0, spot.x, spot.z, 5.2, LEAF_CORRUPT if i % 2 == 0 else LEAF_BRIGHT)
 
 	# Central Ancient Tree on the back rim of the grove
 	var ancient_tree := Node3D.new()
 	ancient_tree.name = "CentralAncientTree"
-	ancient_tree.position = Vector3(0.0, 8.0, 224.5)
-	_cylinder(ancient_tree, 0.85, 5.6, _mat(BARK), Vector3(0.0, 2.8, 0.0), Vector3.ZERO, 0.55)
-	_ancient_tree_crown = _sphere(ancient_tree, 3.2, _glow_mat(LEAF_CORRUPT, MAGIC_VIOLET, 0.45), Vector3(0.0, 5.8, 0.0), Vector3(1.2, 0.85, 1.2))
+	ancient_tree.position = Vector3(0.0, 8.0, 227.5)
+	_cylinder(ancient_tree, 1.1, 6.2, _mat(BARK), Vector3(0.0, 3.1, 0.0), Vector3.ZERO, 0.65)
+	_ancient_tree_crown = _sphere(ancient_tree, 3.8, _glow_mat(LEAF_CORRUPT, MAGIC_VIOLET, 0.45), Vector3(0.0, 6.4, 0.0), Vector3(1.3, 0.9, 1.3))
 	add_child(ancient_tree)
 
 	# Shadow Wolf Boss
 	_boss = ShadowWolfBoss.new()
 	_boss.name = "ShadowWolfBoss"
 	_boss.home = Vector3(0.0, 8.0, 218.0)
-	_boss.arena_radius = 7.2
+	_boss.arena_radius = 11.8
 	_boss.set_woods(self)
 	add_child(_boss)
 	_boss.global_position = _boss.home
@@ -388,14 +388,14 @@ func _build_region_6_guardian_grove() -> void:
 	_chest = WoodsChest.new()
 	_chest.name = "SecondFragmentChest"
 	_chest.woods = self
-	_chest.position = Vector3(0.0, 8.0, 222.2)
+	_chest.position = Vector3(0.0, 8.0, 224.2)
 	_chest.rotation.y = PI
 	add_child(_chest)
-	_record_surface(Vector3(0.0, 8.0, 222.2), 1.2)
+	_record_surface(Vector3(0.0, 8.0, 224.2), 1.2)
 
-	# Portal Terrace to Level 3 (placed cleanly behind arena, edge at 227.0 to 232.0)
-	_stone_slab(8.0, 0.0, 229.5, 2.5, 3.0)
-	portal_position = Vector3(0.0, 8.55, 229.5)
+	# Portal Terrace to Level 3 (clear of the grove rim at 231.5; spans 232.4 to 238.8)
+	_stone_slab(8.0, 0.0, 235.6, 3.2, 3.0)
+	portal_position = Vector3(0.0, 8.55, 235.6)
 	_build_level_3_portal(portal_position)
 
 
@@ -1015,7 +1015,7 @@ func _build_flanks_and_backdrop() -> void:
 		[1.8, 16.0, 62.0, 4.5],
 		[3.5, -16.5, 112.0, 4.5],
 		[5.8, 17.0, 158.0, 4.8],
-		[7.8, -18.0, 214.0, 4.5],
+		[7.8, -20.0, 214.0, 4.5],
 	]:
 		_grass_slab(float(flank[0]), float(flank[1]), float(flank[2]), float(flank[3]), 2.6, false)
 		_rounded_tree(float(flank[0]), float(flank[1]), float(flank[2]), 4.2, LEAF_BRIGHT)

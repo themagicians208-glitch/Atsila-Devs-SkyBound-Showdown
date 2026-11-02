@@ -47,6 +47,29 @@ func _ready() -> void:
 	else:
 		print("COINS OK: %d coins placed, %d required" % [woods.coins_placed, woods.coins_required])
 
+	# No two round floors may merge: the grown Guardian's Grove has to read as
+	# its own island, with jumps to the Root Maze ledge and the portal terrace.
+	var floors: Array = []
+	for child in woods.get_children():
+		var floor_node := child as Node3D
+		if floor_node == null or not floor_node.name.begins_with("Slab_"):
+			continue
+		var shape_node := floor_node.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if shape_node != null and shape_node.shape is CylinderShape3D:
+			floors.append({"node": floor_node, "r": (shape_node.shape as CylinderShape3D).radius})
+	var floor_merges := 0
+	for i in floors.size():
+		for j in range(i + 1, floors.size()):
+			var na: Node3D = floors[i]["node"]
+			var nb: Node3D = floors[j]["node"]
+			var xz := Vector2(na.position.x - nb.position.x, na.position.z - nb.position.z).length()
+			var min_dist := float(floors[i]["r"]) + float(floors[j]["r"])
+			if xz < min_dist - 0.05:
+				floor_merges += 1
+				problems.append("floor %s at %s merges into floor %s at %s (xz %.2f < %.2f)" % [
+					na.name, na.position.round(), nb.name, nb.position.round(), xz, min_dist])
+	print("merged floors: %d" % floor_merges)
+
 	# Enemies
 	var slimes := get_tree().get_nodes_in_group("shadow_slimes")
 	var wolves := get_tree().get_nodes_in_group("shadow_wolves")

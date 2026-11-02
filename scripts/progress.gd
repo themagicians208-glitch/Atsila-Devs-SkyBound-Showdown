@@ -29,6 +29,20 @@ var frozen_checkpoint_index := 0
 var rescued_creatures: Dictionary = {}
 var woods_coins_best := 0
 
+# Level 4: Ember Heights progression
+var fourth_fragment_recovered := false
+var malakar_fortress_discovered := false
+var magical_shield_unlocked := false
+var ember_switch_solved := false
+var ember_crystals_activated := 0
+var ember_machines_activated := 0
+var ember_rising_lava_solved := false
+var ember_fortress_solved := false
+var ember_seals_activated := 0
+var ember_dragon_defeated := false
+var ember_coin_ids: Array[String] = []
+var ember_checkpoint_index := 0
+
 
 func _ready() -> void:
 	load_progress()
@@ -59,6 +73,20 @@ func load_progress() -> void:
 	frozen_generators_activated = int(config.get_value("frozen_skies", "frozen_generators_activated", 0))
 	frozen_crystal_blocks_aligned = bool(config.get_value("frozen_skies", "frozen_crystal_blocks_aligned", false))
 	frozen_checkpoint_index = int(config.get_value("frozen_skies", "frozen_checkpoint_index", 0))
+	fourth_fragment_recovered = bool(config.get_value("ember_heights", "fourth_fragment_recovered", false))
+	malakar_fortress_discovered = bool(config.get_value("ember_heights", "malakar_fortress_discovered", false))
+	magical_shield_unlocked = bool(config.get_value("ember_heights", "magical_shield_unlocked", false))
+	ember_switch_solved = bool(config.get_value("ember_heights", "ember_switch_solved", false))
+	ember_crystals_activated = int(config.get_value("ember_heights", "ember_crystals_activated", 0))
+	ember_machines_activated = int(config.get_value("ember_heights", "ember_machines_activated", 0))
+	ember_rising_lava_solved = bool(config.get_value("ember_heights", "ember_rising_lava_solved", false))
+	ember_fortress_solved = bool(config.get_value("ember_heights", "ember_fortress_solved", false))
+	ember_seals_activated = int(config.get_value("ember_heights", "ember_seals_activated", 0))
+	ember_dragon_defeated = bool(config.get_value("ember_heights", "ember_dragon_defeated", false))
+	ember_coin_ids.clear()
+	for coin_id in config.get_value("ember_heights", "ember_coin_ids", PackedStringArray()):
+		ember_coin_ids.append(str(coin_id))
+	ember_checkpoint_index = int(config.get_value("ember_heights", "ember_checkpoint_index", 0))
 
 
 func save_progress() -> void:
@@ -79,6 +107,18 @@ func save_progress() -> void:
 	config.set_value("frozen_skies", "frozen_generators_activated", frozen_generators_activated)
 	config.set_value("frozen_skies", "frozen_crystal_blocks_aligned", frozen_crystal_blocks_aligned)
 	config.set_value("frozen_skies", "frozen_checkpoint_index", frozen_checkpoint_index)
+	config.set_value("ember_heights", "fourth_fragment_recovered", fourth_fragment_recovered)
+	config.set_value("ember_heights", "malakar_fortress_discovered", malakar_fortress_discovered)
+	config.set_value("ember_heights", "magical_shield_unlocked", magical_shield_unlocked)
+	config.set_value("ember_heights", "ember_switch_solved", ember_switch_solved)
+	config.set_value("ember_heights", "ember_crystals_activated", ember_crystals_activated)
+	config.set_value("ember_heights", "ember_machines_activated", ember_machines_activated)
+	config.set_value("ember_heights", "ember_rising_lava_solved", ember_rising_lava_solved)
+	config.set_value("ember_heights", "ember_fortress_solved", ember_fortress_solved)
+	config.set_value("ember_heights", "ember_seals_activated", ember_seals_activated)
+	config.set_value("ember_heights", "ember_dragon_defeated", ember_dragon_defeated)
+	config.set_value("ember_heights", "ember_coin_ids", PackedStringArray(ember_coin_ids))
+	config.set_value("ember_heights", "ember_checkpoint_index", ember_checkpoint_index)
 	config.save(config_path)
 
 
@@ -167,6 +207,71 @@ func set_frozen_checkpoint(index: int) -> void:
 	save_progress()
 
 
+# --- Level 4: Ember Heights helper methods -----------------------------------
+
+func recover_fourth_fragment() -> void:
+	if fourth_fragment_recovered:
+		return
+	fourth_fragment_recovered = true
+	save_progress()
+
+func discover_malakar_fortress() -> void:
+	if malakar_fortress_discovered:
+		return
+	malakar_fortress_discovered = true
+	save_progress()
+
+func unlock_magical_shield() -> void:
+	if magical_shield_unlocked:
+		return
+	magical_shield_unlocked = true
+	save_progress()
+
+func mark_ember_switch_solved() -> void:
+	ember_switch_solved = true
+	save_progress()
+
+func set_ember_crystals_activated(value: int) -> void:
+	ember_crystals_activated = clampi(value, 0, 3)
+	save_progress()
+
+func set_ember_machines_activated(value: int) -> void:
+	ember_machines_activated = clampi(value, 0, 3)
+	save_progress()
+
+func mark_ember_rising_lava_solved() -> void:
+	ember_rising_lava_solved = true
+	save_progress()
+
+func mark_ember_fortress_solved() -> void:
+	ember_fortress_solved = true
+	save_progress()
+
+func set_ember_seals_activated(value: int) -> void:
+	ember_seals_activated = clampi(value, 0, 4)
+	save_progress()
+
+func mark_ember_dragon_defeated() -> void:
+	ember_dragon_defeated = true
+	save_progress()
+
+func has_ember_coin(coin_id: String) -> bool:
+	return coin_id in ember_coin_ids
+
+func collect_ember_coin(coin_id: String) -> void:
+	if coin_id.is_empty() or has_ember_coin(coin_id):
+		return
+	ember_coin_ids.append(coin_id)
+	save_progress()
+
+func ember_coins_collected() -> int:
+	return ember_coin_ids.size()
+
+func set_ember_checkpoint(index: int) -> void:
+	ember_checkpoint_index = maxi(0, index)
+	save_progress()
+
+
 ## Forget everything. Only the dev checks call this.
 func clear() -> void:
 	fragment_recovered = false
@@ -184,5 +289,17 @@ func clear() -> void:
 	frozen_checkpoint_index = 0
 	rescued_creatures.clear()
 	woods_coins_best = 0
+	fourth_fragment_recovered = false
+	malakar_fortress_discovered = false
+	magical_shield_unlocked = false
+	ember_switch_solved = false
+	ember_crystals_activated = 0
+	ember_machines_activated = 0
+	ember_rising_lava_solved = false
+	ember_fortress_solved = false
+	ember_seals_activated = 0
+	ember_dragon_defeated = false
+	ember_coin_ids.clear()
+	ember_checkpoint_index = 0
 	save_progress()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))

@@ -43,10 +43,9 @@ func _ready() -> void:
 			warden.global_position.round(), warden.home.round()])
 
 	# --- 1. Dormant until the player arrives --------------------------------
-	# Settle the player on the porch first, safely out of the Warden's reach (it
-	# wakes within 11 units; this is 12.5). A wave sweeps out to 10.5, so the
-	# porch is also the only ground in the chamber a standing player survives -
-	# which is where a real jump gets measured.
+	# Settle the player on the ruins floor first, safely out of the Warden's
+	# reach (it wakes within 11 units, and the arena rim now starts 28 units
+	# north). That floor is where a real jump gets measured.
 	var woke := [false]
 	warden.woke.connect(func(): woke[0] = true)
 	player.global_position = Vector3(0.0, 8.55, 148.0)
@@ -81,12 +80,12 @@ func _ready() -> void:
 	var died_in_hold := [false]
 	var death_y := [0.0]
 	player.died.connect(func(): death_y[0] = player.global_position.y; died_in_hold[0] = true)
-	_hold(player, floor_height + hold, 152.0)
+	_hold(player, floor_height + hold, 169.0)
 	var waited := 0.0
 	var frames := 0
 	while frames < 180 and warden.state_name() == "dormant":
 		frames += 1
-		_hold(player, floor_height + hold, 152.0)
+		_hold(player, floor_height + hold, 169.0)
 		await get_tree().physics_frame
 	waited = float(frames) / 60.0
 	print("after the player walked in: state %s, woke %s, boss bar up %s (%.1fs)" % [
@@ -102,7 +101,7 @@ func _ready() -> void:
 	frames = 0
 	while frames < 360 and not saw_rings:
 		frames += 1
-		_hold(player, floor_height + hold, 158.0)
+		_hold(player, floor_height + hold, 175.0)
 		await get_tree().physics_frame
 		lowest = minf(lowest, player.global_position.y - floor_height)
 		if warden.rings_out() > 0:
@@ -113,7 +112,7 @@ func _ready() -> void:
 
 	# Keep holding for a full sweep underneath, then read the verdict.
 	for _frame in 90:
-		_hold(player, floor_height + hold, 158.0)
+		_hold(player, floor_height + hold, 175.0)
 		await get_tree().physics_frame
 		lowest = minf(lowest, player.global_position.y - floor_height)
 	print("player held %.2f up (lowest %.2f, wave clearance %.2f) while waves passed: dead %s%s" % [
@@ -122,7 +121,7 @@ func _ready() -> void:
 	_check(not bool(player.get("is_dead")), "a wave killed a player who was held up in the air")
 
 	# And it does catch a player standing in it, which is the whole threat.
-	player.global_position = Vector3(0.0, floor_height + 0.55, 158.5)
+	player.global_position = Vector3(0.0, floor_height + 0.55, 175.5)
 	player.velocity = Vector3.ZERO
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -151,7 +150,7 @@ func _ready() -> void:
 	_check(not hud.boss_panel.visible, "the boss bar stayed up after the reset")
 
 	# Walk back in and wake it again for the phase work.
-	player.global_position = Vector3(0.0, 8.55, 152.0)
+	player.global_position = Vector3(0.0, 8.55, 169.0)
 	player.velocity = Vector3.ZERO
 	warden.begin_fight()
 	await get_tree().create_timer(1.6).timeout
