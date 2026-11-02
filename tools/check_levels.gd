@@ -23,6 +23,13 @@ func _ready() -> void:
 				get_tree().get_nodes_in_group("collectible_coins").size(),
 				int(island.get("coins_required")) if island != null else -1,
 				int(island.get("checkpoint_points").size()) if island != null else -1])
+		elif level == 2:
+			var woods: Node = main.get("woods")
+			print("level 2 (The Whispering Woods): %d enemies, %d coins (%d needed for the portal), %d checkpoints" % [
+				enemies.size(),
+				get_tree().get_nodes_in_group("collectible_coins").size(),
+				int(woods.get("coins_required")) if woods != null else -1,
+				int(woods.get("checkpoint_points").size()) if woods != null else -1])
 		else:
 			print("level %d: %d enemy (health %d), %d coins, %d shards" % [
 				level, enemies.size(), health,

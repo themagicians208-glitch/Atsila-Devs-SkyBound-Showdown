@@ -16,7 +16,7 @@ signal activated
 @export var success := "The ancient switch hums - a stone gate grinds open to the north!"
 @export var done := false
 
-var island: ForgottenIsland = null
+var island: Node = null
 
 var _lamp: MeshInstance3D
 var _lamp_material: StandardMaterial3D
@@ -135,15 +135,15 @@ func activate() -> void:
 		_lamp_material.emission_energy_multiplier = 2.2
 	Audio.play("res://sounds/coin.ogg")
 	activated.emit()
-	if island != null:
-		island.solve_puzzle(solved_name, success)
+	if island != null and island.has_method("solve_puzzle"):
+		island.call("solve_puzzle", solved_name, success)
 	else:
 		_report(success)
 
 
 func _report(text: String) -> void:
-	if island != null:
-		island.message.emit(text)
+	if island != null and island.has_signal("message"):
+		island.emit_signal("message", text)
 
 
 func _nearest_player(range_limit: float) -> Node3D:
