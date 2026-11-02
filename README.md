@@ -46,11 +46,6 @@ Journey across floating kingdoms, collect coins, solve environmental puzzles, re
 ## 📸 Gallery
 
 <p align="center">
-  <img src="screenshots/screenshot1.jpg" width="45%" />
-  <img src="screenshots/screenshot2.jpg" width="45%" />
-</p>
-
-<p align="center">
   <img src="screenshots/whatsapp-01.jpeg" width="45%" />
   <img src="screenshots/whatsapp-02.jpeg" width="45%" />
 </p>
