@@ -2026,6 +2026,8 @@ func _remove_remote_player(id: int) -> void:
 func _physics_process(_delta: float) -> void:
 	if not online or multiplayer.multiplayer_peer == null:
 		return
+	if not multiplayer.is_server() and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
 	var id := multiplayer.get_unique_id()
 	var pos := player.position
 	var rot := player.rotation.y
