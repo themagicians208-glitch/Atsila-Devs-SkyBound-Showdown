@@ -481,7 +481,8 @@ func handle_controls(delta):
 	input.x = Input.get_axis(action_left, action_right)
 	input.z = Input.get_axis(action_forward, action_back)
 
-	input = input.rotated(Vector3.UP, view.rotation.y)
+	var camera_yaw := view.rotation.y if is_instance_valid(view) else 0.0
+	input = input.rotated(Vector3.UP, camera_yaw)
 
 	if input.length() > 1:
 		input = input.normalized()
