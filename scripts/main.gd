@@ -437,6 +437,16 @@ func _on_frozen_generator_progress(current: int, total: int) -> void:
 func _on_frozen_mechanism_blocked(message: String) -> void:
 	hud.show_finish_message(message)
 
+func _on_frozen_return_portal_entered(body: Node3D) -> void:
+	if body != player and body != player_two:
+		return
+	if not Progress.second_fragment_recovered:
+		hud.show_finish_message("The Level 2 portal needs the Second Fragment.")
+		return
+	get_tree().set_meta("level_number", 2)
+	Engine.time_scale = 1.0
+	hud.play_level_transition("RETURNING TO LEVEL 2 – WHISPERING WOODS", func(): get_tree().reload_current_scene())
+
 func _update_frozen_ability_hud() -> void:
 	if frozen_skies == null:
 		return

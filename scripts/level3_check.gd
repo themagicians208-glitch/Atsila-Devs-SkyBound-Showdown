@@ -47,6 +47,7 @@ func _run() -> void:
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
+	assert(world.get_node_or_null("Level2ReturnPortalArea") != null, "Frozen arrival portal must provide a Level 2 return interaction")
 	assert(instance.get_node("HUD").frozen_progress_hint != null, "Frozen Skies needs progression HUD")
 	assert(instance.get_node("HUD").frozen_progress_hint.text.contains("GENERATORS 0/3"), "Frozen HUD must show generator progress")
 	assert(not instance.get("frozen_skies").arrival_cinematic_complete, "arrival portal must begin opening")

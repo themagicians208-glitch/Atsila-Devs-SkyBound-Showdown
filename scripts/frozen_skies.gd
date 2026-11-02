@@ -525,6 +525,19 @@ func _add_portal(point: Vector3, color: Color, is_exit := false) -> void:
 	surface.material_override = _material(Color(color, 0.18), 0.7)
 	portal.add_child(surface)
 	_world.add_child(portal)
+	if not is_exit:
+		var return_area := Area3D.new()
+		return_area.name = "Level2ReturnPortalArea"
+		return_area.collision_layer = 0
+		return_area.collision_mask = 1
+		var return_shape := CollisionShape3D.new()
+		var return_box := BoxShape3D.new()
+		return_box.size = Vector3(2.4, 3.0, 1.4)
+		return_shape.shape = return_box
+		return_area.add_child(return_shape)
+		return_area.position = point + Vector3(0.0, 1.4, 0.0)
+		_world.add_child(return_area)
+		return_area.body_entered.connect(_main._on_frozen_return_portal_entered)
 
 func _build_snowfall() -> void:
 	var particles := GPUParticles3D.new()
