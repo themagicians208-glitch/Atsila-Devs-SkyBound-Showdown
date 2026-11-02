@@ -57,6 +57,12 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").frozen_ruin_count >= 3, "Frozen Skies needs ancient frozen ruins")
 	assert(instance.get("frozen_skies")._crystal_generators.size() == 3, "Crystal Cave needs three generators")
 	var player: Node = instance.get_node("Player")
+	var slippery_zone: Node = load("res://scripts/slippery_zone.gd").new()
+	slippery_zone._on_body_entered(player)
+	assert(player.slippery, "Frozen ice zones must enable slippery movement")
+	slippery_zone._on_body_exited(player)
+	assert(not player.slippery, "Leaving Frozen ice zones must restore movement control")
+	slippery_zone.free()
 	var crystals: Array = crystal_puzzle.get("_crystals")
 	for index in crystals.size():
 		player.global_position = crystals[index].global_position
