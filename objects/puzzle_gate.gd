@@ -5,6 +5,7 @@ class_name PuzzleGate
 ## When opened it sinks out of the way and turns off its collision.
 
 var opened := false
+@export var open_drop := 2.6
 
 
 func open() -> void:
@@ -16,4 +17,4 @@ func open() -> void:
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(self, "position:y", position.y - 2.6, 0.7)
+	tween.tween_property(self, "position:y", position.y - open_drop, 0.7)

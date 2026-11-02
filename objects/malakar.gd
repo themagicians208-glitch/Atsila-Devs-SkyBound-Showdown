@@ -1,6 +1,9 @@
 extends Node3D
 class_name Malakar
 
+signal encounter_phase_changed(phase: int)
+signal encounter_completed
+
 const SHADOW_BOLT := preload("res://objects/shadow_bolt.gd")
 
 ## Malakar, the Shadow King: a towering mirror-dimension boss assembled entirely
@@ -45,6 +48,9 @@ var _time := 0.0
 var _base_y := 0.0
 var _base_rot_y := 0.0
 var _built := false
+var encounter_started := false
+var _encounter_elapsed := 0.0
+var _encounter_phase := 0
 
 
 func _ready() -> void:
@@ -93,7 +99,38 @@ func _process(delta: float) -> void:
 	if _arc_material != null:
 		_arc_material.emission_energy_multiplier = 0.8 + 0.9 * absf(sin(_time * 6.0))
 	_update_beam(pulse)
-	_update_attacks(delta)
+	if encounter_started:
+		_encounter_elapsed += delta
+		var next_phase := 1 if _encounter_elapsed < 8.0 else (2 if _encounter_elapsed < 16.0 else 3)
+		if next_phase != _encounter_phase:
+			_encounter_phase = next_phase
+			attack_interval = [2.6, 2.0, 1.4][_encounter_phase - 1]
+			encounter_phase_changed.emit(_encounter_phase)
+		if _encounter_elapsed >= 24.0:
+			encounter_started = false
+			attacks_enabled = false
+			visible = false
+			encounter_completed.emit()
+			return
+		_update_attacks(delta)
+
+
+func start_encounter() -> void:
+	if encounter_started or _encounter_phase > 0:
+		return
+	_encounter_elapsed = 0.0
+	_encounter_phase = 0
+	encounter_started = true
+	attacks_enabled = true
+
+
+func reset_encounter() -> void:
+	encounter_started = false
+	_encounter_elapsed = 0.0
+	_encounter_phase = 0
+	_attack_timer = 2.0
+	attacks_enabled = false
+	visible = true
 
 
 func _update_beam(pulse: float) -> void:
