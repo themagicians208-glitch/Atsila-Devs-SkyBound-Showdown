@@ -7,6 +7,7 @@ var target: Node3D
 var _life := 4.0
 
 func _ready() -> void:
+	add_to_group("frozen_projectiles")
 	collision_layer = 0
 	collision_mask = 1
 	var shape := CollisionShape3D.new()

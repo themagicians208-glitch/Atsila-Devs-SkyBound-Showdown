@@ -20,9 +20,14 @@ var _dead := false
 var _time := 0.0
 var _touch_cooldown := 0.0
 var _projectile_cooldown := 1.8
+var _projectile_warning_time := 0.0
+var _projectile_target: Node3D
+var _attack_warning: MeshInstance3D
 var _lunge_time := 0.0
 var _lunge_cooldown := 0.0
 var _lunge_direction := Vector3.ZERO
+var _hit_time := 0.0
+var _wolf_legs: Array[Node3D] = []
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -77,6 +82,7 @@ func _build() -> void:
 				leg.position = Vector3(side * 0.32, -0.48, front * 0.28)
 				leg.material_override = _body_material
 				_visual.add_child(leg)
+				_wolf_legs.append(leg)
 			var tail := MeshInstance3D.new()
 			var tail_mesh := CylinderMesh.new()
 			tail_mesh.top_radius = 0.03
@@ -98,6 +104,17 @@ func _build() -> void:
 			shard.position = Vector3((index - 1) * 0.42, 0.35 + (index % 2) * 0.25, 0.0)
 			shard.material_override = _crystal_material()
 			_visual.add_child(shard)
+		_attack_warning = MeshInstance3D.new()
+		_attack_warning.name = "AttackWarning"
+		var warning_mesh := TorusMesh.new()
+		warning_mesh.inner_radius = 0.48
+		warning_mesh.outer_radius = 0.56
+		_attack_warning.mesh = warning_mesh
+		_attack_warning.rotation.x = PI / 2.0
+		_attack_warning.position.y = -0.5
+		_attack_warning.material_override = _crystal_material()
+		_attack_warning.visible = false
+		_visual.add_child(_attack_warning)
 	for i in 3:
 		var crystal := MeshInstance3D.new()
 		var cone := CylinderMesh.new()
@@ -157,9 +174,17 @@ func _physics_process(delta: float) -> void:
 	_time += delta
 	_touch_cooldown = maxf(_touch_cooldown - delta, 0.0)
 	_projectile_cooldown = maxf(_projectile_cooldown - delta, 0.0)
+	_projectile_warning_time = maxf(_projectile_warning_time - delta, 0.0)
+	_hit_time = maxf(_hit_time - delta, 0.0)
 	_lunge_cooldown = maxf(_lunge_cooldown - delta, 0.0)
 	_visual.position.y = sin(_time * 3.0) * 0.1
 	_visual.rotation.y += delta * 0.45
+	_visual.scale = _visual.scale.lerp(Vector3.ONE, delta * 12.0)
+	if variant == "Frost Wolf":
+		for index in _wolf_legs.size():
+			_wolf_legs[index].rotation.x = sin(_time * 8.0 + float(index) * PI) * 0.22
+	if _body_material != null:
+		_body_material.emission_energy_multiplier = 1.8 if _hit_time > 0.0 else 0.35
 	var target := _nearest_player()
 	if target == null:
 		if variant == "Crystal Phantom":
@@ -175,10 +200,24 @@ func _physics_process(delta: float) -> void:
 		return
 	if distance > detect_range:
 		if variant == "Crystal Phantom":
+			_projectile_warning_time = 0.0
+			if _attack_warning != null:
+				_attack_warning.visible = false
 			_patrol_phantom()
 		return
-	if variant == "Crystal Phantom" and _projectile_cooldown <= 0.0:
-		_launch_projectile(target)
+	if variant == "Crystal Phantom":
+		if _projectile_warning_time > 0.0 and _projectile_target != null and is_instance_valid(_projectile_target):
+			if _attack_warning != null:
+				_attack_warning.visible = true
+				_attack_warning.scale = Vector3.ONE * (1.0 + sin(_time * 18.0) * 0.15)
+		elif _projectile_warning_time <= 0.0 and _projectile_target != null and _attack_warning != null and _attack_warning.visible:
+			_attack_warning.visible = false
+			_launch_projectile(_projectile_target)
+			_projectile_target = null
+		elif _projectile_cooldown <= 0.0:
+			_projectile_target = target
+			_projectile_warning_time = 0.3
+			_attack_warning.visible = true
 	if variant == "Frost Wolf" and distance < 2.4 and _lunge_cooldown <= 0.0:
 		_lunge_direction = Vector3(offset.x, 0.0, offset.z).normalized()
 		_lunge_time = 0.18
@@ -213,7 +252,7 @@ func _launch_projectile(target: Node3D) -> void:
 	projectile.launch(target)
 
 func _movement_speed(target: Node3D) -> float:
-	var player_speed := float(target.get("movement_speed")) if target.get("movement_speed") != null else 8.4
+	var player_speed := float(target.call("get_normal_movement_speed")) if target.has_method("get_normal_movement_speed") else 0.0
 	return player_speed * speed_ratio
 
 func _nearest_player() -> Node3D:
@@ -231,10 +270,55 @@ func _nearest_player() -> Node3D:
 func take_hit(amount: int, from: Vector3) -> bool:
 	if _dead:
 		return false
+	_hit_time = 0.16
+	_visual.scale = Vector3(1.18, 0.82, 1.18)
 	health -= amount
 	if health <= 0:
 		_dead = true
 		defeated.emit()
+		_burst_crystals()
 		queue_free()
 	return true
+
+func _burst_crystals() -> void:
+	var particles := GPUParticles3D.new()
+	particles.name = "FrozenDefeatBurst"
+	particles.amount = 16
+	particles.lifetime = 0.75
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	var shard := QuadMesh.new()
+	shard.size = Vector2(0.12, 0.12)
+	shard.material = _crystal_material()
+	particles.draw_pass_1 = shard
+	var process := ParticleProcessMaterial.new()
+	process.direction = Vector3(0.0, 1.0, 0.0)
+	process.spread = 150.0
+	process.initial_velocity_min = 0.8
+	process.initial_velocity_max = 2.5
+	process.gravity = Vector3(0.0, -1.5, 0.0)
+	particles.process_material = process
+	var parent := get_parent()
+	if parent == null:
+		return
+	parent.add_child(particles)
+	particles.global_position = global_position + Vector3(0.0, 0.45, 0.0)
+	particles.emitting = true
+	get_tree().create_timer(0.9).timeout.connect(particles.queue_free)
+
+func reset_to_home() -> void:
+	if _dead:
+		return
+	health = max_health
+	global_position = _home
+	_lunge_time = 0.0
+	_lunge_cooldown = 0.0
+	_projectile_cooldown = 1.8
+	_touch_cooldown = 0.0
+	_projectile_warning_time = 0.0
+	_projectile_target = null
+	_hit_time = 0.0
+	if _attack_warning != null:
+		_attack_warning.visible = false
+	_visual.scale = Vector3.ONE
 

@@ -108,13 +108,15 @@ func _ready() -> void:
 		coin_goal = frozen_skies.coins_required
 		coins_collected = Progress.frozen_coins_collected()
 		hud.show_finish_message("LEVEL 3 – FROZEN SKIES")
-		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 		_update_frozen_ability_hud()
 		_update_frozen_progress_hud()
+		_update_frozen_portal_objective()
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
 	hud.set_coin_goal(coin_goal)
+	if frozen_skies != null:
+		hud._on_coin_collected(coins_collected)
 	hud.set_level_info(current_level, LEVEL_NAMES[current_level - 1])
 	hud.bind_players([player])
 	hud.continue_pressed.connect(_on_continue_pressed)
@@ -440,6 +442,7 @@ func _bind_frozen_boss(boss: Node) -> void:
 		hud.hide_boss()
 		hud.show_finish_message("The Frost Titan falls. Open the ancient chest!")
 		hud.set_objective("Open the ancient chest and recover the Third Fragment.")
+		_update_frozen_portal_objective()
 	)
 
 
@@ -447,7 +450,7 @@ func _on_frozen_fragment_recovered() -> void:
 	if frozen_skies != null:
 		frozen_skies.thaw_environment()
 	hud.show_finish_message("You have recovered the Third Fragment of the Eternal Tree!")
-	hud.set_objective("Find 50 coins to unlock the Level 4 portal.")
+	_update_frozen_portal_objective()
 	_update_frozen_progress_hud()
 
 
@@ -460,20 +463,44 @@ func _on_frozen_mechanism_progress(current: int, total: int) -> void:
 		hud.set_objective("Activate the frozen mechanisms: %d / %d" % [current, total])
 
 func _on_frozen_crystal_light_solved() -> void:
+	_update_frozen_ability_hud()
 	hud.show_finish_message("Crystal light aligned! The frozen gate responds.")
 	hud.set_objective("Crystal light aligned. Continue through Frozen Crystal Caves.")
 	_update_frozen_progress_hud()
 
 func _on_frozen_generator_progress(current: int, total: int) -> void:
 	_update_frozen_progress_hud()
-	if current >= total:
+	if current >= total and not Progress.frozen_crystal_blocks_aligned:
+		hud.show_finish_message("Generators charged. Align the three crystal blocks.")
+		hud.set_objective("Align the three crystal blocks to open the ancient cave door.")
+	elif current >= total:
 		hud.show_finish_message("All three crystal generators are charged. The cave door opens!")
 		hud.set_objective("Continue through the Shattered Ice Fortress.")
 	else:
 		hud.set_objective("Activate the crystal generators: %d / %d" % [current, total])
 
+func _on_frozen_block_progress(aligned: bool, _total: int) -> void:
+	_update_frozen_progress_hud()
+	if aligned and Progress.frozen_generators_activated >= 3:
+		hud.show_finish_message("Crystal blocks aligned. The cave door opens!")
+		hud.set_objective("Continue through the Shattered Ice Fortress.")
+	elif aligned:
+		hud.set_objective("Crystal blocks aligned. Activate all three crystal generators.")
+	else:
+		hud.set_objective("Align the crystal blocks: rotate each block into its glowing slot.")
+
 func _on_frozen_mechanism_blocked(message: String) -> void:
 	hud.show_finish_message(message)
+
+func _on_frozen_return_portal_entered(body: Node3D) -> void:
+	if body != player and body != player_two:
+		return
+	if not Progress.second_fragment_recovered:
+		hud.show_finish_message("The Level 2 portal needs the Second Fragment.")
+		return
+	get_tree().set_meta("level_number", 2)
+	Engine.time_scale = 1.0
+	hud.play_level_transition("RETURNING TO LEVEL 2 – WHISPERING WOODS", func(): get_tree().reload_current_scene())
 
 func _update_frozen_ability_hud() -> void:
 	if frozen_skies == null:
@@ -496,7 +523,17 @@ func _update_frozen_progress_hud() -> void:
 		Progress.crystal_light_solved,
 		Progress.third_fragment_recovered,
 		active_checkpoint,
-		Progress.frozen_generators_activated)
+		Progress.frozen_generators_activated,
+		Progress.frozen_crystal_blocks_aligned)
+
+func _update_frozen_portal_objective() -> void:
+	if frozen_skies == null:
+		return
+	if frozen_skies.boss_defeated and Progress.third_fragment_recovered and coins_collected >= coin_goal:
+		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
+	else:
+		# Keep the HUD and portal interaction in agreement about every remaining requirement.
+		hud.set_objective(frozen_skies.portal_blocked_reason(coins_collected))
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1227,6 +1264,12 @@ func _reset_enemies() -> void:
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if node.has_method("reset_to_home"):
 			node.call("reset_to_home")
+	if frozen_skies != null and frozen_skies.has_method("reset_boss_encounter"):
+		frozen_skies.reset_boss_encounter()
+	for node in get_tree().get_nodes_in_group("frost_hazards"):
+		node.queue_free()
+	for node in get_tree().get_nodes_in_group("frozen_projectiles"):
+		node.queue_free()
 	hud.hide_boss()
 
 
@@ -1571,10 +1614,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not get_tree().paused:
 		hud.toggle_pause()
 		return
-	if event.is_action_pressed("interact") and not puzzle_solved:
+	if event.is_action_pressed("interact"):
 		if frozen_skies != null and frozen_skies.try_activate_nearby(player):
 			return
-		_try_press_switch()
+		if not puzzle_solved:
+			_try_press_switch()
 
 
 func _on_coin_collected(_coins: int) -> void:
@@ -1592,7 +1636,7 @@ func _on_coin_collected(_coins: int) -> void:
 		hud.show_finish_message("All coins collected! Press the switches, then reach the flag!")
 	if frozen_skies != null and coins_collected >= coin_goal \
 			and frozen_skies.boss_defeated and Progress.third_fragment_recovered:
-		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
+		_update_frozen_portal_objective()
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
@@ -1656,6 +1700,11 @@ func _on_player_died(who: CharacterBody3D) -> void:
 	if local_coop:
 		# In co-op, drop the fallen player back in rather than stopping the game.
 		respawn_player(who)
+	elif frozen_skies != null:
+		hud.show_finish_message("The frost claims you. Returning to the latest checkpoint...")
+		await get_tree().create_timer(0.45).timeout
+		if is_instance_valid(who) and bool(who.get("is_dead")):
+			respawn_player(who)
 	else:
 		Engine.time_scale = 1.0
 		var cause := str(who.get("last_death_cause")) if who != null and who.get("last_death_cause") != null else "fall"

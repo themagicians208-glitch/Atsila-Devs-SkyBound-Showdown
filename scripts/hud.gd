@@ -325,11 +325,11 @@ func set_frozen_abilities(unlocked: Array[String]) -> void:
 	frozen_ability_hint.text = "ICE ABILITIES  •  " + "  |  ".join(unlocked)
 	frozen_ability_hint.visible = true
 
-func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int, generators: int = 0) -> void:
+func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int, generators: int = 0, blocks_aligned: bool = false) -> void:
 	if not is_instance_valid(frozen_progress_hint):
 		return
-	frozen_progress_hint.text = "SEALS %d/%d  •  GENERATORS %d/3  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d" % [
-		seals, total, generators, "ALIGNED" if crystal_solved else "PENDING",
+	frozen_progress_hint.text = "SEALS %d/%d  •  GENERATORS %d/3  •  BLOCKS %s  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d" % [
+		seals, total, generators, "ALIGNED" if blocks_aligned else "PENDING", "ALIGNED" if crystal_solved else "PENDING",
 		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
 	frozen_progress_hint.visible = true
 

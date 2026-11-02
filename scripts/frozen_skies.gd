@@ -2,6 +2,7 @@ extends Node3D
 class_name FrozenSkies
 
 const PLATFORM := preload("res://objects/platform_medium.tscn")
+const FALLING_PLATFORM := preload("res://objects/platform_falling.tscn")
 const COIN := preload("res://objects/coin.tscn")
 const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
@@ -10,6 +11,7 @@ const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
 const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
 const CRYSTAL_LIGHT := preload("res://objects/crystal_light_puzzle.gd")
 const CRYSTAL_GENERATOR := preload("res://objects/frozen_crystal_generator.gd")
+const CRYSTAL_BLOCK := preload("res://objects/frozen_crystal_block.gd")
 const PUZZLE_GATE := preload("res://objects/puzzle_gate.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
@@ -31,11 +33,15 @@ var _main: Node
 var _chest: FrozenFragmentChest
 var _titan: FrostTitan
 var mechanisms: Array[FrozenMechanism] = []
+var _timed_seal_switch: FrozenMechanism
+var _timed_seal_time := 0.0
 var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
+var _rotating_bridges: Array[AnimatableBody3D] = []
 var _time := 0.0
 var _crystal_light: Node3D
 var _crystal_generators: Array[Node3D] = []
+var _crystal_blocks: Array[Node3D] = []
 var _ice_bridges: Array[StaticBody3D] = []
 var _snowfall: GPUParticles3D
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
@@ -43,7 +49,11 @@ var environment_thawed := false
 var _crystal_gate: StaticBody3D
 var _cave_gate: StaticBody3D
 var _boss_gate: StaticBody3D
+var _boss_gate_home_y := 0.0
+var _boss_gate_tween: Tween
+var _boss_arena_trigger: Area3D
 var boss_arena_locked := false
+var boss_fight_started := false
 var _exit_portal_ring: MeshInstance3D
 var _exit_portal_material: StandardMaterial3D
 var _portal_energy := 0.0
@@ -54,6 +64,9 @@ var arrival_cinematic_complete := false
 var _arrival_time := 0.0
 var waterfall_count := 0
 var cave_cluster_count := 0
+var glowing_flower_count := 0
+var frozen_ruin_count := 0
+var boss_music_active := false
 
 func build(main: Node) -> Array:
 	_main = main
@@ -67,8 +80,10 @@ func build(main: Node) -> Array:
 	_place_coins()
 	_place_enemies()
 	_build_moving_ice_platforms()
+	_build_fortress_platforms()
 	_build_unstable_ice()
 	_build_crystal_light_puzzle()
+	_build_crystal_blocks()
 	_build_crystal_generators()
 	_build_crystal_gate()
 	_build_cave_gate()
@@ -82,11 +97,14 @@ func _build_crystal_light_puzzle() -> void:
 	_crystal_light.position = route[18] + Vector3(0.0, 0.65, 1.8)
 	_world.add_child(_crystal_light)
 	_crystal_light.solved.connect(func():
+		Progress.unlock_crystal_activation()
 		if _crystal_gate != null:
 			_crystal_gate.open()
 		if _main.has_method("_on_frozen_crystal_light_solved"):
 			_main.call("_on_frozen_crystal_light_solved")
 	)
+	if Progress.crystal_light_solved:
+		Progress.unlock_crystal_activation()
 
 func _build_crystal_gate() -> void:
 	_crystal_gate = StaticBody3D.new()
@@ -125,6 +143,34 @@ func _build_crystal_generators() -> void:
 	for index in range(mini(Progress.frozen_generators_activated, _crystal_generators.size())):
 		_crystal_generators[index].activate()
 
+func _build_crystal_blocks() -> void:
+	for entry in [[22, 0, 2], [24, 1, 0], [26, 2, 1]]:
+		var block = CRYSTAL_BLOCK.new()
+		block.name = "CrystalBlock_%02d" % int(entry[0])
+		block.target_slot = int(entry[2])
+		block.starting_slot = int(entry[1])
+		block.position = route[int(entry[0])] + Vector3(-1.15, 0.95, 0.35)
+		_world.add_child(block)
+		_crystal_blocks.append(block)
+		block.moved.connect(_on_crystal_block_moved)
+		if Progress.frozen_crystal_blocks_aligned:
+			block.set_aligned()
+
+func _crystal_blocks_aligned() -> bool:
+	if _crystal_blocks.is_empty():
+		return false
+	for block in _crystal_blocks:
+		if not block.is_aligned():
+			return false
+	return true
+
+func _on_crystal_block_moved(_aligned: bool) -> void:
+	if _crystal_blocks_aligned() and not Progress.frozen_crystal_blocks_aligned:
+		Progress.set_frozen_crystal_blocks_aligned(true)
+	_update_cave_gate()
+	if _main.has_method("_on_frozen_block_progress"):
+		_main.call("_on_frozen_block_progress", _crystal_blocks_aligned(), _crystal_blocks.size())
+
 func _build_cave_gate() -> void:
 	_cave_gate = StaticBody3D.new()
 	_cave_gate.name = "CrystalCaveDoor"
@@ -142,7 +188,12 @@ func _build_cave_gate() -> void:
 	visual.material_override = _material(Color("#79eaff"), 1.25)
 	_cave_gate.add_child(visual)
 	_world.add_child(_cave_gate)
-	if Progress.frozen_generators_activated >= 3:
+	_update_cave_gate()
+
+func _update_cave_gate() -> void:
+	if _cave_gate == null:
+		return
+	if Progress.frozen_generators_activated >= 3 and _crystal_blocks_aligned():
 		_cave_gate.open()
 
 func _on_crystal_generator_activated() -> void:
@@ -151,8 +202,8 @@ func _on_crystal_generator_activated() -> void:
 		if generator.get("is_activated"):
 			activated_count += 1
 	Progress.set_frozen_generators_activated(activated_count)
-	if activated_count >= _crystal_generators.size() and _cave_gate != null:
-		_cave_gate.open()
+	if activated_count >= _crystal_generators.size():
+		_update_cave_gate()
 	if _main.has_method("_on_frozen_generator_progress"):
 		_main.call("_on_frozen_generator_progress", activated_count, _crystal_generators.size())
 
@@ -185,6 +236,9 @@ func _process(delta: float) -> void:
 		_portal_energy = move_toward(_portal_energy, target_energy, delta * 0.8)
 		_exit_portal_ring.rotate_y(delta * (0.45 + _portal_energy * 1.4))
 		_exit_portal_material.emission_energy_multiplier = 0.35 + _portal_energy * 1.8
+	if _titan != null and not boss_defeated and not _titan.locked and not boss_music_active:
+		boss_music_active = true
+		Audio.play_music("res://sounds/itty_bitty.mp3")
 	for index in _moving_platforms.size():
 		var platform := _moving_platforms[index]
 		if not is_instance_valid(platform):
@@ -192,9 +246,16 @@ func _process(delta: float) -> void:
 		var origin: Vector3 = platform.get_meta("origin")
 		var phase: float = platform.get_meta("phase")
 		platform.position = origin + Vector3(sin(_time * 1.1 + phase) * 1.8, sin(_time * 1.7 + phase) * 0.35, 0.0)
+	for bridge in _rotating_bridges:
+		if is_instance_valid(bridge):
+			bridge.rotation = Vector3(0.0, sin(_time * 0.75 + float(bridge.get_meta("phase"))) * 0.72, 0.0)
+	if _timed_seal_time > 0.0:
+		_timed_seal_time = maxf(0.0, _timed_seal_time - delta)
+		if _timed_seal_time == 0.0 and _timed_seal_switch != null:
+			_timed_seal_switch.reset()
 
 func _build_moving_ice_platforms() -> void:
-	for entry in [[14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
+	for entry in [[4, -1.2], [14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
 		var platform: Node3D = PLATFORM.instantiate()
 		platform.name = "MovingIcePlatform_%02d" % int(entry[0])
 		var origin: Vector3 = route[int(entry[0])] + Vector3(float(entry[1]), 1.0, 1.4)
@@ -205,6 +266,31 @@ func _build_moving_ice_platforms() -> void:
 		_world.add_child(platform)
 		_moving_platforms.append(platform)
 		_add_ice_cap(origin)
+
+func _build_fortress_platforms() -> void:
+	var bridge := AnimatableBody3D.new()
+	bridge.name = "RotatingIceBridge"
+	bridge.position = route[34] + Vector3(0.0, 0.85, 1.45)
+	bridge.sync_to_physics = false
+	bridge.set_meta("phase", 0.0)
+	var bridge_shape := CollisionShape3D.new()
+	var bridge_box := BoxShape3D.new()
+	bridge_box.size = Vector3(4.2, 0.24, 0.8)
+	bridge_shape.shape = bridge_box
+	bridge.add_child(bridge_shape)
+	var bridge_visual := MeshInstance3D.new()
+	var bridge_mesh := BoxMesh.new()
+	bridge_mesh.size = bridge_box.size
+	bridge_visual.mesh = bridge_mesh
+	bridge_visual.material_override = _material(Color("#a8efff"), 1.1)
+	bridge.add_child(bridge_visual)
+	_world.add_child(bridge)
+	_rotating_bridges.append(bridge)
+	var falling: Node3D = FALLING_PLATFORM.instantiate()
+	falling.name = "FallingIcePlatform"
+	falling.position = route[36] + Vector3(0.0, 0.7, 1.4)
+	falling.scale = Vector3(0.82, 0.55, 0.82)
+	_world.add_child(falling)
 
 func _build_unstable_ice() -> void:
 	for index in [23, 25, 27, 29]:
@@ -230,6 +316,12 @@ func _build_frozen_mechanics() -> void:
 		_world.add_child(mechanism)
 		mechanisms.append(mechanism)
 		mechanism.activated.connect(_on_mechanism_activated.bind(mechanism))
+	_timed_seal_switch = FROZEN_MECHANISM.new()
+	_timed_seal_switch.name = "TimedSealSwitch"
+	_timed_seal_switch.mechanism_name = "Timed Ice Switch"
+	_timed_seal_switch.position = route[3] + Vector3(0.0, 0.55, 1.25)
+	_world.add_child(_timed_seal_switch)
+	_timed_seal_switch.activated.connect(func(): _timed_seal_time = 6.0)
 	for index in range(mini(Progress.frozen_seals_activated, mechanisms.size())):
 		mechanisms[index].activate()
 	frozen_seals_complete = Progress.frozen_seals_activated >= mechanisms.size()
@@ -238,15 +330,24 @@ func try_activate_nearby(player: Node3D) -> bool:
 	if _crystal_light != null and _crystal_light.try_interact(player):
 		return true
 	if Progress.crystal_activation_unlocked:
+		for block in _crystal_blocks:
+			if block.try_interact(player):
+				return true
 		for generator in _crystal_generators:
 			if not generator.get("is_activated") and generator.global_position.distance_to(player.global_position) <= 2.4:
 				return generator.activate()
+	if _timed_seal_switch != null and not _timed_seal_switch.is_activated and _timed_seal_switch.global_position.distance_to(player.global_position) <= 2.4:
+		return _timed_seal_switch.activate()
 	for index in mechanisms.size():
 		var mechanism := mechanisms[index]
 		if not mechanism.is_activated and mechanism.global_position.distance_to(player.global_position) <= 2.4:
 			if index == 1 and not Progress.crystal_light_solved:
 				if _main.has_method("_on_frozen_mechanism_blocked"):
 					_main.call("_on_frozen_mechanism_blocked", "Align the crystal light first.")
+				return true
+			if index == 0 and _timed_seal_time <= 0.0:
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Activate the timed ice switch, then reach the first seal.")
 				return true
 			if index > 0 and not mechanisms[index - 1].is_activated:
 				if _main.has_method("_on_frozen_mechanism_blocked"):
@@ -282,7 +383,7 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 		frozen_seals_complete = true
 		if _titan != null:
 			_titan.unlock()
-		_lock_boss_arena()
+		_unlock_boss_arena()
 	if _main.has_method("_on_frozen_mechanism_progress"):
 		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
@@ -348,6 +449,10 @@ func _build_environment_details() -> void:
 		_add_frozen_waterfall(route[index] + Vector3(-1.2, 0.0, 0.7))
 	for index in [21, 23, 25, 27]:
 		_add_cave_crystal_cluster(route[index] + Vector3(1.1, 0.55, 0.5))
+	for index in [1, 6, 12, 17, 23, 29, 35, 40]:
+		_add_glowing_flower(route[index] + Vector3(-1.0, 0.5, 0.8))
+	for index in [13, 30, 36]:
+		_add_frozen_ruin(route[index] + Vector3(1.6, 0.5, 0.4))
 
 func _add_frozen_waterfall(point: Vector3) -> void:
 	waterfall_count += 1
@@ -381,6 +486,63 @@ func _add_cave_crystal_cluster(point: Vector3) -> void:
 		shard.material_override = _material(Color("#74eaff"), 1.4)
 		cluster.add_child(shard)
 	_world.add_child(cluster)
+
+func _add_glowing_flower(point: Vector3) -> void:
+	glowing_flower_count += 1
+	var flower := Node3D.new()
+	flower.name = "GlowingBlueFlower"
+	flower.position = point
+	var stem := MeshInstance3D.new()
+	var stem_mesh := CylinderMesh.new()
+	stem_mesh.top_radius = 0.025
+	stem_mesh.bottom_radius = 0.04
+	stem_mesh.height = 0.55
+	stem.mesh = stem_mesh
+	stem.position.y = 0.28
+	stem.material_override = _material(Color("#8fd8bc"), 0.15)
+	flower.add_child(stem)
+	for index in 3:
+		var petal := MeshInstance3D.new()
+		var petal_mesh := SphereMesh.new()
+		petal_mesh.radius = 0.12
+		petal_mesh.height = 0.2
+		petal.mesh = petal_mesh
+		petal.position = Vector3(cos(float(index) * TAU / 3.0) * 0.12, 0.58, sin(float(index) * TAU / 3.0) * 0.12)
+		petal.material_override = _material(Color("#66eaff"), 1.8)
+		flower.add_child(petal)
+	_world.add_child(flower)
+
+func _add_frozen_ruin(point: Vector3) -> void:
+	frozen_ruin_count += 1
+	var ruin := Node3D.new()
+	ruin.name = "AncientFrozenRuin"
+	ruin.position = point
+	for side in [-1.0, 1.0]:
+		var pillar := MeshInstance3D.new()
+		var pillar_mesh := BoxMesh.new()
+		pillar_mesh.size = Vector3(0.32, 1.8, 0.32)
+		pillar.mesh = pillar_mesh
+		pillar.position = Vector3(side * 0.75, 0.9, 0.0)
+		pillar.rotation.z = side * 0.08
+		pillar.material_override = _material(Color("#9fcde7"), 0.55)
+		ruin.add_child(pillar)
+	var lintel := MeshInstance3D.new()
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(1.8, 0.28, 0.38)
+	lintel.mesh = lintel_mesh
+	lintel.position.y = 1.72
+	lintel.material_override = _material(Color("#ccefff"), 0.8)
+	ruin.add_child(lintel)
+	var sigil := MeshInstance3D.new()
+	var sigil_mesh := TorusMesh.new()
+	sigil_mesh.inner_radius = 0.18
+	sigil_mesh.outer_radius = 0.25
+	sigil.mesh = sigil_mesh
+	sigil.position = Vector3(0.0, 1.05, -0.2)
+	sigil.rotation.x = PI / 2.0
+	sigil.material_override = _material(Color("#b88cff"), 1.5)
+	ruin.add_child(sigil)
+	_world.add_child(ruin)
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):
@@ -417,10 +579,11 @@ func _place_enemies() -> void:
 	if frozen_seals_complete or boss_defeated:
 		_titan.unlock()
 	if frozen_seals_complete and not boss_defeated:
-		_lock_boss_arena()
+		_unlock_boss_arena()
 	if boss_defeated:
 		_titan.set_process(false)
 		_titan.set_physics_process(false)
+		_titan.visible = false
 		_chest.unlock()
 		_unlock_boss_arena()
 	_chest.fragment_recovered.connect(func():
@@ -522,6 +685,19 @@ func _add_portal(point: Vector3, color: Color, is_exit := false) -> void:
 	surface.material_override = _material(Color(color, 0.18), 0.7)
 	portal.add_child(surface)
 	_world.add_child(portal)
+	if not is_exit:
+		var return_area := Area3D.new()
+		return_area.name = "Level2ReturnPortalArea"
+		return_area.collision_layer = 0
+		return_area.collision_mask = 1
+		var return_shape := CollisionShape3D.new()
+		var return_box := BoxShape3D.new()
+		return_box.size = Vector3(2.4, 3.0, 1.4)
+		return_shape.shape = return_box
+		return_area.add_child(return_shape)
+		return_area.position = point + Vector3(0.0, 1.4, 0.0)
+		_world.add_child(return_area)
+		return_area.body_entered.connect(_main._on_frozen_return_portal_entered)
 
 func _build_snowfall() -> void:
 	var particles := GPUParticles3D.new()
@@ -552,6 +728,7 @@ func _build_snowfall() -> void:
 
 func _build_boss_arena() -> void:
 	var centre: Vector3 = route[route.size() - 3] + Vector3(0.0, 0.0, 3.0)
+	_add_frozen_tree(centre + Vector3(0.0, 0.0, 4.0))
 	for i in 8:
 		var angle := TAU * float(i) / 8.0
 		var pillar := MeshInstance3D.new()
@@ -586,11 +763,28 @@ func _build_boss_arena() -> void:
 	gate_visual.material_override = _material(Color("#89eaff"), 1.0)
 	_boss_gate.add_child(gate_visual)
 	_world.add_child(_boss_gate)
+	_boss_gate_home_y = _boss_gate.position.y
+	boss_arena_locked = true
+	_boss_arena_trigger = Area3D.new()
+	_boss_arena_trigger.name = "FrostTitanArenaTrigger"
+	_boss_arena_trigger.collision_layer = 0
+	_boss_arena_trigger.collision_mask = 1
+	var trigger_shape := CollisionShape3D.new()
+	var trigger_box := BoxShape3D.new()
+	trigger_box.size = Vector3(5.0, 2.5, 5.0)
+	trigger_shape.shape = trigger_box
+	_boss_arena_trigger.add_child(trigger_shape)
+	_boss_arena_trigger.position = centre + Vector3(0.0, 1.0, 0.0)
+	_world.add_child(_boss_arena_trigger)
+	_boss_arena_trigger.body_entered.connect(_on_boss_arena_entered)
 
 func _lock_boss_arena() -> void:
-	if boss_arena_locked or _boss_gate == null:
+	if _boss_gate == null:
 		return
+	if _boss_gate_tween != null and _boss_gate_tween.is_valid():
+		_boss_gate_tween.kill()
 	boss_arena_locked = true
+	_boss_gate.position.y = _boss_gate_home_y
 	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
 		(shape as CollisionShape3D).set_deferred("disabled", false)
 
@@ -600,8 +794,25 @@ func _unlock_boss_arena() -> void:
 	boss_arena_locked = false
 	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
 		(shape as CollisionShape3D).set_deferred("disabled", true)
-	var tween := _boss_gate.create_tween()
-	tween.tween_property(_boss_gate, "position:y", _boss_gate.position.y - 2.5, 0.7)
+	if _boss_gate_tween != null and _boss_gate_tween.is_valid():
+		_boss_gate_tween.kill()
+	_boss_gate_tween = _boss_gate.create_tween()
+	_boss_gate_tween.tween_property(_boss_gate, "position:y", _boss_gate_home_y - 2.5, 0.7)
+
+func _on_boss_arena_entered(body: Node3D) -> void:
+	if _main == null or body != _main.get("player") and body != _main.get("player_two"):
+		return
+	if boss_defeated or boss_fight_started or _titan == null or _titan.locked:
+		return
+	boss_fight_started = true
+	_lock_boss_arena()
+	if _main.has_method("_on_frozen_boss_started"):
+		_main.call("_on_frozen_boss_started")
+
+func reset_boss_encounter() -> void:
+	boss_fight_started = false
+	if not boss_defeated and Progress.frozen_seals_activated >= 3:
+		_unlock_boss_arena()
 
 func _material(color: Color, emission: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -614,6 +825,9 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 
 func _on_boss_defeated() -> void:
 	boss_defeated = true
+	boss_fight_started = false
+	boss_music_active = false
+	Audio.play_music("res://sounds/pixelland.mp3")
 	Progress.mark_frost_titan_defeated()
 	_unlock_boss_arena()
 	if _chest != null:

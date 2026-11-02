@@ -40,6 +40,13 @@ signal fly_mode_changed(enabled: bool)
 @export var dash_cooldown := 0.08
 @export var dash_min_stamina_pct := 0.25
 
+@export_subgroup("Ice Abilities")
+@export var frost_dash_speed_multiplier := 3.0
+@export var frost_dash_duration := 0.3
+@export var frost_dash_cooldown := 3.0
+@export var ice_shield_duration := 2.0
+@export var ice_shield_cooldown := 8.0
+
 # --- Fighting, in the spirit of Hollow Knight ---------------------------------
 # Slash an enemy for the fun of it; a down-slash on one bounces the player back
 # into the air, which is the pogo. Being touched by one is fatal, the same way
@@ -118,6 +125,9 @@ var ice_shield_active := false
 var ice_shield_cooldown_left := 0.0
 var frost_dash_cooldown_left := 0.0
 var frost_dash_time_left := 0.0
+var _frost_dash_direction := Vector3.ZERO
+var _frost_dash_trail: GPUParticles3D
+var _ice_shield_time_left := 0.0
 var _ice_shield_visual: MeshInstance3D
 
 @onready var particles_trail = $ParticlesTrail
@@ -147,6 +157,7 @@ func _ready() -> void:
 	_ensure_dash_action()
 	_ensure_frozen_actions()
 	_build_ice_shield_visual()
+	_build_frost_dash_trail()
 	model_rest_rotation = model.rotation
 	model_rest_position = model.position
 	if model.has_method("set_player_index"):
@@ -258,6 +269,30 @@ func set_player_name(new_name: String) -> void:
 	name_label.text = new_name
 	name_label.visible = true
 
+func _build_frost_dash_trail() -> void:
+	_frost_dash_trail = GPUParticles3D.new()
+	_frost_dash_trail.name = "FrostDashTrail"
+	_frost_dash_trail.amount = 32
+	_frost_dash_trail.lifetime = 0.3
+	_frost_dash_trail.emitting = false
+	_frost_dash_trail.local_coords = false
+	_frost_dash_trail.position.y = 0.55
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.07
+	mesh.height = 0.14
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#7deaff")
+	material.emission_enabled = true
+	material.emission = Color("#3aaeff")
+	mesh.material = material
+	_frost_dash_trail.draw_pass_1 = mesh
+	var particles := ParticleProcessMaterial.new()
+	particles.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	particles.emission_sphere_radius = 0.35
+	particles.gravity = Vector3.ZERO
+	_frost_dash_trail.process_material = particles
+	add_child(_frost_dash_trail)
+
 
 # Functions
 
@@ -277,7 +312,6 @@ func _physics_process(delta):
 			_start_frost_dash()
 
 	_update_dash(delta)
-	_update_frost_dash(delta)
 	_update_ice_shield(delta)
 	_update_combat(delta)
 
@@ -297,12 +331,17 @@ func _physics_process(delta):
 	applied_velocity.y = -gravity
 	applied_velocity.x += external_velocity.x + knockback.x
 	applied_velocity.z += external_velocity.z + knockback.z
+	if frost_dash_time_left > 0.0:
+		var dash_speed := get_normal_movement_speed() * frost_dash_speed_multiplier
+		applied_velocity.x = _frost_dash_direction.x * dash_speed
+		applied_velocity.z = _frost_dash_direction.z * dash_speed
 	if sticky:
 		applied_velocity.x = 0.0
 		applied_velocity.z = 0.0
 
 	velocity = applied_velocity
 	move_and_slide()
+	_update_frost_dash(delta)
 
 	# Rotation
 
@@ -423,6 +462,10 @@ func _set_pose_state(logical: String) -> void:
 
 # Handle movement input
 
+func get_normal_movement_speed() -> float:
+	# The existing controller scales its legacy speed setting by the physics step.
+	return movement_speed * get_physics_process_delta_time()
+
 func handle_controls(delta):
 
 	# Movement
@@ -535,9 +578,9 @@ func set_wind(lift: float) -> void:
 # Dash skill
 
 func _start_dash() -> void:
-	# Dashing is blocked when stamina is below 25% of max stamina
+	# Dashing is blocked when stamina is below 25% of max stamina or during frost dash.
 	var min_stamina := max_stamina * dash_min_stamina_pct
-	if stamina < min_stamina:
+	if stamina < min_stamina or frost_dash_time_left > 0.0:
 		return
 	is_dashing = true
 	dash_time_left = dash_duration
@@ -554,11 +597,13 @@ func _end_dash() -> void:
 	dash_cooldown_left = dash_cooldown
 
 func _start_frost_dash() -> void:
-	if not Progress.frost_dash_unlocked or is_dead:
+	if not Progress.frost_dash_unlocked or is_dead or is_dashing or frost_dash_cooldown_left > 0.0:
 		return
-	frost_dash_time_left = 0.3
-	frost_dash_cooldown_left = 3.0
+	frost_dash_time_left = frost_dash_duration
+	frost_dash_cooldown_left = frost_dash_cooldown
+	_frost_dash_direction = Vector3(sin(rotation.y), 0.0, cos(rotation.y))
 	is_dashing = true
+	_frost_dash_trail.emitting = true
 	Audio.play("res://sounds/jump.ogg")
 
 func _update_frost_dash(delta: float) -> void:
@@ -566,34 +611,39 @@ func _update_frost_dash(delta: float) -> void:
 		frost_dash_cooldown_left = maxf(0.0, frost_dash_cooldown_left - delta)
 	if frost_dash_time_left <= 0.0:
 		return
-	frost_dash_time_left -= delta
-	var direction := Vector3(sin(rotation.y), 0.0, cos(rotation.y))
-	velocity.x = direction.x * movement_speed * 3.0
-	velocity.z = direction.z * movement_speed * 3.0
+	frost_dash_time_left = maxf(0.0, frost_dash_time_left - delta)
 	if frost_dash_time_left <= 0.0:
 		is_dashing = false
+		_frost_dash_trail.emitting = false
+		var horizontal := Vector3(velocity.x, 0.0, velocity.z).limit_length(get_normal_movement_speed())
+		velocity.x = horizontal.x
+		velocity.z = horizontal.z
 
 func _activate_ice_shield() -> void:
-	if not Progress.ice_shield_unlocked or ice_shield_cooldown_left > 0.0 or ice_shield_active:
+	if is_dead or not Progress.ice_shield_unlocked or ice_shield_cooldown_left > 0.0 or ice_shield_active:
 		return
 	ice_shield_active = true
-	ice_shield_cooldown_left = 8.0
+	ice_shield_cooldown_left = ice_shield_cooldown
+	_ice_shield_time_left = ice_shield_duration
 	if _ice_shield_visual != null:
 		_ice_shield_visual.visible = true
-	get_tree().create_timer(2.0).timeout.connect(func():
-		ice_shield_active = false
-		if _ice_shield_visual != null:
-			_ice_shield_visual.visible = false
-	)
+		_ice_shield_visual.scale = Vector3.ONE * 0.6
 
 func _update_ice_shield(delta: float) -> void:
 	if ice_shield_cooldown_left > 0.0:
 		ice_shield_cooldown_left = maxf(0.0, ice_shield_cooldown_left - delta)
 	if _ice_shield_visual != null and ice_shield_active:
+		_ice_shield_time_left = maxf(0.0, _ice_shield_time_left - delta)
 		_ice_shield_visual.rotation.y += delta * 1.8
+		_ice_shield_visual.scale = _ice_shield_visual.scale.lerp(Vector3.ONE, minf(delta * 12.0, 1.0))
+		if _ice_shield_time_left <= 0.0:
+			ice_shield_active = false
+			_ice_shield_visual.visible = false
 
 
 func _update_dash(delta: float) -> void:
+	if frost_dash_time_left > 0.0:
+		return
 	if is_dashing:
 		dash_time_left -= delta
 		stamina = maxf(0.0, stamina - dash_stamina_drain * delta)
@@ -632,6 +682,8 @@ func collect_coin():
 # Dying
 
 func reset_vitals() -> void:
+	_reset_ice_abilities()
+	knockback = Vector3.ZERO
 	health = max_health
 	stamina = max_stamina
 	last_death_cause = "fall"
@@ -652,7 +704,21 @@ func die(cause: String = "fall") -> void:
 	is_dashing = false
 	dash_time_left = 0.0
 	dash_cooldown_left = 0.0
+	_reset_ice_abilities()
 	died.emit()
+
+func _reset_ice_abilities() -> void:
+	if frost_dash_time_left > 0.0:
+		is_dashing = false
+	frost_dash_time_left = 0.0
+	frost_dash_cooldown_left = 0.0
+	ice_shield_active = false
+	_ice_shield_time_left = 0.0
+	ice_shield_cooldown_left = 0.0
+	if _ice_shield_visual != null:
+		_ice_shield_visual.visible = false
+	if _frost_dash_trail != null:
+		_frost_dash_trail.emitting = false
 
 
 func _activate_time_freeze() -> void:
@@ -853,7 +919,9 @@ func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: St
 			knockback = Vector3.ZERO
 			die(source)
 		return
-	var fatal_or_amount: float = max_health if amount <= 1.0 else amount
+	# Frozen enemies use literal HP damage; legacy sentries retain their fatal-touch rule.
+	var literal_damage := source == "frozen_enemy" or source == "crystal_phantom" or source.begins_with("frost_")
+	var fatal_or_amount: float = maxf(0.0, amount) if literal_damage else (max_health if amount <= 1.0 else amount)
 	health = maxf(0.0, health - fatal_or_amount)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
