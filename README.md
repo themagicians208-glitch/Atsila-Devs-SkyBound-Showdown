@@ -23,9 +23,9 @@
 
 The sky is your playground—and falling is part of the lesson.
 
-Leap across floating islands, hunt down every coin, activate switches, and race to the finish. When the path disappears, shift between the **Material** and **Mirror** dimensions to reveal alternate platforms and routes. Use double jumps, time your moves, and keep your nerve as each course introduces new challenges.
+Journey across floating kingdoms, collect coins, solve environmental puzzles, rescue trapped creatures, defeat corrupted guardians, and recover the Fragments of the Eternal Tree. When the path disappears, shift between the **Material** and **Mirror** dimensions to reveal alternate platforms and routes. Use double jumps, time your moves, and keep your nerve as each level introduces new challenges.
 
-**Your goal:** conquer all six courses, solve their switch puzzles, and reach every finish flag.
+**Your goal:** recover the Eternal Tree fragments through the first three story levels, unlock their portals, and master all six courses.
 
 ## ✨ Make every jump count
 
@@ -65,16 +65,14 @@ Race against your friends or tackle the courses together.
 
 | # | Course | Your challenge |
 |---|---|---|
-| 1 | **Forgotten Island** | Explore a dangerous island, defeat its guardians, recover the First Fragment, and awaken the portal. |
-| 2 | **Switchback Sprint** | Keep moving through a winding route with jump hurdles and moving platforms. |
-| 3 | **Moonflip Maze** | Find the openings, read the route, and time your jumps. |
+| 1 | **Forgotten Island** | Defeat the Island Warden, recover the First Fragment, collect 30 coins, and awaken the portal. |
+| 2 | **The Whispering Woods** | Solve forest puzzles, rescue trapped creatures, defeat the Shadow Wolf, recover the Second Fragment, and collect 40 coins. |
+| 3 | **Frozen Skies** | Cross six frozen regions, unlock ice abilities, defeat the Frost Titan, recover the Third Fragment, and collect 50 coins. |
 | 4 | **Rising Ruins** | Climb through broken-column scenery and increasingly tricky obstacles. |
 | 5 | **Sky Crown** | Take on a long route toward golden gates and a crown of spires. |
 | 6 | **Gimmick Gauntlet** | Master a 42-platform course packed with special surfaces, moving hazards, and tricky crossings. |
 
-No course is quite the same. Switch dimensions, watch the timing, and see if you can collect every coin on the way to the finish.
-
-For more detail on route sizes and mechanics, see **[COURSES.md](COURSES.md)**.
+Levels 1–3 form the current Eternal Tree story arc. Levels 4–6 continue the adventure as increasingly difficult obstacle courses. No course is quite the same: switch dimensions, watch the timing, and explore every route for hidden coins.
 
 ## 🎮 Controls
 
