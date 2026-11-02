@@ -51,13 +51,18 @@ Journey across floating kingdoms, collect coins, solve environmental puzzles, re
   <img src="screenshots/screenshot2.jpg" width="45%" />
 </p>
 
+## 🧠 Game Systems
+
+- **Game State Manager** — Centralized single source of truth for level progress, game status, coins, and player data. Synchronizes state across clients in online play.
+- **Progress Tracking** — Automatic save/resume support keeps you exactly where you left off.
+
 ## 👥 Multiplayer
 
 Race against your friends or tackle the courses together.
 
 - 📺 **Local Co-op** — split-screen action for two players on one machine. Full support for dual controllers or shared keyboard.
 - 🌐 **Online Co-op** — join a room via IP address and hop through dimensions with friends over the network.
-- 🛡️ **Secure Networking** — hardened RPC system to prevent spoofing and ensure a fair race.
+- 🛡️ **Secure Networking** — hardened RPC system with heartbeat monitoring, timeout detection, and improved error handling.
 
 ---
 
@@ -68,7 +73,7 @@ Race against your friends or tackle the courses together.
 | 1 | **Forgotten Island** | Defeat the Island Warden, recover the First Fragment, collect 30 coins, and awaken the portal. |
 | 2 | **The Whispering Woods** | Solve forest puzzles, rescue trapped creatures, defeat the Shadow Wolf, recover the Second Fragment, and collect 40 coins. |
 | 3 | **Frozen Skies** | Cross six frozen regions, unlock ice abilities, defeat the Frost Titan, recover the Third Fragment, and collect 50 coins. |
-| 4 | **Rising Ruins** | Climb through broken-column scenery and increasingly tricky obstacles. |
+| 4 | **Ember Heights** | Cross the Molten River, activate the Magma Crystals and Ancient Energy Machines, escape the Rising Lava Chamber, defeat the Ember Dragon, and recover the Fourth Fragment. |
 | 5 | **Malakar's Fortress** | Cross the corrupted island, align three energy conduits, infiltrate the fortress, and survive Malakar's encounter. |
 | 6 | **Gimmick Gauntlet** | Master a 42-platform course packed with special surfaces, moving hazards, and tricky crossings. |
 
