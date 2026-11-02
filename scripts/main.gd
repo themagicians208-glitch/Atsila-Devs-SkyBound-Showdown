@@ -69,7 +69,7 @@ var route_points: Array = []
 
 # Online co-op (ENet)
 var online := false
-	var game_state_manager: Node = null
+var game_state_manager: Node = null
 var remote_players: Dictionary = {}
 # Dimension shift constraints
 var dimension_shifts_left := 2
@@ -102,7 +102,7 @@ func _ready() -> void:
 		gsm.name = "GameStateManager"
 		game_state_manager = gsm
 
-	current_level = game_state_manager.state.current_level
+	current_level = int(game_state_manager.state["current_level"])
 	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	if current_level == 5:
 		dimension_shifts_left = 4

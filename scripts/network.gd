@@ -25,12 +25,6 @@ var local_character := ""
 var player_characters: Dictionary = {}  # peer_id -> character id
 var last_seen: Dictionary = {}  # peer_id -> float (timestamp)
 
-signal connection_succeeded
-signal connection_failed
-signal peer_list_changed
-signal name_taken(new_name: String)
-signal network_error(message: String)
-
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -240,6 +234,12 @@ func _on_heartbeat_timeout() -> void:
 @rpc("authority", "call_remote", "reliable")
 func _heartbeat_request() -> void:
 	rpc("_heartbeat")
+
+
+@rpc("authority", "call_remote", "reliable")
+func _name_taken(new_name: String) -> void:
+	local_name = new_name
+	name_taken.emit(new_name)
 
 
 func get_player_name(id: int) -> String:
