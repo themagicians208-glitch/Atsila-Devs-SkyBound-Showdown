@@ -93,6 +93,10 @@ func _ready() -> void:
 
 	print("tested %d camera positions (%d of them a moving platform crossing for a frame)" % [
 		tested, _recoveries])
+	if occlusion:
+		var fade_err := await _check_obstacle_fading(main, spots[0])
+		if fade_err != "":
+			failures.append(fade_err)
 	if failures.is_empty():
 		print("\nCAMERA OK - the camera always has a clear view of the player on level %d" % level)
 	else:
@@ -106,6 +110,65 @@ func _ready() -> void:
 
 ## Stand the rig at one spot facing one way, let it settle, and report what - if
 ## anything - is in the line from the camera to the player's head.
+func _check_obstacle_fading(main: Node, spot: Vector3) -> String:
+	_dummy.global_position = spot
+	_view.global_position = spot
+	_view.set("camera_rotation", Vector3(PITCH, 0.0, 0.0))
+	_view.rotation_degrees = Vector3(PITCH, 0.0, 0.0)
+	_camera.position = Vector3(0.0, 0.0, float(_view.get("zoom")))
+	await get_tree().physics_frame
+	await get_tree().process_frame
+
+	var eye := _view.global_transform * _camera.position
+	var head := spot + Vector3(0.0, HEAD_HEIGHT, 0.0)
+	var mid := head.lerp(eye, 0.45)
+
+	# Place a tall obstacle pillar directly in front of the camera angle.
+	var pillar := MeshInstance3D.new()
+	pillar.name = "FadeTestObstaclePillar"
+	var box_mesh := BoxMesh.new()
+	box_mesh.size = Vector3(1.6, 3.2, 0.8)
+	pillar.mesh = box_mesh
+	main.add_child(pillar)
+	pillar.global_position = mid
+	_view.set("_env_cache_clock", 0.0)
+
+	for _step in 10:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+
+	var faded := bool(_view.call("is_mesh_faded", pillar))
+	var alpha_t := pillar.transparency
+	if not faded or alpha_t < 0.45:
+		pillar.queue_free()
+		return "obstacle in front of camera angle did not fade (faded=%s transparency=%.2f)" % [faded, alpha_t]
+
+	# Move the obstacle out of the camera angle and verify it restores opacity.
+	pillar.global_position = spot + Vector3(45.0, 4.0, 45.0)
+	for _step in 12:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+
+	var restored := not bool(_view.call("is_mesh_faded", pillar)) and is_zero_approx(pillar.transparency)
+	if not restored:
+		pillar.queue_free()
+		return "obstacle did not restore opacity after leaving the camera angle (transparency=%.2f)" % pillar.transparency
+
+	# Move it back into the camera angle so it is actively in _faded_meshes AND
+	# _env_meshes_cache, then free it mid-frame (simulating interacting with a
+	# pickup/switch/prompt that frees its mesh) to ensure no freed-object cast occurs.
+	pillar.global_position = mid
+	for _step in 4:
+		await get_tree().physics_frame
+	pillar.free()
+	for _step in 4:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+
+	print("OBSTACLE FADING OK - obstacles in front of the camera angle fade to %.2f transparency, restore cleanly, and survive mid-frame free()" % alpha_t)
+	return ""
+
+
 func _check_spot(spot: Vector3, yaw: float) -> String:
 	_dummy.global_position = spot
 	_view.global_position = spot

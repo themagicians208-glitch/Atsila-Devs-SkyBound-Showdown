@@ -21,7 +21,7 @@ const WATERFALL_SHADER := preload("res://shaders/lobby_waterfall.gdshader")
 
 const LEVEL_NAMES := [
 	"Forgotten Island", "The Whispering Woods", "Frozen Skies",
-	"Rising Ruins", "Malakar's Fortress", "Gimmick Gauntlet",
+	"Rising Ruins", "Malakar's Fortress",
 ]
 
 # Palette (all outlines and text use ink navy).
@@ -552,7 +552,7 @@ func _show_level_select() -> void:
 
 
 func _level_color(i: int) -> Color:
-	return [MINT, PEACH, SKY, LAVENDER, PINK, BUTTER][i % 6]
+	return [MINT, PEACH, SKY, LAVENDER, PINK][i % 5]
 
 
 func _show_character_select(slots: int, on_done: Callable) -> void:

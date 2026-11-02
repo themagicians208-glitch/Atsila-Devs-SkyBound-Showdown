@@ -103,6 +103,7 @@ var is_dead := false
 var health: float = 100.0
 var stamina: float = 100.0
 var last_death_cause: String = "fall"
+var death_animation_type: String = ""
 
 # Floating name tag shown above the player (local co-op / online).
 var player_name := ""
@@ -831,12 +832,34 @@ func collect_coin():
 
 # Dying
 
+static func is_mob_cause(cause: String) -> bool:
+	if cause in [
+		"slime", "wolf", "phantom", "wolf_boss", "warden", "enemy",
+		"frozen_enemy", "crystal_phantom", "frost_titan", "frost_titan_sweep", "frost_titan_shockwave",
+		"magma_slime", "magma_wolf", "lava_phantom", "ember_dragon", "pvp",
+	]:
+		return true
+	return cause.begins_with("frost_titan")
+
+
 func reset_vitals() -> void:
 	_reset_ice_abilities()
 	knockback = Vector3.ZERO
+	attack_timer = 0.0
+	_swing_amount = 0.0
+	_slash_life = 0.0
+	if _slash != null:
+		_slash.visible = false
 	health = max_health
 	stamina = max_stamina
 	last_death_cause = "fall"
+	death_animation_type = ""
+	if model != null:
+		if model.has_method("reset_death_animation"):
+			model.call("reset_death_animation")
+		model.position = model_rest_position
+		model.rotation = model_rest_rotation
+		model.scale = Vector3.ONE
 	health_changed.emit(health, max_health)
 	stamina_changed.emit(stamina, max_stamina)
 
@@ -845,6 +868,7 @@ func die(cause: String = "fall") -> void:
 	if is_dead:
 		return
 	last_death_cause = cause
+	death_animation_type = "mob" if is_mob_cause(cause) else "fall"
 	health = 0.0
 	health_changed.emit(health, max_health)
 	is_dead = true
@@ -854,8 +878,56 @@ func die(cause: String = "fall") -> void:
 	is_dashing = false
 	dash_time_left = 0.0
 	dash_cooldown_left = 0.0
+	attack_timer = 0.0
+	_swing_amount = 0.0
+	_slash_life = 0.0
+	if _slash != null:
+		_slash.visible = false
 	_reset_ice_abilities()
+	if animation != null and death_animation_type == "mob":
+		animation.pause()
+	if model != null:
+		model.scale = Vector3.ONE
+		if model.has_method("play_death_animation"):
+			model.call("play_death_animation", death_animation_type, cause)
+	if death_animation_type == "mob":
+		_spawn_mob_death_burst()
 	died.emit()
+
+
+func _spawn_mob_death_burst() -> void:
+	var parent := get_parent()
+	if parent == null or not is_inside_tree():
+		return
+	var burst := GPUParticles3D.new()
+	burst.name = "MobDeathBurst"
+	burst.process_mode = Node.PROCESS_MODE_ALWAYS
+	burst.amount = 22
+	burst.lifetime = 0.65
+	burst.one_shot = true
+	burst.explosiveness = 0.95
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.16, 0.16)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#ff5b72")
+	mat.emission_enabled = true
+	mat.emission = Color("#ff2e55")
+	mat.emission_energy_multiplier = 2.4
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	quad.material = mat
+	burst.draw_pass_1 = quad
+	var proc := ParticleProcessMaterial.new()
+	proc.direction = Vector3(0.0, 1.0, 0.0)
+	proc.spread = 140.0
+	proc.initial_velocity_min = 1.6
+	proc.initial_velocity_max = 3.8
+	proc.gravity = Vector3(0.0, -4.5, 0.0)
+	burst.process_material = proc
+	parent.add_child(burst)
+	burst.global_position = global_position + Vector3(0.0, 0.55, 0.0)
+	burst.emitting = true
+	var cleanup := get_tree().create_timer(0.85, true, false, true)
+	cleanup.timeout.connect(burst.queue_free)
 
 func _reset_ice_abilities() -> void:
 	if frost_dash_time_left > 0.0:

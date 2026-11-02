@@ -32,7 +32,7 @@ const EMBER_HEIGHTS_SCRIPT := preload("res://scripts/ember_heights.gd")
 const SHADOW_WOLF := preload("res://objects/shadow_wolf.gd")
 const SECOND_FRAGMENT_CHEST := preload("res://objects/second_fragment_chest.gd")
 
-const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
@@ -801,39 +801,39 @@ func _spread(count: int, n: int, blocked: Dictionary) -> Array[int]:
 
 
 func _moving_count(level_number: int) -> int:
-	return [0, 2, 3, 4, 5, 2][level_number - 1]
+	return [0, 2, 3, 4, 5][level_number - 1]
 
 
 func _phase_count(level_number: int) -> int:
-	return [0, 0, 2, 3, 4, 2][level_number - 1]
+	return [0, 0, 2, 3, 4][level_number - 1]
 
 
 func _falling_count(level_number: int) -> int:
-	return [2, 3, 4, 5, 5, 3][level_number - 1]
+	return [2, 3, 4, 5, 5][level_number - 1]
 
 
-func _see_saw_count(level_number: int) -> int:
-	return [0, 0, 0, 0, 0, 3][level_number - 1]
+func _see_saw_count(_level_number: int) -> int:
+	return 0
 
 
-func _log_count(level_number: int) -> int:
-	return [0, 0, 0, 0, 0, 2][level_number - 1]
+func _log_count(_level_number: int) -> int:
+	return 0
 
 
 func _ring_count(level_number: int) -> int:
-	return [3, 3, 4, 4, 5, 3][level_number - 1]
+	return [3, 3, 4, 4, 5][level_number - 1]
 
 
 func _hurdle_count(level_number: int) -> int:
-	return [0, 1, 2, 3, 4, 2][level_number - 1]
+	return [0, 1, 2, 3, 4][level_number - 1]
 
 
 func _wall_count(level_number: int) -> int:
-	return [0, 0, 1, 2, 3, 1][level_number - 1]
+	return [0, 0, 1, 2, 3][level_number - 1]
 
 
 func _sweeper_count(level_number: int) -> int:
-	return [2, 3, 4, 5, 6, 3][level_number - 1]
+	return [2, 3, 4, 5, 6][level_number - 1]
 
 
 func _switch_count(_level_number: int) -> int:
@@ -1152,48 +1152,6 @@ func _add_slide(route: Array, i: int, point: Vector3) -> void:
 func _build_gimmicks(level_number: int, route: Array) -> void:
 	if level_number == 5:
 		_build_fortress(level_number, route)
-		return
-	if level_number != 6:
-		return
-	var n := route.size()
-	var used: Dictionary = _special["all"].duplicate()
-
-	var slippery := _spread(3, n, used)
-	for index in slippery:
-		used[index] = true
-	for index in slippery:
-		_add_zone(route[index], Vector3(2.4, 1.4, 2.4), SLIPPERY_SCRIPT, Color("#8fe0ff"))
-
-	var sticky := _spread(2, n, used)
-	for index in sticky:
-		used[index] = true
-	for index in sticky:
-		_add_zone(route[index], Vector3(2.4, 1.4, 2.4), STICKY_SCRIPT, Color("#c0a06a"))
-
-	var bounce := _spread(3, n, used)
-	for index in bounce:
-		used[index] = true
-	for index in bounce:
-		_add_zone(route[index], Vector3(2.0, 1.2, 2.0), BOUNCE_SCRIPT, Color("#ff8ad0"))
-		_add_bounce_disc(route[index])
-
-	var fans := _spread(2, n, used)
-	for index in fans:
-		used[index] = true
-	for index in fans:
-		_add_fan(route[index])
-
-	var slides := _spread(1, n, used)
-	for index in slides:
-		used[index] = true
-	for index in slides:
-		_add_slide(route, index, route[index])
-
-	var barrels := _spread(3, n, used)
-	for index in barrels:
-		used[index] = true
-	for index in barrels:
-		_add_barrel(route, index, route[index])
 
 
 func _build_fortress(_level_number: int, route: Array) -> void:
@@ -2857,8 +2815,6 @@ func _get_level_routes() -> Array:
 		_serpentine_route(5, 6, 2.4, 0.3),
 		# 5 Malakar's Fortress: a rising 36-platform gallery over the corrupted abyss.
 		_fortress_route(),
-		# 6 Gimmick Gauntlet: 42 platforms stuffed with new puzzle surfaces.
-		_serpentine_route(6, 7, 2.4, 0.28),
 	]
 
 

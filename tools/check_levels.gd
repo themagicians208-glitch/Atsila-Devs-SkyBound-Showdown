@@ -5,7 +5,7 @@ extends Node
 ## its own enemies per area instead.
 
 func _ready() -> void:
-	for level in range(1, 7):
+	for level in range(1, 6):
 		get_tree().set_meta("level_number", level)
 		get_tree().set_meta("local_coop", false)
 		get_tree().set_meta("online", false)

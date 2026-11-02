@@ -12,7 +12,7 @@ func _run() -> void:
 		quit(1))
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	assert(packed != null, "main scene must load")
-	for level in [1, 2, 4, 5, 6]:
+	for level in [1, 2, 4, 5]:
 		set_meta("level_number", level)
 		var instance: Node = packed.instantiate()
 		root.add_child(instance)
@@ -30,6 +30,6 @@ func _run() -> void:
 			assert(instance.get_node("World").get_node_or_null("FourthFragmentChest") != null, "Level 4 must spawn Fourth Fragment chest")
 		instance.queue_free()
 		await process_frame
-	print("LEVEL REGRESSION smoke passed: 1, 2, 4, 5, 6")
+	print("LEVEL REGRESSION smoke passed: 1, 2, 4, 5")
 	progress.clear()
 	quit()
