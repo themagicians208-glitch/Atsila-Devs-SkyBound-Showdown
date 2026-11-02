@@ -20,6 +20,9 @@ func _run() -> void:
 	await process_frame
 	assert(instance.get("current_level") == 3, "level 3 must be selected")
 	assert(instance.get_node("HUD").level_heading.text.contains("FROZEN SKIES"), "Level 3 HUD must be titled Frozen Skies")
+	instance.get_node("HUD").play_level_transition("LEVEL 3 – FROZEN SKIES", func(): pass)
+	await process_frame
+	assert(instance.get_node("HUD")._transition_overlay != null, "level transitions must create their fade overlay on first use")
 	assert(not instance.get_node("View").input_enabled, "Frozen Skies arrival must begin with a camera reveal")
 	assert(get_root().get_node("Progress").second_fragment_recovered, "Level 3 must preserve the Second Fragment")
 	assert(get_root().get_node("Progress").fragment_recovered, "Level 3 must preserve the First Fragment")
