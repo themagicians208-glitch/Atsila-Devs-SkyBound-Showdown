@@ -344,8 +344,115 @@ func show_multiplayer() -> void:
 	var box := _menu_column(220)
 	_menu(box, "LOCAL SPLIT SCREEN", MINT, show_local)
 	_menu(box, "ONLINE ROOM", SKY, show_online)
+	_menu(box, "1V1 BATTLE ARENA", BUTTER, show_battle)
 	_menu(box, "BACK", LAVENDER, show_main)
 	(box.get_child(0) as Control).grab_focus()
+
+
+# ---------------------------------------------------------------- battle ------
+
+func show_battle() -> void:
+	_clear()
+	blur.visible = true
+	_set_screen("battle")
+	_header("1V1 BATTLE ARENA", "Best of three rounds", show_multiplayer)
+
+	var box := _menu_column(200)
+	box.add_theme_constant_override("separation", 12)
+	_menu(box, "LOCAL DUEL", BUTTER, _start_local_duel)
+
+	box.add_child(_caption("YOUR NAME"))
+	var name_edit := _line_field(_online_name, "name")
+	name_edit.text_changed.connect(func(v: String) -> void: _online_name = v)
+	box.add_child(name_edit)
+	_menu(box, "CREATE ARENA", MINT, _battle_create)
+
+	box.add_child(_caption("HOST ADDRESS"))
+	var code_edit := _line_field("", "e.g. 192.168.0.12")
+	box.add_child(code_edit)
+	_menu(box, "JOIN ARENA", SKY, func() -> void: _battle_join(code_edit.text))
+	_menu(box, "BACK", LAVENDER, show_multiplayer)
+	(box.get_child(0) as Control).grab_focus()
+
+
+func _start_local_duel() -> void:
+	if _p1_character.is_empty():
+		_p1_character = ROSTER.default_id()
+	get_tree().set_meta("local_coop", false)
+	get_tree().set_meta("online", false)
+	get_tree().set_meta("arena_local_duel", true)
+	get_tree().set_meta("local_p1_device", "keyboard")
+	get_tree().set_meta("local_p2_device", "keyboard")
+	get_tree().set_meta("local_p1_name", "Player 1")
+	get_tree().set_meta("local_p2_name", "Player 2")
+	get_tree().set_meta("p1_character", _p1_character)
+	get_tree().set_meta("p2_character", _p1_character)
+	get_tree().set_meta("level_number", 1)
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file("res://scenes/battle_arena.tscn")
+
+
+func _battle_create() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		_show_notice("Networking is unavailable.")
+		return
+	network.local_name = _clean_name(_online_name)
+	if not network.host(Network.DEFAULT_PORT, 1):
+		_show_notice("Could not create the arena. The port may already be in use.")
+		return
+	_clear()
+	blur.visible = true
+	_set_screen("battle")
+	_header("ARENA CREATED", "Share this address with your opponent", show_battle)
+	var box := _menu_column(230)
+	var addr := _label(network.get_local_address(), 34, SKY)
+	addr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	addr.add_theme_color_override("font_outline_color", INK)
+	addr.add_theme_constant_override("outline_size", 6)
+	box.add_child(addr)
+	var start := _menu(box, "PICK DUELIST", BUTTER, func() -> void: _pick_character(1, _battle_launch))
+	_menu(box, "CLOSE ARENA", LAVENDER, func() -> void:
+		network.close()
+		show_battle())
+	start.grab_focus()
+
+
+func _battle_launch() -> void:
+	var network := get_node_or_null("/root/Network")
+	if network != null:
+		network.local_character = _p1_character
+		network.announce_profile()
+		network.start_battle()
+	get_tree().set_meta("online", true)
+	get_tree().set_meta("local_coop", false)
+	get_tree().set_meta("arena_local_duel", false)
+	get_tree().set_meta("level_number", 1)
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file("res://scenes/battle_arena.tscn")
+
+
+func _battle_join(address: String) -> void:
+	var network := get_node_or_null("/root/Network")
+	if network == null:
+		_show_notice("Networking is unavailable.")
+		return
+	var addr := address.strip_edges()
+	if addr.is_empty():
+		_show_notice("Enter the host's address first.")
+		return
+	if _p1_character.is_empty():
+		_p1_character = ROSTER.default_id()
+	get_tree().set_meta("p1_character", _p1_character)
+	network.local_name = _clean_name(_online_name)
+	network.local_character = _p1_character
+	if not network.join(addr):
+		_show_notice("Could not start the connection to \"%s\"." % addr)
+		return
+	network.announce_profile()
+	_show_notice("Connected. The host opens the arena when both duelists are ready.")
 
 
 # --------------------------------------------------------------- levels ------

@@ -63,6 +63,8 @@ var level2_wolf: Node = null
 var level2_chest: Node = null
 ## Stops the dormant portal from spamming its message while the player stands in it.
 var _portal_locked_cooldown := 0.0
+## Refresh clock for the Frozen Skies ability row (live cooldown readout).
+var _frozen_hud_clock := 0.0
 
 # Route points of the current level (world space). Used to aim the starting camera.
 var route_points: Array = []
@@ -500,7 +502,7 @@ func _on_frozen_mechanism_progress(current: int, total: int) -> void:
 	_update_frozen_ability_hud()
 	_update_frozen_progress_hud()
 	if current >= total:
-		hud.set_objective("All three frozen seals are active. Defeat the Frost Titan.")
+		hud.set_objective("All four frozen seals are active. Defeat the Frost Titan.")
 	else:
 		hud.set_objective("Activate the frozen mechanisms: %d / %d" % [current, total])
 
@@ -554,7 +556,9 @@ func _update_frozen_ability_hud() -> void:
 		unlocked.append("L Frost Dash")
 	if Progress.crystal_activation_unlocked:
 		unlocked.append("E Crystal Activation")
-	hud.set_frozen_abilities(unlocked)
+	var shield_cd := float(player.get("ice_shield_cooldown_left")) if player.get("ice_shield_cooldown_left") != null else 0.0
+	var dash_cd := float(player.get("frost_dash_cooldown_left")) if player.get("frost_dash_cooldown_left") != null else 0.0
+	hud.set_frozen_abilities(unlocked, bool(player.get("ice_shield_active")), shield_cd, dash_cd)
 
 func _update_frozen_progress_hud() -> void:
 	if frozen_skies == null:
@@ -566,7 +570,14 @@ func _update_frozen_progress_hud() -> void:
 		Progress.third_fragment_recovered,
 		active_checkpoint,
 		Progress.frozen_generators_activated,
-		Progress.frozen_crystal_blocks_aligned)
+		Progress.frozen_crystal_blocks_aligned,
+		frozen_skies.rule_line())
+
+## A puzzle changed its rules: say so, loudly, once.
+func _on_frozen_rule_notice(text: String, tone: String) -> void:
+	hud.show_frozen_notice(text, tone)
+	if tone == "complete" or tone == "objective":
+		_update_frozen_progress_hud()
 
 func _update_frozen_portal_objective() -> void:
 	if frozen_skies == null:
@@ -2593,6 +2604,13 @@ func _set_phase_active(root: Node, active: bool) -> void:
 func _process(delta: float) -> void:
 	if _portal_locked_cooldown > 0.0:
 		_portal_locked_cooldown -= delta
+	# Frozen Skies shows live ability cooldowns; refresh the row a few times a
+	# second rather than every frame.
+	if frozen_skies != null:
+		_frozen_hud_clock -= delta
+		if _frozen_hud_clock <= 0.0:
+			_frozen_hud_clock = 0.25
+			_update_frozen_ability_hud()
 	if shift_active:
 		shift_timer -= delta
 		if shift_timer > 0:
@@ -2620,6 +2638,26 @@ func _process(delta: float) -> void:
 			proxy.position = proxy.position.lerp(target, delta * 12.0)
 			var target_rot: float = proxy.get_meta("net_rot", proxy.rotation.y)
 			proxy.rotation.y = lerp_angle(proxy.rotation.y, target_rot, delta * 12.0)
+
+## Puzzle sites in Frozen Skies keep the shift budget topped up while reality is
+## unstable around them, so a dimension-dependent route can always be retried.
+## A puzzle site can ask the level to change how its own scenery behaves: the
+## fortress puzzle uses this to make Frozen Skies' rotating bridge turn the other
+## way once the fortress changes its rules.
+func reverse_frozen_bridges() -> void:
+	if frozen_skies != null:
+		frozen_skies.reverse_frozen_bridges()
+
+
+func grant_dimension_shifts(amount: int) -> void:
+	dimension_shifts_left = maxi(dimension_shifts_left, amount)
+
+
+## Hold the mirror shift open while the player is inside a puzzle that needs it.
+func extend_shift(seconds: float) -> void:
+	if shift_active:
+		shift_timer = maxf(shift_timer, seconds)
+
 
 func _shift_dimension() -> void:
 	if not shift_active and dimension_shifts_left > 0:

@@ -52,20 +52,19 @@ func _ready() -> void:
 	_check(ember.checkpoint_indices.size() == 5, "Expected 5 checkpoints in Ember Heights")
 	print("REGIONS & PORTALS OK: 6 regions, 5 checkpoints, arrival + exit portals present")
 
-	# 2. Volcanic Enemy Variants (Magma Slime, Magma Wolf, Lava Phantom)
+	# 2. Volcanic Enemy Variants (Magma Slime, Magma Wolf; no flying enemies)
 	var slimes := get_tree().get_nodes_in_group("magma_slimes")
 	var wolves := get_tree().get_nodes_in_group("magma_wolves")
-	var phantoms := get_tree().get_nodes_in_group("lava_phantoms")
+	var flying := get_tree().get_nodes_in_group("lava_phantoms")
 	var dragon: EmberDragon = world.get_node_or_null("EmberDragon") as EmberDragon
 
 	_check(slimes.size() >= 4, "Expected Magma Slimes in Level 4")
 	_check(wolves.size() >= 4, "Expected Magma Wolves in Level 4")
-	_check(phantoms.size() >= 3, "Expected Lava Phantoms in Level 4")
+	_check(flying.is_empty(), "Flying Lava Phantoms must no longer be spawned in Level 4 (%d found)" % flying.size())
 	_check(dragon != null, "EmberDragon boss did not spawn")
 
 	var slime: VolcanicEnemy = slimes[0] as VolcanicEnemy
 	var wolf: VolcanicEnemy = wolves[0] as VolcanicEnemy
-	var phantom: VolcanicEnemy = phantoms[0] as VolcanicEnemy
 
 	# Speed formula verification:
 	# Magma Slime = 50% of player speed; Magma Wolf = 110% of player speed
@@ -82,12 +81,6 @@ func _ready() -> void:
 	_check(wolf.attack_damage < orig_slime_dmg, "Magma Wolf attack_damage (%f) is not < Level 1 Shadow Slime (%f)" % [wolf.attack_damage, orig_slime_dmg])
 	_check(is_equal_approx(slime.attack_damage, orig_slime_dmg), "Magma Slime attack_damage (%f) does not match Level 1 Shadow Slime (%f)" % [slime.attack_damage, orig_slime_dmg])
 	_check(wolf._legs.size() == 4 and wolf._head_pivot != null and wolf._tail_pivot != null, "Magma Wolf does not have an articulated 4-legged rig")
-
-	# Lava Phantom aerial patrol & projectile test
-	player.global_position = Vector3(0.0, 0.0, -30.0)
-	var phantom_pos_before := phantom.global_position
-	phantom._physics_process(0.4)
-	_check(not phantom.global_position.is_equal_approx(phantom_pos_before), "Lava Phantom did not patrol through the air")
 
 	# Verify wolves and slimes cannot walk on air off their platforms
 	player.global_position = wolf._home + Vector3(0.0, 0.0, 5.5)

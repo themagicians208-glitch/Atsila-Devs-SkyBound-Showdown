@@ -26,6 +26,10 @@ var crystal_light_solved := false
 var frozen_generators_activated := 0
 var frozen_crystal_blocks_aligned := false
 var frozen_checkpoint_index := 0
+## Rule-changing puzzle state, one entry per puzzle id: {done, shifted, steps, fails}.
+## Frozen Skies' puzzles change their rules mid-solve, so what has to survive a
+## reload is not just "solved" but which set of rules the puzzle is running.
+var frozen_rule_states: Dictionary = {}
 var rescued_creatures: Dictionary = {}
 var woods_coins_best := 0
 var intro_seen := false
@@ -75,6 +79,12 @@ func load_progress() -> void:
 	frozen_generators_activated = int(config.get_value("frozen_skies", "frozen_generators_activated", 0))
 	frozen_crystal_blocks_aligned = bool(config.get_value("frozen_skies", "frozen_crystal_blocks_aligned", false))
 	frozen_checkpoint_index = int(config.get_value("frozen_skies", "frozen_checkpoint_index", 0))
+	frozen_rule_states.clear()
+	if config.has_section("frozen_rules"):
+		for key in config.get_section_keys("frozen_rules"):
+			var value: Variant = config.get_value("frozen_rules", key, {})
+			if value is Dictionary:
+				frozen_rule_states[str(key)] = (value as Dictionary).duplicate()
 	fourth_fragment_recovered = bool(config.get_value("ember_heights", "fourth_fragment_recovered", false))
 	malakar_fortress_discovered = bool(config.get_value("ember_heights", "malakar_fortress_discovered", false))
 	magical_shield_unlocked = bool(config.get_value("ember_heights", "magical_shield_unlocked", false))
@@ -110,6 +120,8 @@ func save_progress() -> void:
 	config.set_value("frozen_skies", "frozen_generators_activated", frozen_generators_activated)
 	config.set_value("frozen_skies", "frozen_crystal_blocks_aligned", frozen_crystal_blocks_aligned)
 	config.set_value("frozen_skies", "frozen_checkpoint_index", frozen_checkpoint_index)
+	for rule_id in frozen_rule_states.keys():
+		config.set_value("frozen_rules", str(rule_id), frozen_rule_states[rule_id])
 	config.set_value("ember_heights", "fourth_fragment_recovered", fourth_fragment_recovered)
 	config.set_value("ember_heights", "malakar_fortress_discovered", malakar_fortress_discovered)
 	config.set_value("ember_heights", "magical_shield_unlocked", magical_shield_unlocked)
@@ -183,6 +195,37 @@ func unlock_crystal_activation() -> void:
 func set_frozen_seals_activated(value: int) -> void:
 	frozen_seals_activated = clampi(value, 0, 3)
 	save_progress()
+
+
+func set_frozen_rule_state(rule_id: String, state: Dictionary) -> void:
+	if rule_id.is_empty():
+		return
+	frozen_rule_states[rule_id] = state.duplicate()
+	save_progress()
+
+
+func frozen_rule_state(rule_id: String) -> Dictionary:
+	var value: Variant = frozen_rule_states.get(rule_id, {})
+	if value is Dictionary:
+		return value as Dictionary
+	return {}
+
+
+func frozen_rule_done(rule_id: String) -> bool:
+	return bool(frozen_rule_state(rule_id).get("done", false))
+
+
+func frozen_rule_shifted(rule_id: String) -> bool:
+	return bool(frozen_rule_state(rule_id).get("shifted", false))
+
+
+## How many rule-changing puzzles are finished, for the HUD's puzzle counter.
+func frozen_rules_completed() -> int:
+	var count := 0
+	for rule_id in frozen_rule_states.keys():
+		if bool((frozen_rule_states[rule_id] as Dictionary).get("done", false)):
+			count += 1
+	return count
 
 func has_frozen_coin(coin_id: String) -> bool:
 	return coin_id in frozen_coin_ids
@@ -297,6 +340,7 @@ func clear() -> void:
 	frozen_generators_activated = 0
 	frozen_crystal_blocks_aligned = false
 	frozen_checkpoint_index = 0
+	frozen_rule_states.clear()
 	rescued_creatures.clear()
 	woods_coins_best = 0
 	intro_seen = false

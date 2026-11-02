@@ -6,6 +6,7 @@ signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
 signal fly_mode_changed(enabled: bool)
 signal magical_shield_changed(active: bool, cooldown_left: float, cooldown_max: float)
+signal attacked(direction: int)
 
 @export_subgroup("Components")
 @export var view: Node3D
@@ -87,6 +88,16 @@ var jumps_remaining := 2
 
 var coins = 0
 var fly_mode := false
+
+# --- Battle arena duelling -----------------------------------------------------
+# The 1v1 battle arena sets these; the story levels never touch them, so the
+# campaign controller behaves exactly as it always has.
+## The arena holds a duelist still through countdowns and round changes, and
+## keeps attacks sealed until the cages open.
+var controls_locked := false
+## A duel gives both players the same kit (Magical Shield in, Ice Shield out)
+## whatever the campaign has unlocked.
+var arena_mode := false
 
 var is_dead := false
 var health: float = 100.0
@@ -378,24 +389,29 @@ func _physics_process(delta):
 	if is_dead:
 		return
 
-	if Input.is_action_just_pressed(action_time_freeze) and freeze_cooldown <= 0.0:
+	if not arena_mode and not controls_locked and Input.is_action_just_pressed(action_time_freeze) and freeze_cooldown <= 0.0:
 		_activate_time_freeze()
 
-	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0:
+	if not controls_locked and Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0:
 		_start_dash()
 	var current_lvl := int(get_tree().get_meta("level_number", 1))
-	if current_lvl >= 3:
+	if arena_mode:
+		# A duel gives both players the same kit: Magical Shield in, Ice Shield
+		# out. Nothing fires while the arena is holding the duelist still.
+		if not controls_locked and Input.is_action_just_pressed(action_magical_shield):
+			_activate_magical_shield()
+	elif current_lvl >= 3:
 		var prog := get_node_or_null("/root/Progress")
 		var mag_unlocked := prog != null and bool(prog.get("magical_shield_unlocked"))
 		var ice_unlocked := prog != null and bool(prog.get("ice_shield_unlocked"))
-		if Input.is_action_just_pressed(action_ice_shield):
+		if not controls_locked and Input.is_action_just_pressed(action_ice_shield):
 			if current_lvl == 4 and mag_unlocked and not ice_unlocked:
 				_activate_magical_shield()
 			else:
 				_activate_ice_shield()
-		if Input.is_action_just_pressed(action_frost_dash) and frost_dash_cooldown_left <= 0.0:
+		if not controls_locked and Input.is_action_just_pressed(action_frost_dash) and frost_dash_cooldown_left <= 0.0:
 			_start_frost_dash()
-		if Input.is_action_just_pressed(action_magical_shield):
+		if not controls_locked and Input.is_action_just_pressed(action_magical_shield):
 			_activate_magical_shield()
 
 	_update_dash(delta)
@@ -555,6 +571,11 @@ func get_normal_movement_speed() -> float:
 	return movement_speed * get_physics_process_delta_time()
 
 func handle_controls(delta):
+
+	# The arena holds a duelist still through countdowns and round changes.
+	if controls_locked:
+		movement_velocity = Vector3.ZERO
+		return
 
 	# Movement
 
@@ -878,7 +899,7 @@ func _update_combat(delta: float) -> void:
 	_update_slash(delta)
 	_update_swing()
 
-	if Input.is_action_just_pressed(action_attack):
+	if not controls_locked and Input.is_action_just_pressed(action_attack):
 		_swing()
 
 
@@ -898,7 +919,7 @@ func _update_swing() -> void:
 
 
 func _swing() -> void:
-	if is_dead:
+	if is_dead or controls_locked:
 		return
 	if attack_cooldown_left > 0.0:
 		return
@@ -913,6 +934,7 @@ func _swing() -> void:
 		attack_dir = -1
 	elif Input.is_action_pressed(action_forward):
 		attack_dir = 1
+	attacked.emit(attack_dir)
 	_show_slash()
 	Audio.play("res://sounds/break.ogg")
 
@@ -1023,6 +1045,17 @@ func _ensure_combat_actions() -> void:
 		attack_button.button_index = JOY_BUTTON_B
 		attack_button.device = -1
 		InputMap.action_add_event(action_attack, attack_button)
+
+
+## Battle arena duelling: another duelist's slash has reached this node. The hit
+## is only a CLAIM - the arena's host validates it and applies the damage on
+## both peers. Story-mode remote proxies are never in the "enemies" group, so
+## in the campaign this can never fire.
+func take_hit(_amount: int, from: Vector3) -> bool:
+	var arena := get_tree().get_first_node_in_group("battle_arena")
+	if arena == null or not arena.has_method("request_hit"):
+		return false
+	return bool(arena.call("request_hit", from))
 
 
 ## Touched by an enemy: a single Shadow Slime hit takes 4% of the player's max

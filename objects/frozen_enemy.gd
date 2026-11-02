@@ -28,6 +28,7 @@ var _lunge_cooldown := 0.0
 var _lunge_direction := Vector3.ZERO
 var _hit_time := 0.0
 var _wolf_legs: Array[Node3D] = []
+var _wolf_head: Node3D
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -66,33 +67,19 @@ func _build() -> void:
 		(mesh as CylinderMesh).height = 1.15
 	else:
 		mesh = SphereMesh.new()
-		(mesh as SphereMesh).radius = 0.55 if variant == "Frost Wolf" else 0.42
-		(mesh as SphereMesh).height = 1.0 if variant == "Frost Wolf" else 0.78
+		# The wolf's sphere is its torso, not its whole body.
+		(mesh as SphereMesh).radius = 0.42
+		(mesh as SphereMesh).height = 0.84 if variant == "Frost Wolf" else 0.78
 	body.mesh = mesh
 	body.material_override = _body_material
 	_visual.add_child(body)
 	if variant == "Frost Wolf":
-		for side in [-1.0, 1.0]:
-			for front in [-1.0, 1.0]:
-				var leg := MeshInstance3D.new()
-				var leg_mesh := CapsuleMesh.new()
-				leg_mesh.radius = 0.12
-				leg_mesh.height = 0.62
-				leg.mesh = leg_mesh
-				leg.position = Vector3(side * 0.32, -0.48, front * 0.28)
-				leg.material_override = _body_material
-				_visual.add_child(leg)
-				_wolf_legs.append(leg)
-			var tail := MeshInstance3D.new()
-			var tail_mesh := CylinderMesh.new()
-			tail_mesh.top_radius = 0.03
-			tail_mesh.bottom_radius = 0.16
-			tail_mesh.height = 0.85
-			tail.mesh = tail_mesh
-			tail.position = Vector3(0.0, 0.15, -0.65)
-			tail.rotation.x = -0.7
-			tail.material_override = _crystal_material()
-			_visual.add_child(tail)
+		# Not a blob with legs: an elongated torso, a head you can read from the
+		# front, and the ice growths along the spine.
+		body.scale = Vector3(1.0, 0.88, 1.55)
+		body.position = Vector3(0.0, -0.05, -0.05)
+		_build_wolf_limbs()
+		_build_wolf_head()
 	if variant == "Crystal Phantom":
 		for index in 3:
 			var shard := MeshInstance3D.new()
@@ -115,27 +102,140 @@ func _build() -> void:
 		_attack_warning.material_override = _crystal_material()
 		_attack_warning.visible = false
 		_visual.add_child(_attack_warning)
-	for i in 3:
-		var crystal := MeshInstance3D.new()
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.0
-		cone.bottom_radius = 0.12
-		cone.height = 0.42
-		crystal.mesh = cone
-		crystal.material_override = _crystal_material()
-		crystal.position = Vector3((i - 1) * 0.22, 0.4 + (i % 2) * 0.12, 0.0)
-		crystal.rotation.z = (i - 1) * 0.25
-		_visual.add_child(crystal)
+	if variant != "Frost Wolf":
+		for i in 3:
+			var crystal := MeshInstance3D.new()
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.0
+			cone.bottom_radius = 0.12
+			cone.height = 0.42
+			crystal.mesh = cone
+			crystal.material_override = _crystal_material()
+			crystal.position = Vector3((i - 1) * 0.22, 0.4 + (i % 2) * 0.12, 0.0)
+			crystal.rotation.z = (i - 1) * 0.25
+			_visual.add_child(crystal)
+		for side in [-1.0, 1.0]:
+			var eye := MeshInstance3D.new()
+			var eye_mesh := SphereMesh.new()
+			eye_mesh.radius = 0.08
+			eye_mesh.height = 0.16
+			eye.mesh = eye_mesh
+			eye.material_override = _crystal_material()
+			eye.position = Vector3(0.14 * side, 0.1, 0.34)
+			_visual.add_child(eye)
+	_build_frost_particles()
+
+
+## The wolf's four legs, the ice spikes down its spine and its single tail. The
+## enemy's origin sits 0.42 above the floor (see _snap_to_ground), so the feet
+## reach down to about -0.44 and stand in the snow.
+func _build_wolf_limbs() -> void:
 	for side in [-1.0, 1.0]:
+		for front in [-1.0, 1.0]:
+			var leg := MeshInstance3D.new()
+			var leg_mesh := CapsuleMesh.new()
+			leg_mesh.radius = 0.12
+			leg_mesh.height = 0.44
+			leg.mesh = leg_mesh
+			leg.position = Vector3(side * 0.28, -0.24, front * 0.3)
+			leg.material_override = _body_material
+			_visual.add_child(leg)
+			_wolf_legs.append(leg)
+	var spikes := [
+		Vector3(0.0, 0.3, 0.12),
+		Vector3(0.0, 0.33, -0.12),
+		Vector3(0.0, 0.29, -0.36),
+	]
+	for index in spikes.size():
+		var spike := MeshInstance3D.new()
+		var spike_mesh := CylinderMesh.new()
+		spike_mesh.top_radius = 0.0
+		spike_mesh.bottom_radius = 0.1 - float(index) * 0.012
+		spike_mesh.height = 0.3 - float(index) * 0.045
+		spike.mesh = spike_mesh
+		spike.position = spikes[index]
+		spike.rotation.x = -0.32
+		spike.material_override = _crystal_material()
+		_visual.add_child(spike)
+	var tail := MeshInstance3D.new()
+	var tail_mesh := CylinderMesh.new()
+	tail_mesh.top_radius = 0.04
+	tail_mesh.bottom_radius = 0.14
+	tail_mesh.height = 0.8
+	tail.mesh = tail_mesh
+	tail.position = Vector3(0.0, 0.14, -0.72)
+	tail.rotation.x = -0.85
+	tail.material_override = _crystal_material()
+	_visual.add_child(tail)
+
+
+## Skull, snout, jaw, brows, ears and glowing eyes: the face the Frost Wolf was
+## missing. Everything sits at +Z, which is the direction the wolf runs.
+func _build_wolf_head() -> void:
+	_wolf_head = Node3D.new()
+	_wolf_head.name = "WolfHead"
+	_wolf_head.position = Vector3(0.0, 0.34, 0.6)
+	_visual.add_child(_wolf_head)
+	var skull := MeshInstance3D.new()
+	var skull_mesh := SphereMesh.new()
+	skull_mesh.radius = 0.24
+	skull_mesh.height = 0.48
+	skull.mesh = skull_mesh
+	skull.scale = Vector3(1.0, 0.94, 1.12)
+	skull.material_override = _body_material
+	_wolf_head.add_child(skull)
+	var snout := MeshInstance3D.new()
+	var snout_mesh := CylinderMesh.new()
+	snout_mesh.top_radius = 0.085
+	snout_mesh.bottom_radius = 0.16
+	snout_mesh.height = 0.34
+	snout.mesh = snout_mesh
+	snout.rotation.x = PI * 0.5
+	snout.position = Vector3(0.0, -0.04, 0.26)
+	snout.material_override = _body_material
+	_wolf_head.add_child(snout)
+	var jaw := MeshInstance3D.new()
+	var jaw_mesh := BoxMesh.new()
+	jaw_mesh.size = Vector3(0.17, 0.07, 0.26)
+	jaw.mesh = jaw_mesh
+	jaw.position = Vector3(0.0, -0.14, 0.22)
+	jaw.material_override = _body_material
+	_wolf_head.add_child(jaw)
+	var nose := MeshInstance3D.new()
+	var nose_mesh := SphereMesh.new()
+	nose_mesh.radius = 0.06
+	nose_mesh.height = 0.12
+	nose.mesh = nose_mesh
+	nose.position = Vector3(0.0, 0.02, 0.41)
+	nose.material_override = _nose_material()
+	_wolf_head.add_child(nose)
+	for side in [-1.0, 1.0]:
+		var ear := MeshInstance3D.new()
+		var ear_mesh := CylinderMesh.new()
+		ear_mesh.top_radius = 0.0
+		ear_mesh.bottom_radius = 0.1
+		ear_mesh.height = 0.32
+		ear.mesh = ear_mesh
+		ear.position = Vector3(side * 0.14, 0.26, -0.03)
+		ear.rotation = Vector3(-0.1, 0.0, -side * 0.22)
+		ear.material_override = _crystal_material()
+		_wolf_head.add_child(ear)
+		var brow := MeshInstance3D.new()
+		var brow_mesh := BoxMesh.new()
+		brow_mesh.size = Vector3(0.13, 0.04, 0.1)
+		brow.mesh = brow_mesh
+		brow.position = Vector3(side * 0.12, 0.15, 0.17)
+		brow.rotation.z = -side * 0.18
+		brow.material_override = _crystal_material()
+		_wolf_head.add_child(brow)
 		var eye := MeshInstance3D.new()
 		var eye_mesh := SphereMesh.new()
-		eye_mesh.radius = 0.08
-		eye_mesh.height = 0.16
+		eye_mesh.radius = 0.055
+		eye_mesh.height = 0.11
 		eye.mesh = eye_mesh
-		eye.material_override = _crystal_material()
-		eye.position = Vector3(0.14 * side, 0.1, 0.34)
-		_visual.add_child(eye)
-	_build_frost_particles()
+		eye.position = Vector3(side * 0.12, 0.07, 0.19)
+		eye.material_override = _eye_material()
+		_wolf_head.add_child(eye)
 
 func _build_frost_particles() -> void:
 	var particles := GPUParticles3D.new()
@@ -168,6 +268,24 @@ func _crystal_material() -> StandardMaterial3D:
 	material.emission = Color("#67e8ff")
 	return material
 
+
+## Wolf eyes glow hard enough for the face to read from a distance.
+func _eye_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#f2ffff")
+	material.emission_enabled = true
+	material.emission = Color("#5ff0ff")
+	material.emission_energy_multiplier = 2.4
+	return material
+
+
+## Dark slate muzzle tip - the one part of the face that does not glow.
+func _nose_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("#2f4f66")
+	material.roughness = 0.5
+	return material
+
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
@@ -177,8 +295,15 @@ func _physics_process(delta: float) -> void:
 	_projectile_warning_time = maxf(_projectile_warning_time - delta, 0.0)
 	_hit_time = maxf(_hit_time - delta, 0.0)
 	_lunge_cooldown = maxf(_lunge_cooldown - delta, 0.0)
-	_visual.position.y = sin(_time * 3.0) * 0.1
-	_visual.rotation.y += delta * 0.45
+	_visual.position.y = sin(_time * 3.0) * (0.06 if variant == "Frost Wolf" else 0.1)
+	if variant == "Frost Wolf":
+		# A wolf has to look where it is running: the node carries the turn (see the
+		# lerp_angle below) and the head only nods. The blob enemies keep their spin.
+		_visual.rotation.y = 0.0
+		if _wolf_head != null:
+			_wolf_head.rotation.x = sin(_time * 7.0) * 0.05
+	else:
+		_visual.rotation.y += delta * 0.45
 	_visual.scale = _visual.scale.lerp(Vector3.ONE, delta * 12.0)
 	if variant == "Frost Wolf":
 		for index in _wolf_legs.size():

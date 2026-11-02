@@ -8,6 +8,8 @@ signal connection_failed
 signal peer_list_changed
 signal name_taken(new_name: String)
 signal network_error(message: String)
+# Host-side: a peer's battle arena has finished loading and is in its cage.
+signal arena_ready(peer_id: int)
 
 const DEFAULT_PORT := 27015
 const MAX_PLAYERS := 4
@@ -17,6 +19,8 @@ const TIMEOUT_THRESHOLD := 15.0
 var is_host := false
 var is_online := false
 var game_started := false
+## True when the session is a 1v1 battle arena instead of a story co-op room.
+var battle_mode := false
 var current_level := 1
 var players: Dictionary = {}
 var local_name := "Player"
@@ -24,6 +28,10 @@ var player_names: Dictionary = {}  # peer_id -> name
 var local_character := ""
 var player_characters: Dictionary = {}  # peer_id -> character id
 var last_seen: Dictionary = {}  # peer_id -> float (timestamp)
+# Peer ids whose battle arena has announced that its scene is loaded. The host
+# waits for this before it starts a duel: until then, an RPC aimed at the arena
+# scene has nowhere to land on that peer.
+var arena_ready_peers: Dictionary = {}
 
 
 func _ready() -> void:
@@ -42,9 +50,11 @@ func _ready() -> void:
 	add_child(timer)
 
 
-func host(port: int = DEFAULT_PORT) -> bool:
+## [param max_clients] defaults to a full story co-op room; the battle arena
+## asks for exactly one, so a duel can never have a third peer in the room.
+func host(port: int = DEFAULT_PORT, max_clients: int = MAX_PLAYERS - 1) -> bool:
 	var peer := ENetMultiplayerPeer.new()
-	if peer.create_server(port, MAX_PLAYERS - 1) != OK:
+	if peer.create_server(port, maxi(1, max_clients)) != OK:
 		network_error.emit("Failed to host: Port already in use or restricted.")
 		return false
 	multiplayer.multiplayer_peer = peer
@@ -58,6 +68,7 @@ func host(port: int = DEFAULT_PORT) -> bool:
 	player_characters[1] = local_character
 	last_seen.clear()
 	last_seen[1] = Time.get_unix_time_from_system()
+	arena_ready_peers.clear()
 	peer_list_changed.emit()
 	return true
 
@@ -75,6 +86,7 @@ func join(address: String, port: int = DEFAULT_PORT) -> bool:
 	is_host = false
 	players.clear()
 	player_names.clear()
+	arena_ready_peers.clear()
 	return true
 
 
@@ -85,10 +97,12 @@ func close() -> void:
 	is_online = false
 	is_host = false
 	game_started = false
+	battle_mode = false
 	players.clear()
 	player_names.clear()
 	player_characters.clear()
 	last_seen.clear()
+	arena_ready_peers.clear()
 
 
 ## Send our name and chosen character to the host (which relays them to everyone).
@@ -116,6 +130,15 @@ func start_game(level: int) -> void:
 		rpc("_set_level", level)
 
 
+## Host-only: open the 1v1 battle arena. Clients (and later joiners) are told to
+## load it; the host's own scene change is done by the menu, like start_game.
+func start_battle() -> void:
+	battle_mode = true
+	game_started = true
+	if multiplayer.is_server():
+		rpc("_set_battle")
+
+
 func get_local_address() -> String:
 	for address in IP.get_local_addresses():
 		if address.count(".") == 3 and not address.begins_with("127.") and not address.begins_with("169.254."):
@@ -134,15 +157,19 @@ func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
 		# Tell the newcomer who I am.
 		rpc_id(id, "_register_profile", multiplayer.get_unique_id(), local_name, local_character)
-		# A client that joins after the host started goes straight into the level.
+		# A client that joins after the host started goes straight into the level,
+		# or into the battle arena when the session is a duel.
 		if game_started:
-			rpc_id(id, "_set_level", current_level)
-			# sync state here if gameplay variables existed
+			if battle_mode:
+				rpc_id(id, "_set_battle")
+			else:
+				rpc_id(id, "_set_level", current_level)
 
 
 func _on_peer_disconnected(id: int) -> void:
 	players.erase(id)
 	last_seen.erase(id)
+	arena_ready_peers.erase(id)
 	peer_list_changed.emit()
 
 
@@ -250,9 +277,39 @@ func get_player_character(id: int) -> String:
 	return str(player_characters.get(id, ""))
 
 
+## Client-side: tell the host that this peer's battle arena has finished loading
+## and its duelist is standing in its cage. The host only starts the duel once
+## it knows that, because until then an RPC aimed at the arena scene has no node
+## to land on over here and would be dropped.
+func announce_arena_ready() -> void:
+	if not is_online or multiplayer.multiplayer_peer == null or multiplayer.is_server():
+		return
+	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	rpc_id(1, "_arena_ready_report")
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _arena_ready_report() -> void:
+	if not multiplayer.is_server():
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if id == 0:
+		return
+	arena_ready_peers[id] = true
+	arena_ready.emit(id)
+
+
 @rpc("authority", "call_remote", "reliable")
 func _set_level(level: int) -> void:
 	get_tree().set_meta("level_number", level)
 	get_tree().set_meta("online", true)
 	get_tree().set_meta("local_coop", false)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+@rpc("authority", "call_remote", "reliable")
+func _set_battle() -> void:
+	get_tree().set_meta("online", true)
+	get_tree().set_meta("local_coop", false)
+	get_tree().change_scene_to_file("res://scenes/battle_arena.tscn")
