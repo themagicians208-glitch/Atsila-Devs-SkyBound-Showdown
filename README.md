@@ -1,18 +1,18 @@
 # ☁️ SkyBound Showdown
 
 <p align="center">
-  <img src="branding/skybound-banner.svg" alt="SkyBound Showdown — six sky-island obstacle courses" width="100%">
+  <img src="branding/skybound-banner.svg" alt="SkyBound Showdown — five sky-island obstacle courses" width="100%">
 </p>
 
 <p align="center">
-  <strong>Six courses. Two dimensions. One sky-high showdown.</strong><br>
+  <strong>Five courses. Two dimensions. One sky-high showdown.</strong><br>
   A 3D platform adventure with local and online multiplayer, made with Godot 4.7.
 </p>
 
 <p align="center">
   <a href="#-the-adventure">The adventure</a> · 
   <a href="#️-multiplayer">Multiplayer</a> · 
-  <a href="#️-choose-your-course">Six Courses</a> · 
+  <a href="#️-choose-your-course">Five Courses</a> ·
   <a href="#-controls">Controls</a> · 
   <a href="#-run-the-game">Get Started</a>
 </p>
@@ -25,7 +25,7 @@ The sky is your playground—and falling is part of the lesson.
 
 Journey across floating kingdoms, collect coins, solve environmental puzzles, rescue trapped creatures, defeat corrupted guardians, and recover the Fragments of the Eternal Tree. When the path disappears, shift between the **Material** and **Mirror** dimensions to reveal alternate platforms and routes. Use double jumps, time your moves, and keep your nerve as each level introduces new challenges.
 
-**Your goal:** recover the Eternal Tree fragments through the first three story levels, unlock their portals, and master all six courses.
+**Your goal:** recover the Eternal Tree fragments, unlock their portals, and master all five courses.
 
 ## ✨ Make every jump count
 
@@ -39,7 +39,6 @@ Journey across floating kingdoms, collect coins, solve environmental puzzles, re
 - ⏱️ **Freeze time** — use a brief time-freeze to help plan tricky moves.
 - ❄️ **Survive Frozen Skies** — cross slippery ice, crystal routes, and the Frost Titan's arena in Level 3.
 - ⚠️ **Read the hazards** — dodge spinning sweepers, falling platforms, hurdles, and maze walls.
-- 🎢 **Take on the Gauntlet** — balance on see-saws, cross rotating logs, handle slippery and sticky zones, ride bounce pads and fan tunnels, slide down ramps, and avoid rolling barrels.
 - 💛 **Use checkpoints** — reach checkpoint beacons to save your respawn point.
 - 🚩 **Solve and finish** — activate the switches, open the gates, and reach the flag.
 - 💾 **Continue your journey** — resume exactly where you left off with the new progress system.
@@ -49,6 +48,16 @@ Journey across floating kingdoms, collect coins, solve environmental puzzles, re
 <p align="center">
   <img src="screenshots/screenshot1.jpg" width="45%" />
   <img src="screenshots/screenshot2.jpg" width="45%" />
+</p>
+
+<p align="center">
+  <img src="screenshots/whatsapp-01.jpeg" width="45%" />
+  <img src="screenshots/whatsapp-02.jpeg" width="45%" />
+</p>
+<p align="center">
+  <img src="screenshots/whatsapp-03.jpeg" width="30%" />
+  <img src="screenshots/whatsapp-04.jpeg" width="30%" />
+  <img src="screenshots/whatsapp-05.jpeg" width="30%" />
 </p>
 
 ## 🧠 Game Systems
@@ -75,9 +84,8 @@ Race against your friends or tackle the courses together.
 | 3 | **Frozen Skies** | Cross six frozen regions, unlock ice abilities, defeat the Frost Titan, recover the Third Fragment, and collect 50 coins. |
 | 4 | **Ember Heights** | Cross the Molten River, activate the Magma Crystals and Ancient Energy Machines, escape the Rising Lava Chamber, defeat the Ember Dragon, and recover the Fourth Fragment. |
 | 5 | **Malakar's Fortress** | Cross the corrupted island, align three energy conduits, infiltrate the fortress, and survive Malakar's encounter. |
-| 6 | **Gimmick Gauntlet** | Master a 42-platform course packed with special surfaces, moving hazards, and tricky crossings. |
 
-Levels 1–3 form the current Eternal Tree story arc. Levels 4–6 continue the adventure as increasingly difficult obstacle courses. No course is quite the same: switch dimensions, watch the timing, and explore every route for hidden coins.
+The adventure continues through Levels 4–5 and the final confrontation in Malakar's Fortress. No course is quite the same: switch dimensions, watch the timing, and explore every route for hidden coins.
 
 ## 🎮 Controls
 
