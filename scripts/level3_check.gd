@@ -135,8 +135,10 @@ func _run() -> void:
 	assert(titan.phase == 3, "Frost Titan must enter phase 3")
 	titan._perform_phase_attack(player)
 	assert(titan._warning.visible, "Frost Titan phase 3 must show a reappearance warning")
+	assert(not titan._visual.visible, "Frost Titan phase 3 must disappear before reappearing")
 	await create_timer(0.45).timeout
 	assert(not titan._warning.visible, "Frost Titan phase 3 warning must clear after reappearance")
+	assert(titan._visual.visible, "Frost Titan phase 3 must reappear after the warning")
 	titan.take_hit(8, player.global_position)
 	assert(titan.phase == 4, "Frost Titan must enter the final phase")
 	var frozen: Node = instance.get("frozen_skies")
