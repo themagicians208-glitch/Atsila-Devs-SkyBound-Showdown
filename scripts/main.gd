@@ -69,6 +69,7 @@ var route_points: Array = []
 
 # Online co-op (ENet)
 var online := false
+	var game_state_manager: Node = null
 var remote_players: Dictionary = {}
 # Dimension shift constraints
 var dimension_shifts_left := 2
@@ -92,7 +93,16 @@ func _ready() -> void:
 	_ensure_key_action("fly", KEY_9, JOY_BUTTON_LEFT_STICK)
 	# Rebound keys win over the defaults above.
 	_apply_key_binds()
-	current_level = int(get_tree().get_meta("level_number", 1))
+
+	# Initialize Game State Manager
+	game_state_manager = get_node_or_null("/root/GameStateManager")
+	if game_state_manager == null:
+		var gsm = load("res://scripts/game_state_manager.gd").new()
+		get_tree().root.add_child(gsm)
+		gsm.name = "GameStateManager"
+		game_state_manager = gsm
+
+	current_level = game_state_manager.state.current_level
 	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	if current_level == 5:
 		dimension_shifts_left = 4

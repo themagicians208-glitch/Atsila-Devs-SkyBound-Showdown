@@ -1,29 +1,35 @@
 extends Node
 
-## ENet-based online co-op. One player hosts (creates a room), others join by
-## the host's IP address. No external service is required.
+## ENet-based online co-op. Pure transport layer.
+## Logic for game state is now handled by GameStateManager.gd.
 
 signal connection_succeeded
 signal connection_failed
 signal peer_list_changed
-# Raised on the peer whose name was already in use: the host has given it a free
-# variation of it and this is what it is now.
 signal name_taken(new_name: String)
+signal network_error(message: String)
 
 const DEFAULT_PORT := 27015
 const MAX_PLAYERS := 4
+const HEARTBEAT_INTERVAL := 5.0
+const TIMEOUT_THRESHOLD := 15.0
 
 var is_host := false
 var is_online := false
 var game_started := false
 var current_level := 1
 var players: Dictionary = {}
-# Character names: the local player's name, and the name of every peer.
 var local_name := "Player"
 var player_names: Dictionary = {}  # peer_id -> name
-# Chosen characters (ids from res://scripts/roster.gd), local and per peer.
 var local_character := ""
 var player_characters: Dictionary = {}  # peer_id -> character id
+var last_seen: Dictionary = {}  # peer_id -> float (timestamp)
+
+signal connection_succeeded
+signal connection_failed
+signal peer_list_changed
+signal name_taken(new_name: String)
+signal network_error(message: String)
 
 
 func _ready() -> void:
@@ -33,10 +39,19 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
+	# Heartbeat timer
+	var timer := Timer.new()
+	timer.name = "HeartbeatTimer"
+	timer.wait_time = HEARTBEAT_INTERVAL
+	timer.autostart = true
+	timer.timeout.connect(_on_heartbeat_timeout)
+	add_child(timer)
+
 
 func host(port: int = DEFAULT_PORT) -> bool:
 	var peer := ENetMultiplayerPeer.new()
 	if peer.create_server(port, MAX_PLAYERS - 1) != OK:
+		network_error.emit("Failed to host: Port already in use or restricted.")
 		return false
 	multiplayer.multiplayer_peer = peer
 	is_online = true
@@ -47,13 +62,19 @@ func host(port: int = DEFAULT_PORT) -> bool:
 	player_names[1] = local_name
 	player_characters.clear()
 	player_characters[1] = local_character
+	last_seen.clear()
+	last_seen[1] = Time.get_unix_time_from_system()
 	peer_list_changed.emit()
 	return true
 
 
 func join(address: String, port: int = DEFAULT_PORT) -> bool:
+	if address == "" or address == "0.0.0.0":
+		network_error.emit("Please enter a valid IP address.")
+		return false
 	var peer := ENetMultiplayerPeer.new()
 	if peer.create_client(address, port) != OK:
+		network_error.emit("Failed to join: Invalid address or port.")
 		return false
 	multiplayer.multiplayer_peer = peer
 	is_online = true
@@ -73,6 +94,7 @@ func close() -> void:
 	players.clear()
 	player_names.clear()
 	player_characters.clear()
+	last_seen.clear()
 
 
 ## Send our name and chosen character to the host (which relays them to everyone).
@@ -113,6 +135,7 @@ func player_ids() -> Array:
 
 func _on_peer_connected(id: int) -> void:
 	players[id] = true
+	last_seen[id] = Time.get_unix_time_from_system()
 	peer_list_changed.emit()
 	if multiplayer.is_server():
 		# Tell the newcomer who I am.
@@ -120,10 +143,12 @@ func _on_peer_connected(id: int) -> void:
 		# A client that joins after the host started goes straight into the level.
 		if game_started:
 			rpc_id(id, "_set_level", current_level)
+			# sync state here if gameplay variables existed
 
 
 func _on_peer_disconnected(id: int) -> void:
 	players.erase(id)
+	last_seen.erase(id)
 	peer_list_changed.emit()
 
 
@@ -187,10 +212,34 @@ func _unique_name(wanted: String, except_id: int) -> String:
 	return "%s %d" % [wanted, suffix]
 
 
+@rpc("any_peer", "call_remote", "reliable")
+func _heartbeat() -> void:
+	var id := multiplayer.get_remote_sender_id()
+	last_seen[id] = Time.get_unix_time_from_system()
+
+func _on_heartbeat_timeout() -> void:
+	if not is_online: return
+
+	# Host sends heartbeat to all, clients send to host
+	if is_host:
+		for id in multiplayer.get_peers():
+			rpc_id(id, "_heartbeat_request")
+	else:
+		rpc("_heartbeat")
+
+	# Check for timeouts
+	var now = Time.get_unix_time_from_system()
+	for id in last_seen.keys():
+		if id == 1 and not is_host: continue # Host is handled by server_disconnected
+		if now - last_seen[id] > TIMEOUT_THRESHOLD:
+			print("Peer %d timed out" % id)
+			# We can't force-disconnect a peer from the client side, but the host can.
+			if is_host:
+				multiplayer.multiplayer_peer.disconnect_peer(id)
+
 @rpc("authority", "call_remote", "reliable")
-func _name_taken(new_name: String) -> void:
-	local_name = new_name
-	name_taken.emit(new_name)
+func _heartbeat_request() -> void:
+	rpc("_heartbeat")
 
 
 func get_player_name(id: int) -> String:
