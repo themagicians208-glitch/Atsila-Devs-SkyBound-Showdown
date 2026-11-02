@@ -53,6 +53,11 @@ func _run() -> void:
 	var moving_position := moving_platform.position
 	instance.get("frozen_skies")._process(0.5)
 	assert(not moving_platform.position.is_equal_approx(moving_position), "Frozen moving platforms must move over time")
+	var rotating_bridge: Node3D = world.get_node("RotatingIceBridge")
+	var bridge_rotation := rotating_bridge.rotation.y
+	instance.get("frozen_skies")._process(0.5)
+	assert(not is_equal_approx(rotating_bridge.rotation.y, bridge_rotation), "Fortress ice bridges must rotate")
+	assert(world.find_children("FallingIcePlatform", "Node3D", true, false).size() == 1, "Fortress must include a falling ice platform")
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")

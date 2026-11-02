@@ -2,6 +2,7 @@ extends Node3D
 class_name FrozenSkies
 
 const PLATFORM := preload("res://objects/platform_medium.tscn")
+const FALLING_PLATFORM := preload("res://objects/platform_falling.tscn")
 const COIN := preload("res://objects/coin.tscn")
 const FROZEN_ENEMY := preload("res://objects/frozen_enemy.gd")
 const FROST_TITAN := preload("res://objects/frost_titan.gd")
@@ -35,6 +36,7 @@ var _timed_seal_switch: FrozenMechanism
 var _timed_seal_time := 0.0
 var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
+var _rotating_bridges: Array[AnimatableBody3D] = []
 var _time := 0.0
 var _crystal_light: Node3D
 var _crystal_generators: Array[Node3D] = []
@@ -72,6 +74,7 @@ func build(main: Node) -> Array:
 	_place_coins()
 	_place_enemies()
 	_build_moving_ice_platforms()
+	_build_fortress_platforms()
 	_build_unstable_ice()
 	_build_crystal_light_puzzle()
 	_build_crystal_generators()
@@ -203,6 +206,9 @@ func _process(delta: float) -> void:
 		var origin: Vector3 = platform.get_meta("origin")
 		var phase: float = platform.get_meta("phase")
 		platform.position = origin + Vector3(sin(_time * 1.1 + phase) * 1.8, sin(_time * 1.7 + phase) * 0.35, 0.0)
+	for bridge in _rotating_bridges:
+		if is_instance_valid(bridge):
+			bridge.rotation = Vector3(0.0, sin(_time * 0.75 + float(bridge.get_meta("phase"))) * 0.72, 0.0)
 	if _timed_seal_time > 0.0:
 		_timed_seal_time = maxf(0.0, _timed_seal_time - delta)
 		if _timed_seal_time == 0.0 and _timed_seal_switch != null:
@@ -220,6 +226,31 @@ func _build_moving_ice_platforms() -> void:
 		_world.add_child(platform)
 		_moving_platforms.append(platform)
 		_add_ice_cap(origin)
+
+func _build_fortress_platforms() -> void:
+	var bridge := AnimatableBody3D.new()
+	bridge.name = "RotatingIceBridge"
+	bridge.position = route[34] + Vector3(0.0, 0.85, 1.45)
+	bridge.sync_to_physics = false
+	bridge.set_meta("phase", 0.0)
+	var bridge_shape := CollisionShape3D.new()
+	var bridge_box := BoxShape3D.new()
+	bridge_box.size = Vector3(4.2, 0.24, 0.8)
+	bridge_shape.shape = bridge_box
+	bridge.add_child(bridge_shape)
+	var bridge_visual := MeshInstance3D.new()
+	var bridge_mesh := BoxMesh.new()
+	bridge_mesh.size = bridge_box.size
+	bridge_visual.mesh = bridge_mesh
+	bridge_visual.material_override = _material(Color("#a8efff"), 1.1)
+	bridge.add_child(bridge_visual)
+	_world.add_child(bridge)
+	_rotating_bridges.append(bridge)
+	var falling: Node3D = FALLING_PLATFORM.instantiate()
+	falling.name = "FallingIcePlatform"
+	falling.position = route[36] + Vector3(0.0, 0.7, 1.4)
+	falling.scale = Vector3(0.82, 0.55, 0.82)
+	_world.add_child(falling)
 
 func _build_unstable_ice() -> void:
 	for index in [23, 25, 27, 29]:
