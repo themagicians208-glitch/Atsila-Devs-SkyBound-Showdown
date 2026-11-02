@@ -12,6 +12,7 @@ const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
 const CRYSTAL_LIGHT := preload("res://objects/crystal_light_puzzle.gd")
 const CRYSTAL_GENERATOR := preload("res://objects/frozen_crystal_generator.gd")
 const CRYSTAL_BLOCK := preload("res://objects/frozen_crystal_block.gd")
+const FROZEN_AUDIO := preload("res://objects/frozen_audio.gd")
 const PUZZLE_GATE := preload("res://objects/puzzle_gate.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
@@ -44,6 +45,8 @@ var _crystal_generators: Array[Node3D] = []
 var _crystal_blocks: Array[Node3D] = []
 var _ice_bridges: Array[StaticBody3D] = []
 var _snowfall: GPUParticles3D
+var _ambient_audio: Node
+var _boss_audio: Node
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
 var environment_thawed := false
 var _crystal_gate: StaticBody3D
@@ -77,6 +80,7 @@ func build(main: Node) -> Array:
 	_build_frozen_mechanics()
 	_build_boss_arena()
 	_build_snowfall()
+	_build_audio()
 	_place_coins()
 	_place_enemies()
 	_build_moving_ice_platforms()
@@ -90,6 +94,17 @@ func build(main: Node) -> Array:
 	if Progress.third_fragment_recovered:
 		thaw_environment()
 	return route
+
+func _build_audio() -> void:
+	_ambient_audio = FROZEN_AUDIO.new()
+	_ambient_audio.name = "FrozenWindAmbience"
+	_ambient_audio.mode = "ambient"
+	_world.add_child(_ambient_audio)
+	_boss_audio = FROZEN_AUDIO.new()
+	_boss_audio.name = "FrostTitanAudioCue"
+	_boss_audio.mode = "boss"
+	_boss_audio.volume_db = -24.0
+	_world.add_child(_boss_audio)
 
 func _build_crystal_light_puzzle() -> void:
 	_crystal_light = CRYSTAL_LIGHT.new()
@@ -239,6 +254,8 @@ func _process(delta: float) -> void:
 	if _titan != null and not boss_defeated and not _titan.locked and not boss_music_active:
 		boss_music_active = true
 		Audio.play_music("res://sounds/itty_bitty.mp3")
+		if _boss_audio != null:
+			_boss_audio.start()
 	for index in _moving_platforms.size():
 		var platform := _moving_platforms[index]
 		if not is_instance_valid(platform):
@@ -827,6 +844,8 @@ func _on_boss_defeated() -> void:
 	boss_defeated = true
 	boss_fight_started = false
 	boss_music_active = false
+	if _boss_audio != null:
+		_boss_audio.stop()
 	Audio.play_music("res://sounds/pixelland.mp3")
 	Progress.mark_frost_titan_defeated()
 	_unlock_boss_arena()

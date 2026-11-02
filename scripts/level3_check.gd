@@ -66,6 +66,9 @@ func _run() -> void:
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
 	assert(world.get_node_or_null("Level2ReturnPortalArea") != null, "Frozen arrival portal must provide a Level 2 return interaction")
+	assert(world.get_node_or_null("FrozenWindAmbience") != null, "Frozen Skies must provide wind ambience")
+	assert(world.get_node_or_null("FrostTitanAudioCue") != null, "Frozen Skies must provide a separate Titan audio cue")
+	assert(world.get_node("FrozenWindAmbience").is_playing(), "Frozen wind ambience must start on arrival")
 	assert(instance.get_node("HUD").frozen_progress_hint != null, "Frozen Skies needs progression HUD")
 	assert(instance.get_node("HUD").frozen_progress_hint.text.contains("GENERATORS 0/3"), "Frozen HUD must show generator progress")
 	assert(not instance.get("frozen_skies").arrival_cinematic_complete, "arrival portal must begin opening")
@@ -154,6 +157,7 @@ func _run() -> void:
 	instance.get("frozen_skies")._on_boss_arena_entered(player)
 	await process_frame
 	assert(instance.get("frozen_skies").boss_music_active, "Frost Titan must switch to boss music")
+	assert(world.get_node("FrostTitanAudioCue").is_playing(), "Frost Titan audio cue must start when the boss unlocks")
 	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
 	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")
@@ -202,6 +206,7 @@ func _run() -> void:
 	titan.take_hit(999, player.global_position)
 	await process_frame
 	assert(chest.unlocked, "defeating the Frost Titan must unlock the fragment chest")
+	assert(not world.get_node("FrostTitanAudioCue").is_playing(), "Frost Titan audio cue must stop after defeat")
 	instance._update_frozen_portal_objective()
 	assert(instance.get_node("HUD").objective_hint.text.contains("Recover the Third Fragment"), "Frozen HUD must show the missing fragment requirement")
 	assert(not frozen.is_portal_ready(50), "Level 4 portal must stay locked before the fragment")
