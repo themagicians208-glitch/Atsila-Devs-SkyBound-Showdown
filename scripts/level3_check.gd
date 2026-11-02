@@ -131,6 +131,8 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
 	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan arena must lock during the fight")
+	await process_frame
+	assert(instance.get("frozen_skies").boss_music_active, "Frost Titan must switch to boss music")
 	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
 	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")

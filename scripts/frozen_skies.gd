@@ -58,6 +58,7 @@ var waterfall_count := 0
 var cave_cluster_count := 0
 var glowing_flower_count := 0
 var frozen_ruin_count := 0
+var boss_music_active := false
 
 func build(main: Node) -> Array:
 	_main = main
@@ -192,6 +193,9 @@ func _process(delta: float) -> void:
 		_portal_energy = move_toward(_portal_energy, target_energy, delta * 0.8)
 		_exit_portal_ring.rotate_y(delta * (0.45 + _portal_energy * 1.4))
 		_exit_portal_material.emission_energy_multiplier = 0.35 + _portal_energy * 1.8
+	if _titan != null and not boss_defeated and not _titan.locked and not boss_music_active:
+		boss_music_active = true
+		Audio.play_music("res://sounds/itty_bitty.mp3")
 	for index in _moving_platforms.size():
 		var platform := _moving_platforms[index]
 		if not is_instance_valid(platform):
@@ -711,6 +715,8 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 
 func _on_boss_defeated() -> void:
 	boss_defeated = true
+	boss_music_active = false
+	Audio.play_music("res://sounds/pixelland.mp3")
 	Progress.mark_frost_titan_defeated()
 	_unlock_boss_arena()
 	if _chest != null:
