@@ -44,6 +44,10 @@ func _run() -> void:
 		if frozen_enemy is FrozenEnemy:
 			assert(frozen_enemy.get_node_or_null("FrostParticles") != null, "Frozen enemies need frost particles")
 	assert(world.find_children("MovingIcePlatform*", "Node3D", true, false).size() >= 5, "Frozen Skies needs moving ice platforms")
+	var moving_platform: Node3D = world.find_children("MovingIcePlatform*", "Node3D", true, false)[0]
+	var moving_position := moving_platform.position
+	instance.get("frozen_skies")._process(0.5)
+	assert(not moving_platform.position.is_equal_approx(moving_position), "Frozen moving platforms must move over time")
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
