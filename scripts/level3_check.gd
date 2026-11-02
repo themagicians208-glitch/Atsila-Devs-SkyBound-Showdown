@@ -83,6 +83,10 @@ func _run() -> void:
 	var phantom_before: Vector3 = phantom.global_position
 	phantom._physics_process(0.5)
 	assert(not phantom.global_position.is_equal_approx(phantom_before), "Crystal Phantom must patrol when not chasing")
+	player.global_position = phantom.global_position + Vector3(0.0, 0.0, 4.0)
+	phantom._projectile_cooldown = 0.0
+	phantom._physics_process(0.016)
+	assert(phantom._attack_warning.visible, "Crystal Phantom must telegraph ice projectiles")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
 	var seal_list: Array = instance.get("frozen_skies").mechanisms

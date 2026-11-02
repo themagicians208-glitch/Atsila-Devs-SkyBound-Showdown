@@ -20,6 +20,9 @@ var _dead := false
 var _time := 0.0
 var _touch_cooldown := 0.0
 var _projectile_cooldown := 1.8
+var _projectile_warning_time := 0.0
+var _projectile_target: Node3D
+var _attack_warning: MeshInstance3D
 var _lunge_time := 0.0
 var _lunge_cooldown := 0.0
 var _lunge_direction := Vector3.ZERO
@@ -98,6 +101,17 @@ func _build() -> void:
 			shard.position = Vector3((index - 1) * 0.42, 0.35 + (index % 2) * 0.25, 0.0)
 			shard.material_override = _crystal_material()
 			_visual.add_child(shard)
+		_attack_warning = MeshInstance3D.new()
+		_attack_warning.name = "AttackWarning"
+		var warning_mesh := TorusMesh.new()
+		warning_mesh.inner_radius = 0.48
+		warning_mesh.outer_radius = 0.56
+		_attack_warning.mesh = warning_mesh
+		_attack_warning.rotation.x = PI / 2.0
+		_attack_warning.position.y = -0.5
+		_attack_warning.material_override = _crystal_material()
+		_attack_warning.visible = false
+		_visual.add_child(_attack_warning)
 	for i in 3:
 		var crystal := MeshInstance3D.new()
 		var cone := CylinderMesh.new()
@@ -157,6 +171,7 @@ func _physics_process(delta: float) -> void:
 	_time += delta
 	_touch_cooldown = maxf(_touch_cooldown - delta, 0.0)
 	_projectile_cooldown = maxf(_projectile_cooldown - delta, 0.0)
+	_projectile_warning_time = maxf(_projectile_warning_time - delta, 0.0)
 	_lunge_cooldown = maxf(_lunge_cooldown - delta, 0.0)
 	_visual.position.y = sin(_time * 3.0) * 0.1
 	_visual.rotation.y += delta * 0.45
@@ -175,10 +190,24 @@ func _physics_process(delta: float) -> void:
 		return
 	if distance > detect_range:
 		if variant == "Crystal Phantom":
+			_projectile_warning_time = 0.0
+			if _attack_warning != null:
+				_attack_warning.visible = false
 			_patrol_phantom()
 		return
-	if variant == "Crystal Phantom" and _projectile_cooldown <= 0.0:
-		_launch_projectile(target)
+	if variant == "Crystal Phantom":
+		if _projectile_warning_time > 0.0 and _projectile_target != null and is_instance_valid(_projectile_target):
+			if _attack_warning != null:
+				_attack_warning.visible = true
+				_attack_warning.scale = Vector3.ONE * (1.0 + sin(_time * 18.0) * 0.15)
+		elif _projectile_warning_time <= 0.0 and _projectile_target != null and _attack_warning != null and _attack_warning.visible:
+			_attack_warning.visible = false
+			_launch_projectile(_projectile_target)
+			_projectile_target = null
+		elif _projectile_cooldown <= 0.0:
+			_projectile_target = target
+			_projectile_warning_time = 0.3
+			_attack_warning.visible = true
 	if variant == "Frost Wolf" and distance < 2.4 and _lunge_cooldown <= 0.0:
 		_lunge_direction = Vector3(offset.x, 0.0, offset.z).normalized()
 		_lunge_time = 0.18
@@ -247,5 +276,9 @@ func reset_to_home() -> void:
 	_lunge_cooldown = 0.0
 	_projectile_cooldown = 1.8
 	_touch_cooldown = 0.0
+	_projectile_warning_time = 0.0
+	_projectile_target = null
+	if _attack_warning != null:
+		_attack_warning.visible = false
 	_visual.scale = Vector3.ONE
 
