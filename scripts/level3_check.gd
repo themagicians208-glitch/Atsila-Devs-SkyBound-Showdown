@@ -48,6 +48,7 @@ func _run() -> void:
 	for frozen_enemy in world.get_tree().get_nodes_in_group("enemies"):
 		if frozen_enemy is FrozenEnemy:
 			assert(frozen_enemy.get_node_or_null("FrostParticles") != null, "Frozen enemies need frost particles")
+	var player: Node = instance.get_node("Player")
 	assert(world.find_children("MovingIcePlatform*", "Node3D", true, false).size() >= 5, "Frozen Skies needs moving ice platforms")
 	var moving_platform: Node3D = world.find_children("MovingIcePlatform*", "Node3D", true, false)[0]
 	var moving_position := moving_platform.position
@@ -58,6 +59,9 @@ func _run() -> void:
 	instance.get("frozen_skies")._process(0.5)
 	assert(not is_equal_approx(rotating_bridge.rotation.y, bridge_rotation), "Fortress ice bridges must rotate")
 	assert(world.find_children("FallingIcePlatform", "Node3D", true, false).size() == 1, "Fortress must include a falling ice platform")
+	var falling_platform: Node = world.get_node("FallingIcePlatform")
+	falling_platform._on_body_entered(player)
+	assert(falling_platform.falling, "Falling ice platforms must drop after the player lands")
 	assert(world.find_children("UnstableIce_*", "Node3D", true, false).size() == 4, "Frozen Lake needs unstable ice")
 	assert(get_nodes_in_group("collectible_coins").size() >= 50, "Frozen Skies needs at least 50 coins")
 	assert(instance.get("frozen_skies").portal_count == 2, "Frozen Skies needs arrival and exit portals")
@@ -70,7 +74,6 @@ func _run() -> void:
 	assert(instance.get("frozen_skies").glowing_flower_count >= 8, "Frozen Skies needs glowing blue flowers")
 	assert(instance.get("frozen_skies").frozen_ruin_count >= 3, "Frozen Skies needs ancient frozen ruins")
 	assert(instance.get("frozen_skies")._crystal_generators.size() == 3, "Crystal Cave needs three generators")
-	var player: Node = instance.get_node("Player")
 	var slippery_zone: Node = load("res://scripts/slippery_zone.gd").new()
 	slippery_zone._on_body_entered(player)
 	assert(player.slippery, "Frozen ice zones must enable slippery movement")
