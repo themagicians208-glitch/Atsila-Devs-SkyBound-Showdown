@@ -69,7 +69,7 @@ Race against your friends or tackle the courses together.
 | 2 | **The Whispering Woods** | Solve forest puzzles, rescue trapped creatures, defeat the Shadow Wolf, recover the Second Fragment, and collect 40 coins. |
 | 3 | **Frozen Skies** | Cross six frozen regions, unlock ice abilities, defeat the Frost Titan, recover the Third Fragment, and collect 50 coins. |
 | 4 | **Rising Ruins** | Climb through broken-column scenery and increasingly tricky obstacles. |
-| 5 | **Sky Crown** | Take on a long route toward golden gates and a crown of spires. |
+| 5 | **Malakar's Fortress** | Cross the corrupted island, align three energy conduits, infiltrate the fortress, and survive Malakar's encounter. |
 | 6 | **Gimmick Gauntlet** | Master a 42-platform course packed with special surfaces, moving hazards, and tricky crossings. |
 
 Levels 1–3 form the current Eternal Tree story arc. Levels 4–6 continue the adventure as increasingly difficult obstacle courses. No course is quite the same: switch dimensions, watch the timing, and explore every route for hidden coins.
