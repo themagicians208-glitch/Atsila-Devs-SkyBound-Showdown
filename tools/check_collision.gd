@@ -145,7 +145,7 @@ func _degenerate_size(shape: Shape3D) -> String:
 		if (shape as SphereShape3D).radius < MIN_THICKNESS:
 			return "a sphere of radius %.3f" % (shape as SphereShape3D).radius
 	elif shape is ConcavePolygonShape3D:
-		var box: AABB = (shape as ConcavePolygonShape3D).get_aabb()
+		var box := _concave_aabb(shape as ConcavePolygonShape3D)
 		if box.size.x < MIN_THICKNESS or box.size.y < MIN_THICKNESS or box.size.z < MIN_THICKNESS:
 			return "a flat surface %s" % box.size
 	return ""
@@ -165,9 +165,19 @@ func _extent(shape: Shape3D, axis: Vector3) -> float:
 		var cylinder := shape as CylinderShape3D
 		return cylinder.radius + absf(axis.y) * cylinder.height * 0.5
 	if shape is ConcavePolygonShape3D:
-		var aabb: AABB = (shape as ConcavePolygonShape3D).get_aabb()
+		var aabb := _concave_aabb(shape as ConcavePolygonShape3D)
 		return absf(aabb.size.x * axis.x) * 0.5 + absf(aabb.size.y * axis.y) * 0.5 + absf(aabb.size.z * axis.z) * 0.5
 	return 1.0
+
+
+func _concave_aabb(shape: ConcavePolygonShape3D) -> AABB:
+	var faces := shape.get_faces()
+	if faces.is_empty():
+		return AABB()
+	var bounds := AABB(faces[0], Vector3.ZERO)
+	for face in faces:
+		bounds = bounds.expand(face)
+	return bounds
 
 
 ## The CollisionObject3D a shape belongs to, however deep it is nested.
