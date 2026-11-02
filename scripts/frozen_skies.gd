@@ -56,6 +56,8 @@ var arrival_cinematic_complete := false
 var _arrival_time := 0.0
 var waterfall_count := 0
 var cave_cluster_count := 0
+var glowing_flower_count := 0
+var frozen_ruin_count := 0
 
 func build(main: Node) -> Array:
 	_main = main
@@ -369,6 +371,10 @@ func _build_environment_details() -> void:
 		_add_frozen_waterfall(route[index] + Vector3(-1.2, 0.0, 0.7))
 	for index in [21, 23, 25, 27]:
 		_add_cave_crystal_cluster(route[index] + Vector3(1.1, 0.55, 0.5))
+	for index in [1, 6, 12, 17, 23, 29, 35, 40]:
+		_add_glowing_flower(route[index] + Vector3(-1.0, 0.5, 0.8))
+	for index in [13, 30, 36]:
+		_add_frozen_ruin(route[index] + Vector3(1.6, 0.5, 0.4))
 
 func _add_frozen_waterfall(point: Vector3) -> void:
 	waterfall_count += 1
@@ -402,6 +408,63 @@ func _add_cave_crystal_cluster(point: Vector3) -> void:
 		shard.material_override = _material(Color("#74eaff"), 1.4)
 		cluster.add_child(shard)
 	_world.add_child(cluster)
+
+func _add_glowing_flower(point: Vector3) -> void:
+	glowing_flower_count += 1
+	var flower := Node3D.new()
+	flower.name = "GlowingBlueFlower"
+	flower.position = point
+	var stem := MeshInstance3D.new()
+	var stem_mesh := CylinderMesh.new()
+	stem_mesh.top_radius = 0.025
+	stem_mesh.bottom_radius = 0.04
+	stem_mesh.height = 0.55
+	stem.mesh = stem_mesh
+	stem.position.y = 0.28
+	stem.material_override = _material(Color("#8fd8bc"), 0.15)
+	flower.add_child(stem)
+	for index in 3:
+		var petal := MeshInstance3D.new()
+		var petal_mesh := SphereMesh.new()
+		petal_mesh.radius = 0.12
+		petal_mesh.height = 0.2
+		petal.mesh = petal_mesh
+		petal.position = Vector3(cos(float(index) * TAU / 3.0) * 0.12, 0.58, sin(float(index) * TAU / 3.0) * 0.12)
+		petal.material_override = _material(Color("#66eaff"), 1.8)
+		flower.add_child(petal)
+	_world.add_child(flower)
+
+func _add_frozen_ruin(point: Vector3) -> void:
+	frozen_ruin_count += 1
+	var ruin := Node3D.new()
+	ruin.name = "AncientFrozenRuin"
+	ruin.position = point
+	for side in [-1.0, 1.0]:
+		var pillar := MeshInstance3D.new()
+		var pillar_mesh := BoxMesh.new()
+		pillar_mesh.size = Vector3(0.32, 1.8, 0.32)
+		pillar.mesh = pillar_mesh
+		pillar.position = Vector3(side * 0.75, 0.9, 0.0)
+		pillar.rotation.z = side * 0.08
+		pillar.material_override = _material(Color("#9fcde7"), 0.55)
+		ruin.add_child(pillar)
+	var lintel := MeshInstance3D.new()
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(1.8, 0.28, 0.38)
+	lintel.mesh = lintel_mesh
+	lintel.position.y = 1.72
+	lintel.material_override = _material(Color("#ccefff"), 0.8)
+	ruin.add_child(lintel)
+	var sigil := MeshInstance3D.new()
+	var sigil_mesh := TorusMesh.new()
+	sigil_mesh.inner_radius = 0.18
+	sigil_mesh.outer_radius = 0.25
+	sigil.mesh = sigil_mesh
+	sigil.position = Vector3(0.0, 1.05, -0.2)
+	sigil.rotation.x = PI / 2.0
+	sigil.material_override = _material(Color("#b88cff"), 1.5)
+	ruin.add_child(sigil)
+	_world.add_child(ruin)
 
 func _place_coins() -> void:
 	for index in range(1, route.size() - 1):

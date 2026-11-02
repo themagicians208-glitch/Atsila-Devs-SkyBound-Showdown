@@ -53,6 +53,8 @@ func _run() -> void:
 	assert(not instance.get("frozen_skies").arrival_cinematic_complete, "arrival portal must begin opening")
 	assert(instance.get("frozen_skies").waterfall_count == 6, "Frozen Skies needs frozen waterfalls")
 	assert(instance.get("frozen_skies").cave_cluster_count == 4, "Frozen Crystal Caves need crystal clusters")
+	assert(instance.get("frozen_skies").glowing_flower_count >= 8, "Frozen Skies needs glowing blue flowers")
+	assert(instance.get("frozen_skies").frozen_ruin_count >= 3, "Frozen Skies needs ancient frozen ruins")
 	assert(instance.get("frozen_skies")._crystal_generators.size() == 3, "Crystal Cave needs three generators")
 	var player: Node = instance.get_node("Player")
 	var crystals: Array = crystal_puzzle.get("_crystals")
