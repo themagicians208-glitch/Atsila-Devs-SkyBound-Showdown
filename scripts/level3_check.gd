@@ -114,6 +114,9 @@ func _run() -> void:
 	assert(phantom._attack_warning.visible, "Crystal Phantom must telegraph ice projectiles")
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
+	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must start closed")
+	var boss_gate: Node3D = world.get_node("FrostTitanArenaGate")
+	var boss_gate_home_y := boss_gate.position.y
 	var seal_list: Array = instance.get("frozen_skies").mechanisms
 	instance.set("active_checkpoint", 9)
 	instance.set("checkpoint_position", instance.get("frozen_skies").route[9] + Vector3(0.0, 0.55, 0.0))
@@ -138,7 +141,14 @@ func _run() -> void:
 	player.global_position = seal_list[2].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "final seal must activate after the previous seal")
 	assert(not titan.locked, "Frost Titan must unlock after all frozen seals")
-	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan arena must lock during the fight")
+	assert(not instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must open after all frozen seals")
+	await create_timer(0.8).timeout
+	assert(boss_gate.position.y < boss_gate_home_y - 1.0, "Frost Titan entrance must visibly open")
+	instance.get("frozen_skies")._on_boss_arena_entered(player)
+	assert(instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must lock behind the player")
+	instance.get("frozen_skies").reset_boss_encounter()
+	assert(not instance.get("frozen_skies").boss_arena_locked, "Frost Titan entrance must reopen after a failed attempt")
+	instance.get("frozen_skies")._on_boss_arena_entered(player)
 	await process_frame
 	assert(instance.get("frozen_skies").boss_music_active, "Frost Titan must switch to boss music")
 	assert(get_root().get_node("Progress").ice_shield_unlocked, "Ice Shield must unlock at the first seal")
@@ -174,12 +184,17 @@ func _run() -> void:
 	assert(titan.phase == 4, "Frost Titan must enter the final phase")
 	var frozen: Node = instance.get("frozen_skies")
 	var chest: Node = world.get_node("ThirdFragmentChest")
+	instance.set("coins_collected", 50)
+	instance._update_frozen_portal_objective()
+	assert(instance.get_node("HUD").objective_hint.text.contains("Defeat the Frost Titan"), "Frozen HUD must show the missing boss requirement")
 	assert(not chest.unlocked, "fragment chest must stay locked before the boss")
 	assert(not frozen.is_portal_ready(52), "Level 4 portal must stay locked before the boss")
 	assert(frozen.portal_blocked_reason(12).contains("Coins 12/50") and frozen.portal_blocked_reason(12).contains("Defeat the Frost Titan"), "portal must show coin and boss requirements")
 	titan.take_hit(999, player.global_position)
 	await process_frame
 	assert(chest.unlocked, "defeating the Frost Titan must unlock the fragment chest")
+	instance._update_frozen_portal_objective()
+	assert(instance.get_node("HUD").objective_hint.text.contains("Recover the Third Fragment"), "Frozen HUD must show the missing fragment requirement")
 	assert(not frozen.is_portal_ready(50), "Level 4 portal must stay locked before the fragment")
 	assert(frozen.portal_blocked_reason(50).contains("Recover the Third Fragment"), "portal must show the missing fragment requirement")
 	chest._on_body_entered(player)
@@ -194,6 +209,9 @@ func _run() -> void:
 	assert(frozen.is_portal_ready(50), "Level 4 portal must open at 50 coins after boss and fragment")
 	assert(frozen.boss_defeated, "Frozen Skies must retain the defeated Titan state")
 	assert(frozen.fragment_recovered, "Frozen Skies must retain the recovered fragment state")
+	instance.set("coins_collected", 49)
+	instance._update_frozen_portal_objective()
+	assert(instance.get_node("HUD").objective_hint.text.contains("Coins 49/50"), "Frozen HUD must show the remaining coin requirement")
 	instance.set("coins_collected", 50)
 	instance._update_frozen_portal_objective()
 	assert(instance.get_node("HUD").objective_hint.text.contains("path to the fourth island has opened"), "ready portal must update the objective")

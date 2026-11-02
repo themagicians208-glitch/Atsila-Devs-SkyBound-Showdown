@@ -47,7 +47,11 @@ var environment_thawed := false
 var _crystal_gate: StaticBody3D
 var _cave_gate: StaticBody3D
 var _boss_gate: StaticBody3D
+var _boss_gate_home_y := 0.0
+var _boss_gate_tween: Tween
+var _boss_arena_trigger: Area3D
 var boss_arena_locked := false
+var boss_fight_started := false
 var _exit_portal_ring: MeshInstance3D
 var _exit_portal_material: StandardMaterial3D
 var _portal_energy := 0.0
@@ -340,7 +344,7 @@ func _on_mechanism_activated(_mechanism: FrozenMechanism) -> void:
 		frozen_seals_complete = true
 		if _titan != null:
 			_titan.unlock()
-		_lock_boss_arena()
+		_unlock_boss_arena()
 	if _main.has_method("_on_frozen_mechanism_progress"):
 		_main.call("_on_frozen_mechanism_progress", activated_count, mechanisms.size())
 
@@ -536,7 +540,7 @@ func _place_enemies() -> void:
 	if frozen_seals_complete or boss_defeated:
 		_titan.unlock()
 	if frozen_seals_complete and not boss_defeated:
-		_lock_boss_arena()
+		_unlock_boss_arena()
 	if boss_defeated:
 		_titan.set_process(false)
 		_titan.set_physics_process(false)
@@ -718,11 +722,28 @@ func _build_boss_arena() -> void:
 	gate_visual.material_override = _material(Color("#89eaff"), 1.0)
 	_boss_gate.add_child(gate_visual)
 	_world.add_child(_boss_gate)
+	_boss_gate_home_y = _boss_gate.position.y
+	boss_arena_locked = true
+	_boss_arena_trigger = Area3D.new()
+	_boss_arena_trigger.name = "FrostTitanArenaTrigger"
+	_boss_arena_trigger.collision_layer = 0
+	_boss_arena_trigger.collision_mask = 1
+	var trigger_shape := CollisionShape3D.new()
+	var trigger_box := BoxShape3D.new()
+	trigger_box.size = Vector3(5.0, 2.5, 5.0)
+	trigger_shape.shape = trigger_box
+	_boss_arena_trigger.add_child(trigger_shape)
+	_boss_arena_trigger.position = centre + Vector3(0.0, 1.0, 0.0)
+	_world.add_child(_boss_arena_trigger)
+	_boss_arena_trigger.body_entered.connect(_on_boss_arena_entered)
 
 func _lock_boss_arena() -> void:
-	if boss_arena_locked or _boss_gate == null:
+	if _boss_gate == null:
 		return
+	if _boss_gate_tween != null and _boss_gate_tween.is_valid():
+		_boss_gate_tween.kill()
 	boss_arena_locked = true
+	_boss_gate.position.y = _boss_gate_home_y
 	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
 		(shape as CollisionShape3D).set_deferred("disabled", false)
 
@@ -732,8 +753,25 @@ func _unlock_boss_arena() -> void:
 	boss_arena_locked = false
 	for shape in _boss_gate.find_children("*", "CollisionShape3D", true, false):
 		(shape as CollisionShape3D).set_deferred("disabled", true)
-	var tween := _boss_gate.create_tween()
-	tween.tween_property(_boss_gate, "position:y", _boss_gate.position.y - 2.5, 0.7)
+	if _boss_gate_tween != null and _boss_gate_tween.is_valid():
+		_boss_gate_tween.kill()
+	_boss_gate_tween = _boss_gate.create_tween()
+	_boss_gate_tween.tween_property(_boss_gate, "position:y", _boss_gate_home_y - 2.5, 0.7)
+
+func _on_boss_arena_entered(body: Node3D) -> void:
+	if _main == null or body != _main.get("player") and body != _main.get("player_two"):
+		return
+	if boss_defeated or boss_fight_started or _titan == null or _titan.locked:
+		return
+	boss_fight_started = true
+	_lock_boss_arena()
+	if _main.has_method("_on_frozen_boss_started"):
+		_main.call("_on_frozen_boss_started")
+
+func reset_boss_encounter() -> void:
+	boss_fight_started = false
+	if not boss_defeated and Progress.frozen_seals_activated >= 3:
+		_unlock_boss_arena()
 
 func _material(color: Color, emission: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -746,6 +784,7 @@ func _material(color: Color, emission: float) -> StandardMaterial3D:
 
 func _on_boss_defeated() -> void:
 	boss_defeated = true
+	boss_fight_started = false
 	boss_music_active = false
 	Audio.play_music("res://sounds/pixelland.mp3")
 	Progress.mark_frost_titan_defeated()

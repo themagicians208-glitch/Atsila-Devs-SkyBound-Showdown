@@ -476,10 +476,9 @@ func _update_frozen_portal_objective() -> void:
 		return
 	if frozen_skies.boss_defeated and Progress.third_fragment_recovered and coins_collected >= coin_goal:
 		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
-	elif Progress.third_fragment_recovered:
-		hud.set_objective("Find %d coins to unlock the Level 4 portal." % coin_goal)
 	else:
-		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and recover the Third Fragment.")
+		# Keep the HUD and portal interaction in agreement about every remaining requirement.
+		hud.set_objective(frozen_skies.portal_blocked_reason(coins_collected))
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1210,6 +1209,8 @@ func _reset_enemies() -> void:
 	for node in get_tree().get_nodes_in_group("enemies"):
 		if node.has_method("reset_to_home"):
 			node.call("reset_to_home")
+	if frozen_skies != null and frozen_skies.has_method("reset_boss_encounter"):
+		frozen_skies.reset_boss_encounter()
 	for node in get_tree().get_nodes_in_group("frost_hazards"):
 		node.queue_free()
 	for node in get_tree().get_nodes_in_group("frozen_projectiles"):
