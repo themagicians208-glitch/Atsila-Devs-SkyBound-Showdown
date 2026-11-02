@@ -26,6 +26,8 @@ var _attack_warning: MeshInstance3D
 var _lunge_time := 0.0
 var _lunge_cooldown := 0.0
 var _lunge_direction := Vector3.ZERO
+var _hit_time := 0.0
+var _wolf_legs: Array[Node3D] = []
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -80,6 +82,7 @@ func _build() -> void:
 				leg.position = Vector3(side * 0.32, -0.48, front * 0.28)
 				leg.material_override = _body_material
 				_visual.add_child(leg)
+				_wolf_legs.append(leg)
 			var tail := MeshInstance3D.new()
 			var tail_mesh := CylinderMesh.new()
 			tail_mesh.top_radius = 0.03
@@ -172,9 +175,16 @@ func _physics_process(delta: float) -> void:
 	_touch_cooldown = maxf(_touch_cooldown - delta, 0.0)
 	_projectile_cooldown = maxf(_projectile_cooldown - delta, 0.0)
 	_projectile_warning_time = maxf(_projectile_warning_time - delta, 0.0)
+	_hit_time = maxf(_hit_time - delta, 0.0)
 	_lunge_cooldown = maxf(_lunge_cooldown - delta, 0.0)
 	_visual.position.y = sin(_time * 3.0) * 0.1
 	_visual.rotation.y += delta * 0.45
+	_visual.scale = _visual.scale.lerp(Vector3.ONE, delta * 12.0)
+	if variant == "Frost Wolf":
+		for index in _wolf_legs.size():
+			_wolf_legs[index].rotation.x = sin(_time * 8.0 + float(index) * PI) * 0.22
+	if _body_material != null:
+		_body_material.emission_energy_multiplier = 1.8 if _hit_time > 0.0 else 0.35
 	var target := _nearest_player()
 	if target == null:
 		if variant == "Crystal Phantom":
@@ -260,12 +270,41 @@ func _nearest_player() -> Node3D:
 func take_hit(amount: int, from: Vector3) -> bool:
 	if _dead:
 		return false
+	_hit_time = 0.16
+	_visual.scale = Vector3(1.18, 0.82, 1.18)
 	health -= amount
 	if health <= 0:
 		_dead = true
 		defeated.emit()
+		_burst_crystals()
 		queue_free()
 	return true
+
+func _burst_crystals() -> void:
+	var particles := GPUParticles3D.new()
+	particles.name = "FrozenDefeatBurst"
+	particles.amount = 16
+	particles.lifetime = 0.75
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	var shard := QuadMesh.new()
+	shard.size = Vector2(0.12, 0.12)
+	shard.material = _crystal_material()
+	particles.draw_pass_1 = shard
+	var process := ParticleProcessMaterial.new()
+	process.direction = Vector3(0.0, 1.0, 0.0)
+	process.spread = 150.0
+	process.initial_velocity_min = 0.8
+	process.initial_velocity_max = 2.5
+	process.gravity = Vector3(0.0, -1.5, 0.0)
+	particles.process_material = process
+	var parent := get_parent()
+	if parent == null:
+		return
+	parent.add_child(particles)
+	particles.global_position = global_position + Vector3(0.0, 0.45, 0.0)
+	particles.emitting = true
+	get_tree().create_timer(0.9).timeout.connect(particles.queue_free)
 
 func reset_to_home() -> void:
 	if _dead:
@@ -278,6 +317,7 @@ func reset_to_home() -> void:
 	_touch_cooldown = 0.0
 	_projectile_warning_time = 0.0
 	_projectile_target = null
+	_hit_time = 0.0
 	if _attack_warning != null:
 		_attack_warning.visible = false
 	_visual.scale = Vector3.ONE
