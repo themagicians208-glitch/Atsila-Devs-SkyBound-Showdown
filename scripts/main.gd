@@ -24,10 +24,11 @@ const PLAYER_SCENE := preload("res://objects/player.tscn")
 const ISLAND := preload("res://scenes/forgotten_island.tscn")
 const WOODS := preload("res://scenes/whispering_woods.tscn")
 const FROZEN_SKIES_SCRIPT := preload("res://scripts/frozen_skies.gd")
+const EMBER_HEIGHTS_SCRIPT := preload("res://scripts/ember_heights.gd")
 const SHADOW_WOLF := preload("res://objects/shadow_wolf.gd")
 const SECOND_FRAGMENT_CHEST := preload("res://objects/second_fragment_chest.gd")
 
-const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Rising Ruins", "Sky Crown", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Sky Crown", "Gimmick Gauntlet"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
@@ -52,6 +53,7 @@ var coins_collected := 0
 var island: ForgottenIsland = null
 var woods: WhisperingWoods = null
 var frozen_skies: FrozenSkies = null
+var ember_heights: EmberHeights = null
 var level2_wolf: Node = null
 var level2_chest: Node = null
 ## Stops the dormant portal from spamming its message while the player stands in it.
@@ -111,6 +113,13 @@ func _ready() -> void:
 		hud.set_objective("Explore Frozen Skies  -  defeat the Frost Titan and find 50 coins")
 		_update_frozen_ability_hud()
 		_update_frozen_progress_hud()
+	elif ember_heights != null:
+		coin_goal = ember_heights.coins_required
+		coins_collected = Progress.ember_coins_collected()
+		hud.show_finish_message("LEVEL 4 – EMBER HEIGHTS")
+		hud.set_objective("Explore Ember Heights.")
+		_update_ember_ability_hud()
+		_update_ember_progress_hud()
 	else:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
@@ -240,6 +249,7 @@ func _build_level(level_number: int) -> void:
 	island = null
 	woods = null
 	frozen_skies = null
+	ember_heights = null
 	for child in world.get_children():
 		world.remove_child(child)
 		child.free()
@@ -251,6 +261,9 @@ func _build_level(level_number: int) -> void:
 		return
 	if level_number == 3:
 		_build_frozen_skies()
+		return
+	if level_number == 4:
+		_build_ember_heights()
 		return
 	var routes := _get_level_routes()
 	var route: Array = routes[level_number - 1]
@@ -497,6 +510,138 @@ func _update_frozen_progress_hud() -> void:
 		Progress.third_fragment_recovered,
 		active_checkpoint,
 		Progress.frozen_generators_activated)
+
+
+# --- Level 4: Ember Heights --------------------------------------------------
+
+func _build_ember_heights() -> void:
+	var node: EmberHeights = EMBER_HEIGHTS_SCRIPT.new()
+	node.name = "EmberHeights"
+	world.add_child(node)
+	ember_heights = node
+	route_points = node.build(self)
+	active_checkpoint = clampi(Progress.ember_checkpoint_index, 0, node.checkpoint_indices[node.checkpoint_indices.size() - 1])
+	var spawn_pos: Vector3 = route_points[active_checkpoint] + Vector3(0.0, 1.2, 0.0)
+	player.position = spawn_pos
+	player.velocity = Vector3.ZERO
+	checkpoint_position = spawn_pos
+	for checkpoint_index in node.checkpoint_indices:
+		_add_checkpoint(route_points[checkpoint_index], checkpoint_index)
+	finish.position = route_points[route_points.size() - 1] + Vector3(0.0, 1.0, 0.0)
+	$Sun.light_color = Color("#ffcf9e")
+	_apply_dimension_visibility()
+	call_deferred("_play_ember_arrival_reveal")
+
+func _play_ember_arrival_reveal() -> void:
+	if ember_heights == null or not is_instance_valid($View):
+		return
+	var view: Node3D = $View
+	view.input_enabled = false
+	var start_zoom: float = view.zoom
+	var start_rotation: Vector3 = view.camera_rotation
+	var reveal_rotation := Vector3(-22.0, start_rotation.y + 14.0, 0.0)
+	var tween := create_tween()
+	tween.tween_property(view, "camera_rotation", reveal_rotation, 0.65)
+	tween.parallel().tween_property(view, "zoom", minf(start_zoom + 4.5, view.zoom_minimum), 0.65)
+	tween.tween_interval(0.85)
+	tween.tween_property(view, "camera_rotation", start_rotation, 0.65)
+	tween.parallel().tween_property(view, "zoom", start_zoom, 0.65)
+	tween.tween_callback(func(): view.input_enabled = true)
+
+func _bind_ember_boss(boss: Node) -> void:
+	if boss == null or not boss.has_signal("health_changed"):
+		return
+	if boss.has_signal("woke"):
+		boss.woke.connect(func():
+			Audio.play_music("res://sounds/pixelland.mp3")
+			hud.show_boss("THE EMBER DRAGON – GUARDIAN OF EMBER HEIGHTS")
+		)
+	boss.health_changed.connect(func(health: int, maximum: int, phase: int):
+		hud.show_boss("THE EMBER DRAGON – GUARDIAN OF EMBER HEIGHTS")
+		hud.update_boss(health, maximum, phase)
+	)
+	boss.defeated.connect(func():
+		hud.hide_boss()
+		hud.show_finish_message("The Ember Dragon falls. Open the Ancient Magma Chest!")
+		hud.set_objective("Recover the Fourth Fragment.")
+	)
+
+func _on_ember_switch_solved() -> void:
+	_update_ember_ability_hud()
+	_update_ember_progress_hud()
+	hud.show_finish_message("Ancient Energy Switch activated! Magical Shield unlocked (H / K)!")
+	hud.set_objective("Cross the Molten River.")
+
+func _on_ember_crystal_progress(current: int, total: int) -> void:
+	_update_ember_progress_hud()
+	if current >= total:
+		hud.show_finish_message("All three Magma Crystals activated! The ancient energy gate opens!")
+		hud.set_objective("Activate the Ancient Energy Machines.")
+	else:
+		hud.set_objective("Find all three Magma Crystals: %d / %d" % [current, total])
+
+func _on_ember_machine_progress(current: int, total: int) -> void:
+	_update_ember_progress_hud()
+	if current >= total:
+		hud.show_finish_message("All three Ancient Energy Machines aligned! Proceed to the Rising Lava Chamber!")
+		hud.set_objective("Escape the Rising Lava Chamber.")
+	else:
+		hud.set_objective("Activate the Ancient Energy Machines: %d / %d" % [current, total])
+
+func _on_ember_rising_lava_solved() -> void:
+	_update_ember_progress_hud()
+	hud.show_finish_message("Rising Lava Chamber stabilized! Enter the Obsidian Fortress!")
+	hud.set_objective("Activate all four Ember Seals.")
+
+func _on_ember_seal_progress(current: int, total: int) -> void:
+	_update_ember_ability_hud()
+	_update_ember_progress_hud()
+	if current >= total:
+		hud.show_finish_message("All four Ember Seals are lit! The Ember Dragon's Sanctuary opens!")
+		hud.set_objective("Defeat the Ember Dragon.")
+	else:
+		hud.set_objective("Activate all four Ember Seals: %d / %d" % [current, total])
+
+func _on_ember_mechanism_blocked(message: String) -> void:
+	hud.show_finish_message(message)
+
+func _on_ember_fragment_recovered() -> void:
+	if ember_heights != null:
+		ember_heights.recover_environment()
+	hud.show_finish_message("You have recovered the Fourth Fragment of the Eternal Tree!")
+	hud.set_objective("Discover Malakar's Fortress.")
+	_update_ember_progress_hud()
+
+func _on_malakar_fortress_discovered() -> void:
+	hud.show_finish_message("Malakar's fortress has been discovered. The final path is beginning to reveal itself.")
+	hud.set_objective("Find 60 coins to unlock the portal.")
+	_update_ember_progress_hud()
+
+func _update_ember_ability_hud() -> void:
+	if ember_heights == null:
+		return
+	var unlocked: Array[String] = []
+	if Progress.magical_shield_unlocked:
+		unlocked.append("H / K Magical Shield")
+	if Progress.ice_shield_unlocked:
+		unlocked.append("K Ice Shield")
+	if Progress.frost_dash_unlocked:
+		unlocked.append("L Frost Dash")
+	var active := bool(player.get("magical_shield_active")) if player != null else false
+	var cd := float(player.get("magical_shield_cooldown_left")) if (player != null and player.get("magical_shield_cooldown_left") != null) else 0.0
+	hud.set_ember_abilities(unlocked, active, cd)
+
+func _update_ember_progress_hud() -> void:
+	if ember_heights == null:
+		return
+	hud.set_ember_progress(
+		Progress.ember_seals_activated,
+		ember_heights.ember_seals.size(),
+		Progress.ember_crystals_activated,
+		Progress.ember_machines_activated,
+		Progress.fourth_fragment_recovered,
+		active_checkpoint,
+		Progress.malakar_fortress_discovered)
 
 
 ## The island's Warden drives the HUD's boss bar: up when it wakes, filled on
@@ -1181,6 +1326,9 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 	if frozen_skies != null:
 		Progress.set_frozen_checkpoint(checkpoint_index)
 		_update_frozen_progress_hud()
+	elif ember_heights != null:
+		Progress.set_ember_checkpoint(checkpoint_index)
+		_update_ember_progress_hud()
 	flag_material.albedo_color = Color("#ffe25a")
 	flag_material.emission = Color("#ffc928")
 	if frozen_skies != null:
@@ -1193,6 +1341,12 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int, respawn_po
 		var region := frozen_skies.region_name_for_checkpoint(checkpoint_index)
 		hud.show_finish_message("Checkpoint reached: %s" % region)
 		hud.set_objective("Explore %s" % region)
+	elif ember_heights != null:
+		if checkpoint_index >= 10:
+			Progress.unlock_magical_shield()
+			_update_ember_ability_hud()
+		var region := ember_heights.region_name_for_checkpoint(checkpoint_index)
+		hud.show_finish_message("Checkpoint reached: %s" % region)
 	else:
 		hud.show_finish_message("Checkpoint reached! Fall back here if you miss a jump.")
 
@@ -1574,6 +1728,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact") and not puzzle_solved:
 		if frozen_skies != null and frozen_skies.try_activate_nearby(player):
 			return
+		if ember_heights != null and ember_heights.try_activate_nearby(player):
+			return
 		_try_press_switch()
 
 
@@ -1593,6 +1749,10 @@ func _on_coin_collected(_coins: int) -> void:
 	if frozen_skies != null and coins_collected >= coin_goal \
 			and frozen_skies.boss_defeated and Progress.third_fragment_recovered:
 		hud.set_objective("The path to the fourth island has opened! Step through the icy portal.")
+	if ember_heights != null and coins_collected >= coin_goal \
+			and ember_heights.boss_defeated and Progress.fourth_fragment_recovered:
+		hud.show_finish_message("The path to the fifth island has opened!")
+		hud.set_objective("The path to the fifth island has opened! Step through the volcanic portal.")
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
@@ -1608,6 +1768,13 @@ func _on_finish_body_entered(body: Node3D) -> void:
 			_portal_locked_cooldown = 2.5
 			hud.show_finish_message(frozen_skies.portal_blocked_reason(coins_collected))
 		return
+	if ember_heights != null and not ember_heights.is_portal_ready(coins_collected):
+		if _portal_locked_cooldown <= 0.0:
+			_portal_locked_cooldown = 2.5
+			hud.show_finish_message(ember_heights.portal_blocked_reason(coins_collected))
+		return
+	if ember_heights != null:
+		hud.show_finish_message("The path to the fifth island has opened!")
 	if level2_wolf != null and is_instance_valid(level2_wolf):
 		if _portal_locked_cooldown <= 0.0:
 			_portal_locked_cooldown = 2.5
@@ -1648,6 +1815,10 @@ func _go_to_next_level() -> void:
 	get_tree().set_meta("level_number", next_level)
 	if next_level == 3:
 		hud.play_level_transition("LEVEL 3 – FROZEN SKIES", func(): get_tree().reload_current_scene())
+	elif next_level == 4:
+		hud.play_level_transition("LEVEL 4 – EMBER HEIGHTS", func(): get_tree().reload_current_scene())
+	elif next_level == 5:
+		hud.play_level_transition("LEVEL 5 – SKY CROWN", func(): get_tree().reload_current_scene())
 	else:
 		get_tree().reload_current_scene()
 

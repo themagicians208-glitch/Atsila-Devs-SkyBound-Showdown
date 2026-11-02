@@ -30,6 +30,19 @@ func _ready() -> void:
 				get_tree().get_nodes_in_group("collectible_coins").size(),
 				int(woods.get("coins_required")) if woods != null else -1,
 				int(woods.get("checkpoint_points").size()) if woods != null else -1])
+		elif level == 3:
+			var frozen: Node = main.get("frozen_skies")
+			print("level 3 (Frozen Skies): %d enemies, %d coins (%d needed for the portal), 5 checkpoints" % [
+				enemies.size(),
+				get_tree().get_nodes_in_group("collectible_coins").size(),
+				int(frozen.get("coins_required")) if frozen != null else -1])
+		elif level == 4:
+			var ember: Node = main.get("ember_heights")
+			print("level 4 (Ember Heights): %d enemies, %d coins (%d needed for the portal), %d checkpoints" % [
+				enemies.size(),
+				get_tree().get_nodes_in_group("collectible_coins").size(),
+				int(ember.get("coins_required")) if ember != null else -1,
+				int(ember.get("checkpoint_indices").size()) if ember != null else -1])
 		else:
 			print("level %d: %d enemy (health %d), %d coins, %d shards" % [
 				level, enemies.size(), health,

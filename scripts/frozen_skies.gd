@@ -339,7 +339,8 @@ func _build_islands() -> void:
 		if index % 7 == 0:
 			_add_frozen_tree(route[index] + Vector3(1.0, 0.0, 0.6))
 	for region in 6:
-		_add_mountain(Vector3(-7.0 + region * 2.8, 2.0 + region * 0.6, region * 22.0))
+		var side_x := -18.5 if region % 2 == 0 else 18.5
+		_add_mountain(Vector3(side_x, 2.0 + region * 0.6, region * 22.0))
 	_add_portal(route[0] + Vector3(0.0, 0.0, -2.3), Color("#72dfff"))
 	_add_portal(route[route.size() - 1] + Vector3(0.0, 0.0, 1.8), Color("#c4f3ff"), true)
 

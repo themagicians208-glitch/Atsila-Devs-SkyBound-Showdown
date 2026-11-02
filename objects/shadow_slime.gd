@@ -370,10 +370,33 @@ func _move(delta: float) -> void:
 	_was_airborne = airborne
 	velocity += _knockback
 	_knockback = _knockback.lerp(Vector3.ZERO, delta * 5.0)
+	var flat_vel := Vector3(velocity.x, 0.0, velocity.z)
+	if flat_vel.length_squared() > 0.001 and not _has_floor_ahead(flat_vel, delta):
+		velocity.x = 0.0
+		velocity.z = 0.0
+		_knockback.x = 0.0
+		_knockback.z = 0.0
+		if velocity.y > 0.0:
+			velocity.y = 0.0
 	move_and_slide()
 	if global_position.y < -40.0:
 		# It fell off the island; put it back where it belongs rather than losing it.
 		reset_to_home()
+
+
+func _has_floor_ahead(flat_vel: Vector3, delta: float) -> bool:
+	if not is_inside_tree() or get_world_3d() == null:
+		return true
+	var dir := flat_vel.normalized()
+	var probe := global_position + dir * maxf(flat_vel.length() * delta + 0.50, 0.58)
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		probe + Vector3(0.0, 1.2, 0.0),
+		probe + Vector3(0.0, -1.6, 0.0)
+	)
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	return not hit.is_empty()
 
 
 func _animate(delta: float) -> void:

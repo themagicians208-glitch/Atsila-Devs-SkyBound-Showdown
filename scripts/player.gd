@@ -5,6 +5,7 @@ signal died
 signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
 signal fly_mode_changed(enabled: bool)
+signal magical_shield_changed(active: bool, cooldown_left: float, cooldown_max: float)
 
 @export_subgroup("Components")
 @export var view: Node3D
@@ -21,6 +22,7 @@ signal fly_mode_changed(enabled: bool)
 @export var action_attack := "attack"
 @export var action_ice_shield := "ice_shield"
 @export var action_frost_dash := "frost_dash"
+@export var action_magical_shield := "magical_shield"
 
 @export_subgroup("Properties")
 @export var movement_speed = 250
@@ -59,6 +61,11 @@ signal fly_mode_changed(enabled: bool)
 @export var dash_stamina_drain: float = 20.0
 @export var attack_stamina_cost: float = 8.0
 @export var stamina_regen_rate: float = 24.0
+
+@export_subgroup("Magical Shield")
+@export var magical_shield_duration: float = 3.2
+@export var magical_shield_cooldown: float = 7.0
+@export var magical_shield_reduction: float = 0.65
 
 var movement_velocity: Vector3
 var rotation_direction: float
@@ -119,6 +126,12 @@ var ice_shield_cooldown_left := 0.0
 var frost_dash_cooldown_left := 0.0
 var frost_dash_time_left := 0.0
 var _ice_shield_visual: MeshInstance3D
+var magical_shield_active := false
+var magical_shield_time_left := 0.0
+var magical_shield_cooldown_left := 0.0
+var _magical_shield_visual: Node3D
+var _magical_shield_ring_a: MeshInstance3D
+var _magical_shield_ring_b: MeshInstance3D
 
 @onready var particles_trail = $ParticlesTrail
 @onready var sound_footsteps = $SoundFootsteps
@@ -213,12 +226,17 @@ func _ensure_dash_action() -> void:
 	InputMap.action_add_event("dash", button)
 
 func _ensure_frozen_actions() -> void:
-	for action_name in [action_ice_shield, action_frost_dash]:
+	for action_name in [action_ice_shield, action_frost_dash, action_magical_shield]:
 		if InputMap.has_action(action_name):
 			continue
 		InputMap.add_action(action_name)
 		var key := InputEventKey.new()
-		key.physical_keycode = KEY_K if action_name == action_ice_shield else KEY_L
+		if action_name == action_ice_shield:
+			key.physical_keycode = KEY_K
+		elif action_name == action_frost_dash:
+			key.physical_keycode = KEY_L
+		else:
+			key.physical_keycode = KEY_H
 		key.device = -1
 		InputMap.action_add_event(action_name, key)
 
@@ -236,6 +254,60 @@ func _build_ice_shield_visual() -> void:
 	_ice_shield_visual.material_override = material
 	_ice_shield_visual.visible = false
 	add_child(_ice_shield_visual)
+	_build_magical_shield_visual()
+
+func _build_magical_shield_visual() -> void:
+	_magical_shield_visual = Node3D.new()
+	_magical_shield_visual.name = "MagicalShieldVisual"
+	_magical_shield_visual.visible = false
+	add_child(_magical_shield_visual)
+
+	var sphere_inst := MeshInstance3D.new()
+	var sphere_mesh := SphereMesh.new()
+	sphere_mesh.radius = 0.96
+	sphere_mesh.height = 1.92
+	sphere_inst.mesh = sphere_mesh
+	var sphere_mat := StandardMaterial3D.new()
+	sphere_mat.albedo_color = Color(1.0, 0.42, 0.14, 0.28)
+	sphere_mat.emission_enabled = true
+	sphere_mat.emission = Color("#ff6a1f")
+	sphere_mat.emission_energy_multiplier = 1.4
+	sphere_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sphere_inst.material_override = sphere_mat
+	sphere_inst.position.y = 0.45
+	_magical_shield_visual.add_child(sphere_inst)
+
+	var ring_mat_a := StandardMaterial3D.new()
+	ring_mat_a.albedo_color = Color("#ffcf48")
+	ring_mat_a.emission_enabled = true
+	ring_mat_a.emission = Color("#ffae24")
+	ring_mat_a.emission_energy_multiplier = 2.0
+
+	_magical_shield_ring_a = MeshInstance3D.new()
+	var torus_a := TorusMesh.new()
+	torus_a.inner_radius = 0.98
+	torus_a.outer_radius = 1.06
+	_magical_shield_ring_a.mesh = torus_a
+	_magical_shield_ring_a.material_override = ring_mat_a
+	_magical_shield_ring_a.position.y = 0.45
+	_magical_shield_ring_a.rotation.x = 0.42
+	_magical_shield_visual.add_child(_magical_shield_ring_a)
+
+	var ring_mat_b := StandardMaterial3D.new()
+	ring_mat_b.albedo_color = Color("#ff3b1f")
+	ring_mat_b.emission_enabled = true
+	ring_mat_b.emission = Color("#ff4e28")
+	ring_mat_b.emission_energy_multiplier = 1.9
+
+	_magical_shield_ring_b = MeshInstance3D.new()
+	var torus_b := TorusMesh.new()
+	torus_b.inner_radius = 0.92
+	torus_b.outer_radius = 1.00
+	_magical_shield_ring_b.mesh = torus_b
+	_magical_shield_ring_b.material_override = ring_mat_b
+	_magical_shield_ring_b.position.y = 0.45
+	_magical_shield_ring_b.rotation.z = -0.48
+	_magical_shield_visual.add_child(_magical_shield_ring_b)
 
 func set_player_name(new_name: String) -> void:
 	player_name = new_name
@@ -270,15 +342,25 @@ func _physics_process(delta):
 
 	if Input.is_action_just_pressed(action_dash) and dash_cooldown_left <= 0.0:
 		_start_dash()
-	if get_tree().get_meta("level_number", 1) == 3:
+	var current_lvl := int(get_tree().get_meta("level_number", 1))
+	if current_lvl >= 3:
+		var prog := get_node_or_null("/root/Progress")
+		var mag_unlocked := prog != null and bool(prog.get("magical_shield_unlocked"))
+		var ice_unlocked := prog != null and bool(prog.get("ice_shield_unlocked"))
 		if Input.is_action_just_pressed(action_ice_shield):
-			_activate_ice_shield()
+			if current_lvl == 4 and mag_unlocked and not ice_unlocked:
+				_activate_magical_shield()
+			else:
+				_activate_ice_shield()
 		if Input.is_action_just_pressed(action_frost_dash) and frost_dash_cooldown_left <= 0.0:
 			_start_frost_dash()
+		if Input.is_action_just_pressed(action_magical_shield):
+			_activate_magical_shield()
 
 	_update_dash(delta)
 	_update_frost_dash(delta)
 	_update_ice_shield(delta)
+	_update_magical_shield(delta)
 	_update_combat(delta)
 
 	# Handle functions
@@ -554,7 +636,8 @@ func _end_dash() -> void:
 	dash_cooldown_left = dash_cooldown
 
 func _start_frost_dash() -> void:
-	if not Progress.frost_dash_unlocked or is_dead:
+	var prog := get_node_or_null("/root/Progress")
+	if prog == null or not bool(prog.get("frost_dash_unlocked")) or is_dead:
 		return
 	frost_dash_time_left = 0.3
 	frost_dash_cooldown_left = 3.0
@@ -574,7 +657,8 @@ func _update_frost_dash(delta: float) -> void:
 		is_dashing = false
 
 func _activate_ice_shield() -> void:
-	if not Progress.ice_shield_unlocked or ice_shield_cooldown_left > 0.0 or ice_shield_active:
+	var prog := get_node_or_null("/root/Progress")
+	if prog == null or not bool(prog.get("ice_shield_unlocked")) or ice_shield_cooldown_left > 0.0 or ice_shield_active:
 		return
 	ice_shield_active = true
 	ice_shield_cooldown_left = 8.0
@@ -591,6 +675,42 @@ func _update_ice_shield(delta: float) -> void:
 		ice_shield_cooldown_left = maxf(0.0, ice_shield_cooldown_left - delta)
 	if _ice_shield_visual != null and ice_shield_active:
 		_ice_shield_visual.rotation.y += delta * 1.8
+
+func _activate_magical_shield() -> void:
+	var prog := get_node_or_null("/root/Progress")
+	if prog == null or not bool(prog.get("magical_shield_unlocked")) or magical_shield_cooldown_left > 0.0 or magical_shield_active or is_dead:
+		return
+	magical_shield_active = true
+	magical_shield_time_left = magical_shield_duration
+	magical_shield_cooldown_left = magical_shield_cooldown
+	if _magical_shield_visual != null:
+		_magical_shield_visual.visible = true
+		_magical_shield_visual.scale = Vector3.ONE * 0.25
+		var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(_magical_shield_visual, "scale", Vector3.ONE, 0.28)
+	Audio.play("res://sounds/coin.ogg")
+	magical_shield_changed.emit(magical_shield_active, magical_shield_cooldown_left, magical_shield_cooldown)
+
+func _update_magical_shield(delta: float) -> void:
+	var changed := false
+	if magical_shield_active:
+		magical_shield_time_left = maxf(0.0, magical_shield_time_left - delta)
+		if _magical_shield_visual != null:
+			_magical_shield_visual.rotation.y += delta * 2.2
+		if _magical_shield_ring_a != null:
+			_magical_shield_ring_a.rotation.x += delta * 2.6
+		if _magical_shield_ring_b != null:
+			_magical_shield_ring_b.rotation.z -= delta * 3.1
+		if magical_shield_time_left <= 0.0:
+			magical_shield_active = false
+			if _magical_shield_visual != null:
+				_magical_shield_visual.visible = false
+			changed = true
+	if magical_shield_cooldown_left > 0.0:
+		magical_shield_cooldown_left = maxf(0.0, magical_shield_cooldown_left - delta)
+		changed = true
+	if changed or magical_shield_active:
+		magical_shield_changed.emit(magical_shield_active, magical_shield_cooldown_left, magical_shield_cooldown)
 
 
 func _update_dash(delta: float) -> void:
@@ -838,6 +958,17 @@ func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: St
 		return
 	if ice_shield_active:
 		return
+	if magical_shield_active:
+		# Magical Shield completely protects from selected environmental hazards
+		# (lava splash, falling volcanic rocks, magma vents, ember hazards),
+		# and significantly reduces enemy/boss/deep-lava damage without making everything harmless.
+		if source in ["lava_hazard", "falling_rock", "magma_vent", "ember_hazard"]:
+			if _magical_shield_visual != null:
+				_magical_shield_visual.scale = Vector3.ONE * 1.18
+				var stween := create_tween()
+				stween.tween_property(_magical_shield_visual, "scale", Vector3.ONE, 0.16)
+			return
+		amount = maxf(0.5, amount * (1.0 - magical_shield_reduction))
 	Audio.play("res://sounds/land.ogg")
 	var away := global_position - from
 	away.y = 0.0
@@ -845,7 +976,7 @@ func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: St
 		away = -Vector3(sin(rotation.y), 0.0, cos(rotation.y))
 	knockback = away.normalized() * hurt_knockback
 	model.scale = Vector3(1.35, 0.7, 1.35)
-	if source in ["slime", "wolf", "phantom", "wolf_boss"]:
+	if source in ["slime", "wolf", "phantom", "wolf_boss", "magma_slime", "magma_wolf", "lava_phantom", "ember_dragon"]:
 		var pct_dmg: float = amount if amount > 0.0 else max_health * 0.04
 		health = maxf(0.0, health - pct_dmg)
 		health_changed.emit(health, max_health)
@@ -853,7 +984,7 @@ func take_damage(amount: float = 100.0, from: Vector3 = Vector3.ZERO, source: St
 			knockback = Vector3.ZERO
 			die(source)
 		return
-	var fatal_or_amount: float = max_health if amount <= 1.0 else amount
+	var fatal_or_amount: float = max_health if (amount <= 1.0 and not magical_shield_active) else amount
 	health = maxf(0.0, health - fatal_or_amount)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:

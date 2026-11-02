@@ -7,8 +7,11 @@ func _ready() -> void:
 	_base_y = position.y
 	add_to_group("collectible_coins")
 	var persistent_id := str(get_meta("persistent_coin_id", ""))
-	if not persistent_id.is_empty() and Progress.has_frozen_coin(persistent_id):
-		call_deferred("queue_free")
+	if not persistent_id.is_empty():
+		if persistent_id.begins_with("ember_") and Progress.has_ember_coin(persistent_id):
+			call_deferred("queue_free")
+		elif Progress.has_frozen_coin(persistent_id):
+			call_deferred("queue_free")
 
 # Collecting coins
 
@@ -18,7 +21,10 @@ func _on_body_entered(body: Node3D) -> void:
 	body.collect_coin()
 	var persistent_id := str(get_meta("persistent_coin_id", ""))
 	if not persistent_id.is_empty():
-		Progress.collect_frozen_coin(persistent_id)
+		if persistent_id.begins_with("ember_"):
+			Progress.collect_ember_coin(persistent_id)
+		else:
+			Progress.collect_frozen_coin(persistent_id)
 	var audio := get_node_or_null("/root/Audio")
 	if audio != null:
 		audio.play("res://sounds/coin.ogg")
