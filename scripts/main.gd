@@ -431,11 +431,24 @@ func _on_frozen_crystal_light_solved() -> void:
 
 func _on_frozen_generator_progress(current: int, total: int) -> void:
 	_update_frozen_progress_hud()
-	if current >= total:
+	if current >= total and not Progress.frozen_crystal_blocks_aligned:
+		hud.show_finish_message("Generators charged. Align the three crystal blocks.")
+		hud.set_objective("Align the three crystal blocks to open the ancient cave door.")
+	elif current >= total:
 		hud.show_finish_message("All three crystal generators are charged. The cave door opens!")
 		hud.set_objective("Continue through the Shattered Ice Fortress.")
 	else:
 		hud.set_objective("Activate the crystal generators: %d / %d" % [current, total])
+
+func _on_frozen_block_progress(aligned: bool, _total: int) -> void:
+	_update_frozen_progress_hud()
+	if aligned and Progress.frozen_generators_activated >= 3:
+		hud.show_finish_message("Crystal blocks aligned. The cave door opens!")
+		hud.set_objective("Continue through the Shattered Ice Fortress.")
+	elif aligned:
+		hud.set_objective("Crystal blocks aligned. Activate all three crystal generators.")
+	else:
+		hud.set_objective("Align the crystal blocks: rotate each block into its glowing slot.")
 
 func _on_frozen_mechanism_blocked(message: String) -> void:
 	hud.show_finish_message(message)
@@ -471,7 +484,8 @@ func _update_frozen_progress_hud() -> void:
 		Progress.crystal_light_solved,
 		Progress.third_fragment_recovered,
 		active_checkpoint,
-		Progress.frozen_generators_activated)
+		Progress.frozen_generators_activated,
+		Progress.frozen_crystal_blocks_aligned)
 
 func _update_frozen_portal_objective() -> void:
 	if frozen_skies == null:

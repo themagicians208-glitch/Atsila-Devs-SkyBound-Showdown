@@ -88,6 +88,7 @@ func _run() -> void:
 	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
 	assert(crystal_gate.opened, "crystal light puzzle must open its gate")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "solving crystal light must unlock Crystal Activation before the cave")
+	assert(instance.get("frozen_skies")._crystal_blocks.size() == 3, "Crystal Cave needs three movable crystal blocks")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
 	assert(is_equal_approx(wolf._movement_speed(player), player.get_normal_movement_speed() * 1.10), "Frost Wolf must be 110% of actual player speed")
 	wolf.global_position = player.global_position + Vector3(0.0, 0.0, 1.8)
@@ -155,11 +156,17 @@ func _run() -> void:
 	assert(get_root().get_node("Progress").frost_dash_unlocked, "Frost Dash must unlock at the second seal")
 	assert(get_root().get_node("Progress").crystal_activation_unlocked, "Crystal Activation must unlock at the third seal")
 	var generators: Array = instance.get("frozen_skies")._crystal_generators
+	var crystal_blocks: Array = instance.get("frozen_skies")._crystal_blocks
+	for block in crystal_blocks:
+		while not block.is_aligned():
+			player.global_position = block.global_position
+			assert(instance.get("frozen_skies").try_activate_nearby(player), "Crystal Activation must move crystal blocks")
+	assert(get_root().get_node("Progress").frozen_crystal_blocks_aligned, "all crystal blocks must align")
 	for generator in generators:
 		player.global_position = generator.global_position
 		assert(instance.get("frozen_skies").try_activate_nearby(player), "Crystal Activation must activate cave generators")
 	assert(get_root().get_node("Progress").frozen_generators_activated == 3, "all three cave generators must activate")
-	assert(instance.get("frozen_skies")._cave_gate.opened, "three generators must open the cave door")
+	assert(instance.get("frozen_skies")._cave_gate.opened, "generators and aligned blocks must open the cave door")
 	player._activate_ice_shield()
 	assert(player.ice_shield_active, "Ice Shield must activate")
 	var health_before_shield: float = player.health
@@ -226,6 +233,7 @@ func _run() -> void:
 	assert(restored.get("current_level") == 3, "Frozen Skies must reload from saved progression")
 	assert(get_root().get_node("Progress").fragment_recovered and get_root().get_node("Progress").second_fragment_recovered, "saved fragments must survive a Frozen Skies reload")
 	assert(get_root().get_node("Progress").third_fragment_recovered and get_root().get_node("Progress").frost_titan_defeated, "saved boss and Third Fragment state must survive a reload")
+	assert(get_root().get_node("Progress").frozen_crystal_blocks_aligned, "saved crystal block alignment must survive a reload")
 	assert(get_root().get_node("Progress").frozen_checkpoint_index == saved_checkpoint, "saved Frozen Skies checkpoint must survive a reload")
 	var restored_coin_count: int = restored.get("coins_collected")
 	# A checkpoint can overlap an uncollected coin, so the first physics frame may add one.

@@ -11,6 +11,7 @@ const FROZEN_MECHANISM := preload("res://objects/frozen_mechanism.gd")
 const UNSTABLE_ICE := preload("res://objects/unstable_ice_platform.gd")
 const CRYSTAL_LIGHT := preload("res://objects/crystal_light_puzzle.gd")
 const CRYSTAL_GENERATOR := preload("res://objects/frozen_crystal_generator.gd")
+const CRYSTAL_BLOCK := preload("res://objects/frozen_crystal_block.gd")
 const PUZZLE_GATE := preload("res://objects/puzzle_gate.gd")
 const SLIPPERY := preload("res://scripts/slippery_zone.gd")
 
@@ -40,6 +41,7 @@ var _rotating_bridges: Array[AnimatableBody3D] = []
 var _time := 0.0
 var _crystal_light: Node3D
 var _crystal_generators: Array[Node3D] = []
+var _crystal_blocks: Array[Node3D] = []
 var _ice_bridges: Array[StaticBody3D] = []
 var _snowfall: GPUParticles3D
 var _frozen_tree_materials: Array[StandardMaterial3D] = []
@@ -81,6 +83,7 @@ func build(main: Node) -> Array:
 	_build_fortress_platforms()
 	_build_unstable_ice()
 	_build_crystal_light_puzzle()
+	_build_crystal_blocks()
 	_build_crystal_generators()
 	_build_crystal_gate()
 	_build_cave_gate()
@@ -140,6 +143,34 @@ func _build_crystal_generators() -> void:
 	for index in range(mini(Progress.frozen_generators_activated, _crystal_generators.size())):
 		_crystal_generators[index].activate()
 
+func _build_crystal_blocks() -> void:
+	for entry in [[22, 0, 2], [24, 1, 0], [26, 2, 1]]:
+		var block = CRYSTAL_BLOCK.new()
+		block.name = "CrystalBlock_%02d" % int(entry[0])
+		block.target_slot = int(entry[2])
+		block.starting_slot = int(entry[1])
+		block.position = route[int(entry[0])] + Vector3(-1.15, 0.95, 0.35)
+		_world.add_child(block)
+		_crystal_blocks.append(block)
+		block.moved.connect(_on_crystal_block_moved)
+		if Progress.frozen_crystal_blocks_aligned:
+			block.set_aligned()
+
+func _crystal_blocks_aligned() -> bool:
+	if _crystal_blocks.is_empty():
+		return false
+	for block in _crystal_blocks:
+		if not block.is_aligned():
+			return false
+	return true
+
+func _on_crystal_block_moved(_aligned: bool) -> void:
+	if _crystal_blocks_aligned() and not Progress.frozen_crystal_blocks_aligned:
+		Progress.set_frozen_crystal_blocks_aligned(true)
+	_update_cave_gate()
+	if _main.has_method("_on_frozen_block_progress"):
+		_main.call("_on_frozen_block_progress", _crystal_blocks_aligned(), _crystal_blocks.size())
+
 func _build_cave_gate() -> void:
 	_cave_gate = StaticBody3D.new()
 	_cave_gate.name = "CrystalCaveDoor"
@@ -157,7 +188,12 @@ func _build_cave_gate() -> void:
 	visual.material_override = _material(Color("#79eaff"), 1.25)
 	_cave_gate.add_child(visual)
 	_world.add_child(_cave_gate)
-	if Progress.frozen_generators_activated >= 3:
+	_update_cave_gate()
+
+func _update_cave_gate() -> void:
+	if _cave_gate == null:
+		return
+	if Progress.frozen_generators_activated >= 3 and _crystal_blocks_aligned():
 		_cave_gate.open()
 
 func _on_crystal_generator_activated() -> void:
@@ -166,8 +202,8 @@ func _on_crystal_generator_activated() -> void:
 		if generator.get("is_activated"):
 			activated_count += 1
 	Progress.set_frozen_generators_activated(activated_count)
-	if activated_count >= _crystal_generators.size() and _cave_gate != null:
-		_cave_gate.open()
+	if activated_count >= _crystal_generators.size():
+		_update_cave_gate()
 	if _main.has_method("_on_frozen_generator_progress"):
 		_main.call("_on_frozen_generator_progress", activated_count, _crystal_generators.size())
 
@@ -294,6 +330,9 @@ func try_activate_nearby(player: Node3D) -> bool:
 	if _crystal_light != null and _crystal_light.try_interact(player):
 		return true
 	if Progress.crystal_activation_unlocked:
+		for block in _crystal_blocks:
+			if block.try_interact(player):
+				return true
 		for generator in _crystal_generators:
 			if not generator.get("is_activated") and generator.global_position.distance_to(player.global_position) <= 2.4:
 				return generator.activate()
