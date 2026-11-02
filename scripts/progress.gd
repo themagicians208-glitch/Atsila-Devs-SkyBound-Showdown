@@ -28,6 +28,7 @@ var frozen_crystal_blocks_aligned := false
 var frozen_checkpoint_index := 0
 var rescued_creatures: Dictionary = {}
 var woods_coins_best := 0
+var intro_seen := false
 
 # Level 4: Ember Heights progression
 var fourth_fragment_recovered := false
@@ -60,6 +61,7 @@ func load_progress() -> void:
 	else:
 		rescued_creatures = {}
 	woods_coins_best = int(config.get_value("woods", "coins_best", 0))
+	intro_seen = bool(config.get_value("story", "intro_seen", false))
 	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
 	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
 	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
@@ -96,6 +98,7 @@ func save_progress() -> void:
 	config.set_value("woods", "second_fragment_recovered", second_fragment_recovered)
 	config.set_value("woods", "rescued_creatures", rescued_creatures)
 	config.set_value("woods", "coins_best", woods_coins_best)
+	config.set_value("story", "intro_seen", intro_seen)
 	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
 	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
 	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
@@ -146,6 +149,13 @@ func is_creature_rescued(creature_id: String) -> bool:
 
 func rescued_count() -> int:
 	return rescued_creatures.size()
+
+## The intro cutscene plays once, the first time single player starts.
+func mark_intro_seen() -> void:
+	if intro_seen:
+		return
+	intro_seen = true
+	save_progress()
 
 func record_woods_coins(amount: int) -> void:
 	if amount > woods_coins_best:
@@ -289,6 +299,7 @@ func clear() -> void:
 	frozen_checkpoint_index = 0
 	rescued_creatures.clear()
 	woods_coins_best = 0
+	intro_seen = false
 	fourth_fragment_recovered = false
 	malakar_fortress_discovered = false
 	magical_shield_unlocked = false

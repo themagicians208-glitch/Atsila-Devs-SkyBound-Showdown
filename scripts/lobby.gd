@@ -639,6 +639,12 @@ func _begin_level(level_number: int, local_coop: bool) -> void:
 	get_tree().set_meta("level_number", level_number)
 	get_tree().paused = false
 	Engine.time_scale = 1.0
+	# Single player starts with the story intro, once per save.
+	var progress := get_node_or_null("/root/Progress")
+	if not local_coop and level_number == 1 and progress != null and not progress.intro_seen:
+		progress.mark_intro_seen()
+		get_tree().change_scene_to_file("res://scenes/intro.tscn")
+		return
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
