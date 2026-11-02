@@ -98,7 +98,7 @@ func _ready() -> void:
 	game_state_manager = get_node_or_null("/root/GameStateManager")
 	if game_state_manager == null:
 		var gsm = load("res://scripts/game_state_manager.gd").new()
-		get_tree().root.add_child(gsm)
+		get_tree().root.add_child.call_deferred(gsm)
 		gsm.name = "GameStateManager"
 		game_state_manager = gsm
 
