@@ -213,7 +213,7 @@ func _launch_projectile(target: Node3D) -> void:
 	projectile.launch(target)
 
 func _movement_speed(target: Node3D) -> float:
-	var player_speed := float(target.get("movement_speed")) if target.get("movement_speed") != null else 8.4
+	var player_speed := float(target.call("get_normal_movement_speed")) if target.has_method("get_normal_movement_speed") else 0.0
 	return player_speed * speed_ratio
 
 func _nearest_player() -> Node3D:

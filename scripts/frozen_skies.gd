@@ -82,11 +82,14 @@ func _build_crystal_light_puzzle() -> void:
 	_crystal_light.position = route[18] + Vector3(0.0, 0.65, 1.8)
 	_world.add_child(_crystal_light)
 	_crystal_light.solved.connect(func():
+		Progress.unlock_crystal_activation()
 		if _crystal_gate != null:
 			_crystal_gate.open()
 		if _main.has_method("_on_frozen_crystal_light_solved"):
 			_main.call("_on_frozen_crystal_light_solved")
 	)
+	if Progress.crystal_light_solved:
+		Progress.unlock_crystal_activation()
 
 func _build_crystal_gate() -> void:
 	_crystal_gate = StaticBody3D.new()

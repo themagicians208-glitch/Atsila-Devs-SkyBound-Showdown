@@ -4,6 +4,12 @@ func _init() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	var progress := get_root().get_node("Progress")
+	progress.config_path = "user://level_regression_%d.cfg" % OS.get_process_id()
+	progress.clear()
+	create_timer(20.0, true, false, true).timeout.connect(func():
+		push_error("LEVEL REGRESSION timed out")
+		quit(1))
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	assert(packed != null, "main scene must load")
 	for level in [1, 2, 4, 5, 6]:
@@ -19,4 +25,5 @@ func _run() -> void:
 		instance.queue_free()
 		await process_frame
 	print("LEVEL REGRESSION smoke passed: 1, 2, 4, 5, 6")
+	progress.clear()
 	quit()

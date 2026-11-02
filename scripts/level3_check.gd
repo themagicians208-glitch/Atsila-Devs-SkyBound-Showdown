@@ -5,6 +5,10 @@ func _init() -> void:
 
 func _run() -> void:
 	# Smoke tests must start from a known progression state, not a developer save.
+	get_root().get_node("Progress").config_path = "user://level3_smoke_%d.cfg" % OS.get_process_id()
+	create_timer(20.0, true, false, true).timeout.connect(func():
+		push_error("LEVEL3 smoke timed out")
+		quit(1))
 	get_root().get_node("Progress").clear()
 	get_root().get_node("Progress").recover_second_fragment()
 	set_meta("level_number", 3)
@@ -57,17 +61,22 @@ func _run() -> void:
 			assert(crystal_puzzle.try_interact(player), "crystal interaction must be usable")
 	assert(crystal_puzzle.is_solved, "crystal light puzzle must solve")
 	assert(crystal_gate.opened, "crystal light puzzle must open its gate")
+	assert(get_root().get_node("Progress").crystal_activation_unlocked, "solving crystal light must unlock Crystal Activation before the cave")
 	var wolf: Node = world.find_children("FrostWolf", "Node3D", true, false)[0]
-	assert(is_equal_approx(wolf._movement_speed(player), float(player.movement_speed) * 1.10), "Frost Wolf must be 110% of player speed")
+	assert(is_equal_approx(wolf._movement_speed(player), player.get_normal_movement_speed() * 1.10), "Frost Wolf must be 110% of actual player speed")
 	wolf.global_position = player.global_position + Vector3(0.0, 0.0, 1.8)
 	wolf._physics_process(0.016)
 	assert(wolf._lunge_time > 0.0, "Frost Wolf must have an icy lunge attack")
 	var shadow_slime_script: GDScript = load("res://objects/shadow_slime.gd")
 	var original_slime: Node = shadow_slime_script.new()
 	assert(wolf.attack_damage < original_slime.contact_damage, "Frost Wolf attack must be lower than the original Shadow Slime")
+	var health_before_wolf: float = player.health
+	player.take_damage(wolf.attack_damage, wolf.global_position, "frozen_enemy")
+	assert(not player.is_dead and is_equal_approx(player.health, health_before_wolf - wolf.attack_damage), "Frost Wolf must deal ordinary nonfatal configured damage")
+	player.reset_vitals()
 	original_slime.free()
 	var slime: Node = world.find_children("FrostSlime", "Node3D", true, false)[0]
-	assert(is_equal_approx(slime._movement_speed(player), float(player.movement_speed) * 0.50), "Frost Slime must be 50% of player speed")
+	assert(is_equal_approx(slime._movement_speed(player), player.get_normal_movement_speed() * 0.50), "Frost Slime must be 50% of actual player speed")
 	var phantom: Node = world.find_children("CrystalPhantom", "Node3D", true, false)[0]
 	player.global_position = Vector3(0.0, 0.0, -20.0)
 	var phantom_before: Vector3 = phantom.global_position
@@ -107,6 +116,7 @@ func _run() -> void:
 	assert(is_equal_approx(player.health, health_before_shield), "Ice Shield must block damage")
 	player._start_frost_dash()
 	assert(player.is_dashing, "Frost Dash must activate")
+	assert(is_equal_approx(player.get_normal_movement_speed() * player.frost_dash_speed_multiplier, player.movement_speed * player.get_physics_process_delta_time() * 3.0), "Frost Dash must scale from normal movement speed")
 	titan.take_hit(10, player.global_position)
 	assert(titan.phase == 2, "Frost Titan must enter phase 2")
 	titan._perform_phase_attack(player)
