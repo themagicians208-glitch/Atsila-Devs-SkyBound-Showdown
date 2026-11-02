@@ -1,0 +1,188 @@
+extends Node
+
+## Saved progression, in user://progress.cfg. Small on purpose: this game keeps
+## what a player has achieved, not where they were standing.
+##
+##   * the First Fragment - once it is out of the Forgotten Island's chest, it
+##     stays recovered, and the island's chest is already open when it is
+##     revisited.
+##
+## [member config_path] can be pointed elsewhere, which the dev checks do so they
+## never touch a real player's save file.
+
+const CONFIG_PATH := "user://progress.cfg"
+
+var config_path := CONFIG_PATH
+var fragment_recovered := false
+var second_fragment_recovered := false
+var third_fragment_recovered := false
+var ice_shield_unlocked := false
+var frost_dash_unlocked := false
+var crystal_activation_unlocked := false
+var frozen_seals_activated := 0
+var frozen_coin_ids: Array[String] = []
+var frost_titan_defeated := false
+var crystal_light_solved := false
+var frozen_generators_activated := 0
+var frozen_crystal_blocks_aligned := false
+var frozen_checkpoint_index := 0
+var rescued_creatures: Dictionary = {}
+var woods_coins_best := 0
+
+
+func _ready() -> void:
+	load_progress()
+
+
+func load_progress() -> void:
+	var config := ConfigFile.new()
+	if config.load(config_path) != OK:
+		return
+	fragment_recovered = bool(config.get_value("island", "fragment_recovered", false))
+	second_fragment_recovered = bool(config.get_value("woods", "second_fragment_recovered", config.get_value("progression", "second_fragment_recovered", false)))
+	var saved_creatures: Variant = config.get_value("woods", "rescued_creatures", {})
+	if saved_creatures is Dictionary:
+		rescued_creatures = (saved_creatures as Dictionary).duplicate()
+	else:
+		rescued_creatures = {}
+	woods_coins_best = int(config.get_value("woods", "coins_best", 0))
+	third_fragment_recovered = bool(config.get_value("frozen_skies", "third_fragment_recovered", false))
+	ice_shield_unlocked = bool(config.get_value("frozen_skies", "ice_shield_unlocked", false))
+	frost_dash_unlocked = bool(config.get_value("frozen_skies", "frost_dash_unlocked", false))
+	crystal_activation_unlocked = bool(config.get_value("frozen_skies", "crystal_activation_unlocked", false))
+	frozen_seals_activated = int(config.get_value("frozen_skies", "frozen_seals_activated", 0))
+	frozen_coin_ids.clear()
+	for coin_id in config.get_value("frozen_skies", "frozen_coin_ids", PackedStringArray()):
+		frozen_coin_ids.append(str(coin_id))
+	frost_titan_defeated = bool(config.get_value("frozen_skies", "frost_titan_defeated", false))
+	crystal_light_solved = bool(config.get_value("frozen_skies", "crystal_light_solved", false))
+	frozen_generators_activated = int(config.get_value("frozen_skies", "frozen_generators_activated", 0))
+	frozen_crystal_blocks_aligned = bool(config.get_value("frozen_skies", "frozen_crystal_blocks_aligned", false))
+	frozen_checkpoint_index = int(config.get_value("frozen_skies", "frozen_checkpoint_index", 0))
+
+
+func save_progress() -> void:
+	var config := ConfigFile.new()
+	config.set_value("island", "fragment_recovered", fragment_recovered)
+	config.set_value("progression", "second_fragment_recovered", second_fragment_recovered)
+	config.set_value("woods", "second_fragment_recovered", second_fragment_recovered)
+	config.set_value("woods", "rescued_creatures", rescued_creatures)
+	config.set_value("woods", "coins_best", woods_coins_best)
+	config.set_value("frozen_skies", "third_fragment_recovered", third_fragment_recovered)
+	config.set_value("frozen_skies", "ice_shield_unlocked", ice_shield_unlocked)
+	config.set_value("frozen_skies", "frost_dash_unlocked", frost_dash_unlocked)
+	config.set_value("frozen_skies", "crystal_activation_unlocked", crystal_activation_unlocked)
+	config.set_value("frozen_skies", "frozen_seals_activated", frozen_seals_activated)
+	config.set_value("frozen_skies", "frozen_coin_ids", PackedStringArray(frozen_coin_ids))
+	config.set_value("frozen_skies", "frost_titan_defeated", frost_titan_defeated)
+	config.set_value("frozen_skies", "crystal_light_solved", crystal_light_solved)
+	config.set_value("frozen_skies", "frozen_generators_activated", frozen_generators_activated)
+	config.set_value("frozen_skies", "frozen_crystal_blocks_aligned", frozen_crystal_blocks_aligned)
+	config.set_value("frozen_skies", "frozen_checkpoint_index", frozen_checkpoint_index)
+	config.save(config_path)
+
+
+## The First Fragment is out of the chest. Called once, by the chest itself.
+func recover_fragment() -> void:
+	if fragment_recovered:
+		return
+	fragment_recovered = true
+	save_progress()
+
+func recover_second_fragment() -> void:
+	if second_fragment_recovered:
+		return
+	second_fragment_recovered = true
+	save_progress()
+
+func record_creature_rescued(creature_id: String) -> void:
+	if creature_id.is_empty():
+		return
+	rescued_creatures[creature_id] = true
+	save_progress()
+
+func is_creature_rescued(creature_id: String) -> bool:
+	return bool(rescued_creatures.get(creature_id, false))
+
+func rescued_count() -> int:
+	return rescued_creatures.size()
+
+func record_woods_coins(amount: int) -> void:
+	if amount > woods_coins_best:
+		woods_coins_best = amount
+		save_progress()
+
+func recover_third_fragment() -> void:
+	if third_fragment_recovered:
+		return
+	third_fragment_recovered = true
+	save_progress()
+
+func unlock_ice_shield() -> void:
+	ice_shield_unlocked = true
+	save_progress()
+
+func unlock_frost_dash() -> void:
+	frost_dash_unlocked = true
+	save_progress()
+
+func unlock_crystal_activation() -> void:
+	crystal_activation_unlocked = true
+	save_progress()
+
+func set_frozen_seals_activated(value: int) -> void:
+	frozen_seals_activated = clampi(value, 0, 3)
+	save_progress()
+
+func has_frozen_coin(coin_id: String) -> bool:
+	return coin_id in frozen_coin_ids
+
+func collect_frozen_coin(coin_id: String) -> void:
+	if coin_id.is_empty() or has_frozen_coin(coin_id):
+		return
+	frozen_coin_ids.append(coin_id)
+	save_progress()
+
+func frozen_coins_collected() -> int:
+	return frozen_coin_ids.size()
+
+func mark_frost_titan_defeated() -> void:
+	frost_titan_defeated = true
+	save_progress()
+
+func mark_crystal_light_solved() -> void:
+	crystal_light_solved = true
+	save_progress()
+
+func set_frozen_generators_activated(value: int) -> void:
+	frozen_generators_activated = clampi(value, 0, 3)
+	save_progress()
+
+func set_frozen_crystal_blocks_aligned(value: bool) -> void:
+	frozen_crystal_blocks_aligned = value
+	save_progress()
+
+func set_frozen_checkpoint(index: int) -> void:
+	frozen_checkpoint_index = maxi(0, index)
+	save_progress()
+
+
+## Forget everything. Only the dev checks call this.
+func clear() -> void:
+	fragment_recovered = false
+	second_fragment_recovered = false
+	third_fragment_recovered = false
+	ice_shield_unlocked = false
+	frost_dash_unlocked = false
+	crystal_activation_unlocked = false
+	frozen_seals_activated = 0
+	frozen_coin_ids.clear()
+	frost_titan_defeated = false
+	crystal_light_solved = false
+	frozen_generators_activated = 0
+	frozen_crystal_blocks_aligned = false
+	frozen_checkpoint_index = 0
+	rescued_creatures.clear()
+	woods_coins_best = 0
+	save_progress()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))

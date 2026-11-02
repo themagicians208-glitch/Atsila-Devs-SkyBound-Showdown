@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/forgotten_island.gd" id="1_island"]
+
+[node name="ForgottenIsland" type="Node3D"]
+script = ExtResource("1_island")
+coins_required = 30
+coin_lift = 0.8

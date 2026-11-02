@@ -10,9 +10,9 @@ func _ready() -> void:
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.has_method("set_slippery"):
-		body.set_slippery(true, self)
+		body.set_slippery(true)
 
 
 func _on_body_exited(body: Node3D) -> void:
 	if body.has_method("set_slippery"):
-		body.set_slippery(false, self)
+		body.set_slippery(false)
