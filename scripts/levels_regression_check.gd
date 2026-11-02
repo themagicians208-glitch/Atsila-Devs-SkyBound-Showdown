@@ -20,8 +20,9 @@ func _run() -> void:
 		assert(instance.get("current_level") == level, "level %d must load" % level)
 		assert(instance.get("frozen_skies") == null, "level %d must not use Frozen Skies builder" % level)
 		if level == 2:
-			assert(instance.get_node("World").get_node_or_null("ShadowWolf") != null, "Level 2 must spawn Shadow Wolf")
-			assert(instance.get_node("World").get_node_or_null("SecondFragmentChest") != null, "Level 2 must spawn Second Fragment chest")
+			assert(instance.get("woods") != null, "Level 2 must use the Whispering Woods builder")
+			assert(instance.get("woods").get_node_or_null("SecondFragmentChest") != null, "Level 2 must spawn Second Fragment chest")
+			assert(get_first_node_in_group("woods_boss") != null, "Level 2 must spawn Shadow Wolf boss")
 		instance.queue_free()
 		await process_frame
 	print("LEVEL REGRESSION smoke passed: 1, 2, 4, 5, 6")

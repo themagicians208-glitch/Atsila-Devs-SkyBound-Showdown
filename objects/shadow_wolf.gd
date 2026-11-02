@@ -4,8 +4,8 @@ class_name ShadowWolf
 signal defeated
 
 @export var max_health := 6
-@export var movement_speed := 5.0
-@export var contact_damage := 8.0
+@export var chase_speed := 6.6
+@export var contact_damage := 3.0
 var health := 6
 var _dead := false
 var _time := 0.0
@@ -15,6 +15,7 @@ var _body_material: StandardMaterial3D
 
 func _ready() -> void:
 	add_to_group("enemies")
+	add_to_group("shadow_wolves")
 	health = max_health
 	_home = global_position
 	_build()
@@ -74,7 +75,7 @@ func _physics_process(delta: float) -> void:
 	if offset.length() <= 11.0:
 		var flat := Vector3(offset.x, 0.0, offset.z)
 		if flat.length() > 0.8:
-			global_position += flat.normalized() * movement_speed * delta
+			global_position += flat.normalized() * chase_speed * delta
 			rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), delta * 5.0)
 	if global_position.distance_to(target.global_position) < 1.5 and target.has_method("take_damage"):
 		target.call("take_damage", contact_damage, global_position, "shadow_wolf")

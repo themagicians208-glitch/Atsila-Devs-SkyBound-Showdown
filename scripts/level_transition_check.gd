@@ -17,6 +17,11 @@ func _run() -> void:
 	assert(level2.get("current_level") == 2, "handoff check must start on Level 2")
 	await process_frame
 	level2.set("coins_collected", level2.get("coin_goal"))
+	level2.get("woods").notify_coins(level2.get("coin_goal"))
+	var woods_boss: Node = level2.get("woods").get("_boss")
+	woods_boss.set("is_defeated", true)
+	level2.get("woods").boss_defeated()
+	progress.recover_second_fragment()
 	level2._on_finish_body_entered(level2.get("player"))
 	assert(level2.get_node("HUD").victory_overlay.visible, "Level 2 portal must complete the level")
 	level2._on_continue_pressed()

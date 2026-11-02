@@ -224,6 +224,12 @@ func _ensure_dash_action() -> void:
 	InputMap.action_add_event("dash", button)
 
 func _ensure_frozen_actions() -> void:
+	if not InputMap.has_action(action_time_freeze):
+		InputMap.add_action(action_time_freeze)
+		var freeze_key := InputEventKey.new()
+		freeze_key.physical_keycode = KEY_F
+		freeze_key.device = -1
+		InputMap.action_add_event(action_time_freeze, freeze_key)
 	for action_name in [action_ice_shield, action_frost_dash]:
 		if InputMap.has_action(action_name):
 			continue
