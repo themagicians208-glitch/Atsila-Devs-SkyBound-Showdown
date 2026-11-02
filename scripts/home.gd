@@ -2,7 +2,7 @@ extends Control
 
 const UI_FONT = preload("res://fonts/lilita_one_regular.ttf")
 const ROSTER := preload("res://scripts/roster.gd")
-const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress"]
 # How far the menu background extends past the screen so the parallax drift can
 # never reveal a blank edge or corner. Must be larger than the max shift (10).
 const PARALLAX_BLEED := 90.0
@@ -266,7 +266,7 @@ func _build_home() -> void:
 	content.add_theme_constant_override("separation", 18)
 	scroll.add_child(content)
 
-	var tag := _label("A SKY-HOPPING ADVENTURE ACROSS SIX WILDS", 18, Color("#a6f4ff"))
+	var tag := _label("A SKY-HOPPING ADVENTURE ACROSS FIVE WILDS", 18, Color("#a6f4ff"))
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(tag)
 

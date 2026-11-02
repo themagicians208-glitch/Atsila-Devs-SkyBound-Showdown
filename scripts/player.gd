@@ -123,10 +123,8 @@ var dash_bob := 0.0
 var model_rest_rotation := Vector3.ZERO
 var model_rest_position := Vector3.ZERO
 
-# Surface / gimmick state (set by zones in level 6)
+# Surface state used by Frozen Skies and Malakar's Fortress.
 var slippery := false                  # ice / oil slick: little traction
-var sticky := false                    # velcro: kills horizontal momentum
-var external_velocity := Vector3.ZERO  # conveyor push (log rollers, slides)
 var wind_lift := 0.0                   # fan tunnel updraft
 
 # Combat state
@@ -433,16 +431,12 @@ func _physics_process(delta):
 	var control := 3.0 if slippery else 10.0
 	applied_velocity = velocity.lerp(movement_velocity, delta * control)
 	applied_velocity.y = -gravity
-	applied_velocity.x += external_velocity.x + knockback.x
-	applied_velocity.z += external_velocity.z + knockback.z
+	applied_velocity.x += knockback.x
+	applied_velocity.z += knockback.z
 	if frost_dash_time_left > 0.0:
 		var dash_speed := get_normal_movement_speed() * frost_dash_speed_multiplier
 		applied_velocity.x = _frost_dash_direction.x * dash_speed
 		applied_velocity.z = _frost_dash_direction.z * dash_speed
-	if sticky:
-		applied_velocity.x = 0.0
-		applied_velocity.z = 0.0
-
 	velocity = applied_velocity
 	move_and_slide()
 	_update_frost_dash(delta)
@@ -656,30 +650,8 @@ func cloud_bounce() -> void:
 	Audio.play("res://sounds/jump.ogg")
 
 
-# Gimmick surfaces (level 6)
-
-func bounce(strength: float) -> void:
-	gravity = -strength
-	jumps_remaining = 2
-	model.scale = Vector3(0.7, 1.4, 0.7)
-	Audio.play("res://sounds/jump.ogg")
-
-
 func set_slippery(enabled: bool) -> void:
 	slippery = enabled
-
-
-func set_sticky(enabled: bool) -> void:
-	sticky = enabled
-	if enabled:
-		velocity.x = 0.0
-		velocity.z = 0.0
-		movement_velocity.x = 0.0
-		movement_velocity.z = 0.0
-
-
-func set_conveyor(push: Vector3) -> void:
-	external_velocity = push
 
 
 func set_wind(lift: float) -> void:

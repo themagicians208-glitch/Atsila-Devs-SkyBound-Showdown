@@ -1034,7 +1034,6 @@ func _place_duelist(duelist: CharacterBody3D, slot: int) -> void:
 	duelist.set("gravity", 0.0)
 	duelist.set("knockback", Vector3.ZERO)
 	duelist.set("movement_velocity", Vector3.ZERO)
-	duelist.set("external_velocity", Vector3.ZERO)
 	duelist.set("attack_timer", 0.0)
 	duelist.set("attack_cooldown_left", 0.0)
 	duelist.set("controls_locked", true)

@@ -1,6 +1,6 @@
 # Courses and mechanics
 
-SkyBound Showdown has **six playable levels** orchestrated by `scripts/main.gd`. Levels 1–3 use dedicated story environments, while Levels 4–6 continue with increasingly difficult platform routes.
+SkyBound Showdown has **five playable levels** orchestrated by `scripts/main.gd`. Levels 1–4 use dedicated story environments, followed by Malakar's Fortress in Level 5.
 
 Press **Q** to shift between Material and Mirror dimensions. Mirror platforms sit on an offset route, and selected obstacles appear in only one dimension.
 
@@ -11,7 +11,6 @@ Press **Q** to shift between Material and Mirror dimensions. Mirror platforms si
 | 3 | **Frozen Skies** | 42 frozen platforms | Slippery ice, crystal routes, Frost Slimes, Frost Wolves, Crystal Phantoms, and the Frost Titan |
 | 4 | **Rising Ruins** | 30 platforms | Climbing route, maze walls, moving and timed platforms, rotating sweepers, falling platforms, and an anti-gravity zone |
 | 5 | **Malakar's Fortress** | 36 platforms | Corrupted island parkour, three ordered energy conduits, shadow guardians, mirror rifts, and Malakar's throne encounter |
-| 6 | **Gimmick Gauntlet** | 42 platforms | See-saws, rotating logs, slippery and sticky zones, bounce pads, fan tunnels, a slide, rolling barrels, moving and timed platforms, hurdles, and maze walls |
 
 ## Standard generated course loop
 
@@ -26,23 +25,10 @@ Falling platforms collapse when the player lands on them. Timed phase platforms 
 
 Each course has two checkpoint beacons along its route. Touch a beacon to save your respawn point; falling after that returns you to the latest beacon without restarting the course.
 
-## Gimmick Gauntlet: course 6
-
-Gimmick Gauntlet is the most mechanically varied course. Its 42-platform route combines the shared dimension-shifting and switch-gate puzzle with several extra hazards and surfaces:
-
-- **See-saws** tilt as you move across them.
-- **Rotating logs** make narrow crossings harder to time.
-- **Slippery zones and a slide** reduce traction and challenge your control.
-- **Sticky zones** change the feel of movement.
-- **Bounce pads** launch you upward.
-- **Fan tunnels** lift the player through vertical wind columns.
-- **Rolling barrels** move along the route and must be avoided.
-- **Moving and timed platforms**, plus the usual falling platforms, require careful timing.
-
 ## Scenic markers
 
 The glowing upright hoops are decorative route markers. They have no collision and do not block or boost the player.
 
 ## Level progression
 
-The home screen allows direct access to any of the six courses. Completing a course offers the next one; completing Gimmick Gauntlet cycles back to Forgotten Island for another run.
+The home screen allows direct access to any of the five courses. Completing a course offers the next one; completing Malakar's Fortress cycles back to Forgotten Island for another run.

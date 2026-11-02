@@ -13,13 +13,7 @@ const SPINNING_HAZARD_SCRIPT := preload("res://scripts/spinning_hazard.gd")
 const MOVING_PLATFORM_SCRIPT := preload("res://objects/moving_platform.gd")
 const PHASE_PLATFORM_SCRIPT := preload("res://objects/phase_platform.gd")
 const PUZZLE_GATE_SCRIPT := preload("res://objects/puzzle_gate.gd")
-const SEE_SAW_SCRIPT := preload("res://scripts/see_saw.gd")
-const ROTATING_LOG_SCRIPT := preload("res://scripts/rotating_log.gd")
-const ROLLING_BARREL_SCRIPT := preload("res://scripts/rolling_barrel.gd")
-const SLIPPERY_SCRIPT := preload("res://scripts/slippery_zone.gd")
-const STICKY_SCRIPT := preload("res://scripts/sticky_zone.gd")
 const FAN_SCRIPT := preload("res://scripts/fan_tunnel.gd")	
-const BOUNCE_SCRIPT := preload("res://scripts/bounce_pad.gd")
 const SHADOW_GUARDIAN_SCRIPT := preload("res://scripts/shadow_guardian.gd")
 const MALAKAR_SCRIPT := preload("res://objects/malakar.gd")
 const ANIMAL_SCENE := preload("res://objects/character.tscn")
@@ -32,7 +26,7 @@ const EMBER_HEIGHTS_SCRIPT := preload("res://scripts/ember_heights.gd")
 const SHADOW_WOLF := preload("res://objects/shadow_wolf.gd")
 const SECOND_FRAGMENT_CHEST := preload("res://objects/second_fragment_chest.gd")
 
-const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress", "Gimmick Gauntlet"]
+const LEVEL_NAMES := ["Forgotten Island", "The Whispering Woods", "Frozen Skies", "Ember Heights", "Malakar's Fortress"]
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: Control = $HUD
@@ -105,9 +99,9 @@ func _ready() -> void:
 		game_state_manager = gsm
 
 	current_level = int(get_tree().get_meta("level_number", 1))
+	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	if game_state_manager != null:
 		game_state_manager.state["current_level"] = current_level
-	current_level = clampi(current_level, 1, LEVEL_NAMES.size())
 	if current_level == 5:
 		dimension_shifts_left = 4
 	get_tree().set_meta("level_number", current_level)
@@ -358,7 +352,8 @@ func _build_level(level_number: int) -> void:
 		@warning_ignore("integer_division")
 		_add_anti_gravity_zone(route[route.size() / 2])
 	_build_level_identity(level_number, route)
-	_build_gimmicks(level_number, route)
+	if level_number == 5:
+		_build_fortress(level_number, route)
 	_build_puzzle(level_number, route)
 	_apply_dimension_visibility()
 
@@ -753,11 +748,11 @@ func _get_checkpoint_indices(level_number: int, route_size: int) -> Array[int]:
 # platforms and more switches. The special indices are spread evenly along the
 # route so no two features collide.
 
-var _special: Dictionary = {"moving": [], "phase": [], "falling": [], "see_saw": [], "log": [], "all": {}}
+var _special: Dictionary = {"moving": [], "phase": [], "falling": [], "all": {}}
 
 
 func _build_specials(level_number: int, n: int) -> void:
-	_special = {"moving": [], "phase": [], "falling": [], "see_saw": [], "log": [], "all": {0: true, n - 1: true}}
+	_special = {"moving": [], "phase": [], "falling": [], "all": {0: true, n - 1: true}}
 	var moving := _spread(_moving_count(level_number), n, _special["all"])
 	_special["moving"] = moving
 	for i in moving:
@@ -769,14 +764,6 @@ func _build_specials(level_number: int, n: int) -> void:
 	var falling := _spread(_falling_count(level_number), n, _special["all"])
 	_special["falling"] = falling
 	for i in falling:
-		_special["all"][i] = true
-	var see_saw := _spread(_see_saw_count(level_number), n, _special["all"])
-	_special["see_saw"] = see_saw
-	for i in see_saw:
-		_special["all"][i] = true
-	var log_indices := _spread(_log_count(level_number), n, _special["all"])
-	_special["log"] = log_indices
-	for i in log_indices:
 		_special["all"][i] = true
 
 
@@ -801,39 +788,31 @@ func _spread(count: int, n: int, blocked: Dictionary) -> Array[int]:
 
 
 func _moving_count(level_number: int) -> int:
-	return [0, 2, 3, 4, 5, 2][level_number - 1]
+	return [0, 2, 3, 4, 5][level_number - 1]
 
 
 func _phase_count(level_number: int) -> int:
-	return [0, 0, 2, 3, 4, 2][level_number - 1]
+	return [0, 0, 2, 3, 4][level_number - 1]
 
 
 func _falling_count(level_number: int) -> int:
-	return [2, 3, 4, 5, 5, 3][level_number - 1]
-
-
-func _see_saw_count(level_number: int) -> int:
-	return [0, 0, 0, 0, 0, 3][level_number - 1]
-
-
-func _log_count(level_number: int) -> int:
-	return [0, 0, 0, 0, 0, 2][level_number - 1]
+	return [2, 3, 4, 5, 5][level_number - 1]
 
 
 func _ring_count(level_number: int) -> int:
-	return [3, 3, 4, 4, 5, 3][level_number - 1]
+	return [3, 3, 4, 4, 5][level_number - 1]
 
 
 func _hurdle_count(level_number: int) -> int:
-	return [0, 1, 2, 3, 4, 2][level_number - 1]
+	return [0, 1, 2, 3, 4][level_number - 1]
 
 
 func _wall_count(level_number: int) -> int:
-	return [0, 0, 1, 2, 3, 1][level_number - 1]
+	return [0, 0, 1, 2, 3][level_number - 1]
 
 
 func _sweeper_count(level_number: int) -> int:
-	return [2, 3, 4, 5, 6, 3][level_number - 1]
+	return [2, 3, 4, 5, 6][level_number - 1]
 
 
 func _switch_count(_level_number: int) -> int:
@@ -877,12 +856,6 @@ func _add_main_platform(level_number: int, route: Array, i: int, point: Vector3)
 		return
 	if i in _special["phase"]:
 		_add_phase_platform(point)
-		return
-	if i in _special["see_saw"]:
-		_add_see_saw(route, i, point)
-		return
-	if i in _special["log"]:
-		_add_log(route, i, point)
 		return
 	var platform_scene := _platform_scene_for(level_number, i)
 	var platform: Node3D = platform_scene.instantiate()
@@ -991,113 +964,6 @@ func _add_phase_platform(point: Vector3) -> void:
 	world.add_child(platform)
 
 
-# --- Level 6 gimmicks --------------------------------------------------------
-
-func _path_yaw(route: Array, i: int) -> float:
-	var direction: Vector3
-	if i <= 0:
-		direction = route[1] - route[0]
-	elif i >= route.size() - 1:
-		direction = route[i] - route[i - 1]
-	else:
-		direction = route[i + 1] - route[i - 1]
-	direction.y = 0.0
-	return atan2(direction.x, direction.z)
-
-
-func _add_see_saw(route: Array, i: int, point: Vector3) -> void:
-	var see_saw := Node3D.new()
-	see_saw.name = "SeeSaw"
-	see_saw.position = point + Vector3(0, 0.55, 0)
-	see_saw.rotation.y = _path_yaw(route, i)
-	see_saw.set_script(SEE_SAW_SCRIPT)
-
-	var plank := AnimatableBody3D.new()
-	plank.name = "Plank"
-	plank.sync_to_physics = false
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(1.7, 0.22, 2.8)
-	shape.shape = box
-	plank.add_child(shape)
-	var visual := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(1.7, 0.22, 2.8)
-	visual.mesh = mesh
-	visual.material_override = _map_material(Color("#ffcf6b"))
-	plank.add_child(visual)
-	see_saw.add_child(plank)
-
-	var fulcrum := MeshInstance3D.new()
-	var cone := CylinderMesh.new()
-	cone.top_radius = 0.16
-	cone.bottom_radius = 0.32
-	cone.height = 0.6
-	fulcrum.mesh = cone
-	fulcrum.position.y = -0.42
-	fulcrum.material_override = _map_material(Color("#8a6a3a"))
-	see_saw.add_child(fulcrum)
-
-	world.add_child(see_saw)
-	see_saw.configure(plank, player)
-
-
-func _add_log(route: Array, i: int, point: Vector3) -> void:
-	var log_roller := AnimatableBody3D.new()
-	log_roller.name = "LogRoller"
-	log_roller.set_script(ROTATING_LOG_SCRIPT)
-	log_roller.position = point + Vector3(0, 0.42, 0)
-	log_roller.rotation.y = _path_yaw(route, i)
-	log_roller.set("spin_speed", 2.5)
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 0.42
-	cylinder.height = 2.6
-	shape.shape = cylinder
-	shape.rotation = Vector3(0, 0, PI / 2.0)
-	log_roller.add_child(shape)
-	var visual := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.42
-	mesh.bottom_radius = 0.42
-	mesh.height = 2.6
-	visual.mesh = mesh
-	visual.rotation = Vector3(0, 0, PI / 2.0)
-	visual.material_override = _map_material(Color("#b07a3c"))
-	log_roller.add_child(visual)
-	world.add_child(log_roller)
-
-
-func _add_barrel(route: Array, i: int, point: Vector3) -> void:
-	var direction: Vector3 = route[i + 1] - route[i] if i < route.size() - 1 else route[i] - route[i - 1]
-	direction.y = 0.0
-	var barrel := AnimatableBody3D.new()
-	barrel.name = "RollingBarrel"
-	barrel.set_script(ROLLING_BARREL_SCRIPT)
-	barrel.position = point + Vector3(0, 0.55, 0)
-	barrel.rotation.y = _path_yaw(route, i)
-	barrel.set("move_offset", direction.normalized() * 3.2)
-	barrel.set("move_speed", 1.0 + float(i % 3) * 0.25)
-	barrel.set("roll_speed", 4.0)
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 0.45
-	cylinder.height = 1.0
-	shape.shape = cylinder
-	shape.rotation = Vector3(0, 0, PI / 2.0)
-	barrel.add_child(shape)
-	var visual := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.45
-	mesh.bottom_radius = 0.45
-	mesh.height = 1.0
-	visual.mesh = mesh
-	visual.rotation = Vector3(0, 0, PI / 2.0)
-	visual.material_override = _map_material(Color("#c47a3a"))
-	barrel.add_child(visual)
-	world.add_child(barrel)
-
-
 func _add_zone(point: Vector3, size: Vector3, script: Script, tint: Color, y_offset: float = 0.5) -> Area3D:
 	var zone := Area3D.new()
 	zone.position = point + Vector3(0, y_offset, 0)
@@ -1121,79 +987,6 @@ func _add_zone(point: Vector3, size: Vector3, script: Script, tint: Color, y_off
 	zone.add_child(visual)
 	world.add_child(zone)
 	return zone
-
-
-func _add_slide(route: Array, i: int, point: Vector3) -> void:
-	var slide := StaticBody3D.new()
-	slide.name = "Slide"
-	slide.position = point + Vector3(0, 0.85, -1.2)
-	slide.rotation.y = _path_yaw(route, i)
-	slide.rotation.x = deg_to_rad(24.0)
-	var size := Vector3(1.7, 0.16, 4.0)
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = size
-	shape.shape = box
-	slide.add_child(shape)
-	var visual := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	visual.mesh = mesh
-	var material := _map_material(Color("#7fd8ff"))
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(0.5, 0.85, 1.0, 0.75)
-	visual.material_override = material
-	slide.add_child(visual)
-	world.add_child(slide)
-	# Slippery coating so the player actually slides down the ramp.
-	_add_zone(point + Vector3(0, 0.4, -1.2), Vector3(2.0, 1.6, 4.2), SLIPPERY_SCRIPT, Color("#7fd8ff"), 0.0)
-
-
-func _build_gimmicks(level_number: int, route: Array) -> void:
-	if level_number == 5:
-		_build_fortress(level_number, route)
-		return
-	if level_number != 6:
-		return
-	var n := route.size()
-	var used: Dictionary = _special["all"].duplicate()
-
-	var slippery := _spread(3, n, used)
-	for index in slippery:
-		used[index] = true
-	for index in slippery:
-		_add_zone(route[index], Vector3(2.4, 1.4, 2.4), SLIPPERY_SCRIPT, Color("#8fe0ff"))
-
-	var sticky := _spread(2, n, used)
-	for index in sticky:
-		used[index] = true
-	for index in sticky:
-		_add_zone(route[index], Vector3(2.4, 1.4, 2.4), STICKY_SCRIPT, Color("#c0a06a"))
-
-	var bounce := _spread(3, n, used)
-	for index in bounce:
-		used[index] = true
-	for index in bounce:
-		_add_zone(route[index], Vector3(2.0, 1.2, 2.0), BOUNCE_SCRIPT, Color("#ff8ad0"))
-		_add_bounce_disc(route[index])
-
-	var fans := _spread(2, n, used)
-	for index in fans:
-		used[index] = true
-	for index in fans:
-		_add_fan(route[index])
-
-	var slides := _spread(1, n, used)
-	for index in slides:
-		used[index] = true
-	for index in slides:
-		_add_slide(route, index, route[index])
-
-	var barrels := _spread(3, n, used)
-	for index in barrels:
-		used[index] = true
-	for index in barrels:
-		_add_barrel(route, index, route[index])
 
 
 func _build_fortress(_level_number: int, route: Array) -> void:
@@ -2178,18 +1971,6 @@ func _add_great_tree(point: Vector3) -> Node3D:
 	return tree
 
 
-func _add_bounce_disc(point: Vector3) -> void:
-	var disc := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.9
-	mesh.bottom_radius = 0.9
-	mesh.height = 0.12
-	disc.mesh = mesh
-	disc.position = point + Vector3(0, 0.56, 0)
-	disc.material_override = _map_material(Color("#ff5fb8"), true)
-	world.add_child(disc)
-
-
 func _add_fan(point: Vector3) -> void:
 	# Tall wind column; the FanTunnel area lifts the player while inside.
 	_add_zone(point, Vector3(2.2, 7.0, 2.2), FAN_SCRIPT, Color("#bff4ff"), 3.4)
@@ -2516,8 +2297,6 @@ func respawn_player(who: CharacterBody3D = null) -> void:
 	if target.has_method("reset_vitals"):
 		target.call("reset_vitals")
 	target.slippery = false
-	target.sticky = false
-	target.external_velocity = Vector3.ZERO
 	target.wind_lift = 0.0
 	target.global_position = checkpoint_position
 	target.velocity = Vector3.ZERO
@@ -2857,8 +2636,6 @@ func _get_level_routes() -> Array:
 		_serpentine_route(5, 6, 2.4, 0.3),
 		# 5 Malakar's Fortress: a rising 36-platform gallery over the corrupted abyss.
 		_fortress_route(),
-		# 6 Gimmick Gauntlet: 42 platforms stuffed with new puzzle surfaces.
-		_serpentine_route(6, 7, 2.4, 0.28),
 	]
 
 

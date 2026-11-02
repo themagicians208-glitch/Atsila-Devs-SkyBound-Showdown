@@ -1,11 +1,11 @@
 extends Node
 
-## Levels 2-6 must place exactly one sky sentry, within reach of a jump (about
+## Levels 2-5 must place exactly one sky sentry, within reach of a jump (about
 ## 2 units with the double jump). Level 1 is the Forgotten Island, which lays out
 ## its own enemies per area instead.
 
 func _ready() -> void:
-	for level in range(1, 7):
+	for level in range(1, 6):
 		get_tree().set_meta("level_number", level)
 		get_tree().set_meta("local_coop", false)
 		get_tree().set_meta("online", false)
