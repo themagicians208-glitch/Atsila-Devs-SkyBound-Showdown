@@ -328,6 +328,12 @@ func set_frozen_abilities(unlocked: Array[String]) -> void:
 func set_frozen_progress(seals: int, total: int, crystal_solved: bool, fragment_recovered: bool, checkpoint: int, generators: int = 0, blocks_aligned: bool = false) -> void:
 	if not is_instance_valid(frozen_progress_hint):
 		return
+	# Frozen Skies has two extra status rows; keep its transient message and
+	# boss bar below the title instead of stacking them over the progress text.
+	finish_message.offset_top = 164
+	finish_message.offset_bottom = 204
+	boss_panel.offset_top = 214
+	boss_panel.offset_bottom = 294
 	frozen_progress_hint.text = "SEALS %d/%d  •  GENERATORS %d/3  •  BLOCKS %s  •  CRYSTAL LIGHT %s  •  FRAGMENT %s  •  CHECKPOINT %d" % [
 		seals, total, generators, "ALIGNED" if blocks_aligned else "PENDING", "ALIGNED" if crystal_solved else "PENDING",
 		"RECOVERED" if fragment_recovered else "PENDING", checkpoint]
