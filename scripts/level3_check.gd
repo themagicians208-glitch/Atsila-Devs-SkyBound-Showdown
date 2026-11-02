@@ -215,6 +215,8 @@ func _run() -> void:
 	instance.set("coins_collected", 50)
 	instance._update_frozen_portal_objective()
 	assert(instance.get_node("HUD").objective_hint.text.contains("path to the fourth island has opened"), "ready portal must update the objective")
+	get_root().get_node("Progress").collect_frozen_coin("smoke_reload_coin")
+	var saved_coin_count: int = get_root().get_node("Progress").frozen_coins_collected()
 	var saved_checkpoint: int = get_root().get_node("Progress").frozen_checkpoint_index
 	instance.queue_free()
 	await process_frame
@@ -225,6 +227,11 @@ func _run() -> void:
 	assert(get_root().get_node("Progress").fragment_recovered and get_root().get_node("Progress").second_fragment_recovered, "saved fragments must survive a Frozen Skies reload")
 	assert(get_root().get_node("Progress").third_fragment_recovered and get_root().get_node("Progress").frost_titan_defeated, "saved boss and Third Fragment state must survive a reload")
 	assert(get_root().get_node("Progress").frozen_checkpoint_index == saved_checkpoint, "saved Frozen Skies checkpoint must survive a reload")
+	var restored_coin_count: int = restored.get("coins_collected")
+	# A checkpoint can overlap an uncollected coin, so the first physics frame may add one.
+	assert(restored_coin_count >= saved_coin_count, "saved Frozen Skies coins must restore for portal logic")
+	assert(restored.get_node("HUD").coins_label.text.contains("%d / 50" % restored_coin_count), "saved Frozen Skies coins must restore in the HUD")
+	assert(not restored.get_node("World/FrostTitan").visible, "a defeated Frost Titan must stay gone after reload")
 	assert(restored.get("frozen_skies").is_portal_ready(50), "saved Frozen Skies progression must reopen the Level 4 portal")
 	restored.queue_free()
 	await process_frame

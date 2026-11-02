@@ -108,6 +108,8 @@ func _ready() -> void:
 		hud.show_finish_message("RIGHT CLICK / Q / LB: SHIFT DIMENSION")
 		hud.set_objective("SHIFT DIMENSIONS  •  COLLECT COINS  •  PRESS BOTH FAR-APART BUTTONS  •  REACH THE FLAG", false)
 	hud.set_coin_goal(coin_goal)
+	if frozen_skies != null:
+		hud._on_coin_collected(coins_collected)
 	hud.set_level_info(current_level, LEVEL_NAMES[current_level - 1])
 	hud.bind_players([player])
 	hud.continue_pressed.connect(_on_continue_pressed)

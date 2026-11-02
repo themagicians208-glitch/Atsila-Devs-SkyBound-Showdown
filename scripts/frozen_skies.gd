@@ -544,6 +544,7 @@ func _place_enemies() -> void:
 	if boss_defeated:
 		_titan.set_process(false)
 		_titan.set_physics_process(false)
+		_titan.visible = false
 		_chest.unlock()
 		_unlock_boss_arena()
 	_chest.fragment_recovered.connect(func():
