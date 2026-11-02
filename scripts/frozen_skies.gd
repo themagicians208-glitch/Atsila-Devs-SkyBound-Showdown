@@ -31,6 +31,8 @@ var _main: Node
 var _chest: FrozenFragmentChest
 var _titan: FrostTitan
 var mechanisms: Array[FrozenMechanism] = []
+var _timed_seal_switch: FrozenMechanism
+var _timed_seal_time := 0.0
 var frozen_seals_complete := false
 var _moving_platforms: Array[Node3D] = []
 var _time := 0.0
@@ -195,9 +197,13 @@ func _process(delta: float) -> void:
 		var origin: Vector3 = platform.get_meta("origin")
 		var phase: float = platform.get_meta("phase")
 		platform.position = origin + Vector3(sin(_time * 1.1 + phase) * 1.8, sin(_time * 1.7 + phase) * 0.35, 0.0)
+	if _timed_seal_time > 0.0:
+		_timed_seal_time = maxf(0.0, _timed_seal_time - delta)
+		if _timed_seal_time == 0.0 and _timed_seal_switch != null:
+			_timed_seal_switch.reset()
 
 func _build_moving_ice_platforms() -> void:
-	for entry in [[14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
+	for entry in [[4, -1.2], [14, -1.4], [17, 1.2], [26, -1.6], [33, 1.5], [37, -1.0]]:
 		var platform: Node3D = PLATFORM.instantiate()
 		platform.name = "MovingIcePlatform_%02d" % int(entry[0])
 		var origin: Vector3 = route[int(entry[0])] + Vector3(float(entry[1]), 1.0, 1.4)
@@ -233,6 +239,12 @@ func _build_frozen_mechanics() -> void:
 		_world.add_child(mechanism)
 		mechanisms.append(mechanism)
 		mechanism.activated.connect(_on_mechanism_activated.bind(mechanism))
+	_timed_seal_switch = FROZEN_MECHANISM.new()
+	_timed_seal_switch.name = "TimedSealSwitch"
+	_timed_seal_switch.mechanism_name = "Timed Ice Switch"
+	_timed_seal_switch.position = route[3] + Vector3(0.0, 0.55, 1.25)
+	_world.add_child(_timed_seal_switch)
+	_timed_seal_switch.activated.connect(func(): _timed_seal_time = 6.0)
 	for index in range(mini(Progress.frozen_seals_activated, mechanisms.size())):
 		mechanisms[index].activate()
 	frozen_seals_complete = Progress.frozen_seals_activated >= mechanisms.size()
@@ -244,12 +256,18 @@ func try_activate_nearby(player: Node3D) -> bool:
 		for generator in _crystal_generators:
 			if not generator.get("is_activated") and generator.global_position.distance_to(player.global_position) <= 2.4:
 				return generator.activate()
+	if _timed_seal_switch != null and not _timed_seal_switch.is_activated and _timed_seal_switch.global_position.distance_to(player.global_position) <= 2.4:
+		return _timed_seal_switch.activate()
 	for index in mechanisms.size():
 		var mechanism := mechanisms[index]
 		if not mechanism.is_activated and mechanism.global_position.distance_to(player.global_position) <= 2.4:
 			if index == 1 and not Progress.crystal_light_solved:
 				if _main.has_method("_on_frozen_mechanism_blocked"):
 					_main.call("_on_frozen_mechanism_blocked", "Align the crystal light first.")
+				return true
+			if index == 0 and _timed_seal_time <= 0.0:
+				if _main.has_method("_on_frozen_mechanism_blocked"):
+					_main.call("_on_frozen_mechanism_blocked", "Activate the timed ice switch, then reach the first seal.")
 				return true
 			if index > 0 and not mechanisms[index - 1].is_activated:
 				if _main.has_method("_on_frozen_mechanism_blocked"):

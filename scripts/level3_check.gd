@@ -86,6 +86,8 @@ func _run() -> void:
 	var titan: Node = world.get_node("FrostTitan")
 	assert(titan.locked, "Frost Titan must be locked behind the frozen seals")
 	var seal_list: Array = instance.get("frozen_skies").mechanisms
+	player.global_position = instance.get("frozen_skies")._timed_seal_switch.global_position
+	assert(instance.get("frozen_skies").try_activate_nearby(player), "timed seal switch must start the first seal challenge")
 	player.global_position = seal_list[1].global_position
 	assert(instance.get("frozen_skies").try_activate_nearby(player), "blocked seal interaction must be handled")
 	player.global_position = seal_list[0].global_position

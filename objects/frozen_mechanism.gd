@@ -50,6 +50,13 @@ func activate() -> bool:
 	activated.emit()
 	return true
 
+func reset() -> void:
+	is_activated = false
+	if _material != null:
+		_material.albedo_color = Color("#68dfff")
+		_material.emission = Color("#68dfff")
+		_material.emission_energy_multiplier = 0.75
+
 func _material_for(color: Color, energy: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
